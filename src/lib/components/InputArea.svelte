@@ -1,10 +1,12 @@
 <script lang="ts">
-	import type { OllamaModel } from '$lib/types';
+	import type { OllamaModel, Attachment } from '$lib/types';
+	import { onDestroy } from 'svelte';
 	
 	let {
 		input = $bindable(),
 		models = [],
 		selectedModel = $bindable(),
+		attachments = $bindable([]),
 		isGenerating = false,
 		onSend,
 		onStop
@@ -12,12 +14,18 @@
 		input: string;
 		models: OllamaModel[];
 		selectedModel: string;
+		attachments: Attachment[];
 		isGenerating: boolean;
 		onSend: () => void;
 		onStop: () => void;
 	}>();
 
 	let textareaElement = $state<HTMLTextAreaElement | null>(null);
+	let fileInputEl = $state<HTMLInputElement | null>(null);
+	let showLinkInput = $state(false);
+	let linkUrl = $state('');
+	let isLoadingLink = $state(false);
+	let linkInputEl = $state<HTMLInputElement | null>(null);
 
 	// Auto-resize textarea logic
 	$effect(() => {
@@ -42,78 +50,306 @@
 		// Send message on Enter without shift
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			if (input.trim() && !isGenerating) {
+			if ((input.trim() || attachments.length > 0) && !isGenerating) {
 				onSend();
 			}
 		}
 	}
+
+	function triggerFileInput() {
+		if (fileInputEl) {
+			fileInputEl.click();
+		}
+	}
+
+	function processImageFile(file: File) {
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			const content = event.target?.result as string;
+			const id = Math.random().toString(36).substring(2, 9);
+			const previewUrl = URL.createObjectURL(file);
+			attachments = [...attachments, {
+				id,
+				type: 'image',
+				name: file.name || 'Pasted Image',
+				content,
+				previewUrl
+			}];
+		};
+		reader.readAsDataURL(file);
+	}
+
+	function processTextFile(file: File) {
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			const content = event.target?.result as string;
+			const id = Math.random().toString(36).substring(2, 9);
+			attachments = [...attachments, {
+				id,
+				type: 'file',
+				name: file.name,
+				content
+			}];
+		};
+		reader.readAsText(file);
+	}
+
+	function handleFileChange(e: Event) {
+		const inputEl = e.target as HTMLInputElement;
+		const files = inputEl.files;
+		if (!files) return;
+
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+			if (file.type.startsWith('image/')) {
+				processImageFile(file);
+			} else {
+				processTextFile(file);
+			}
+		}
+		inputEl.value = ''; // reset so same file can be uploaded again
+	}
+
+	function handlePaste(e: ClipboardEvent) {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.type.indexOf('image') !== -1) {
+				const file = item.getAsFile();
+				if (file) {
+					e.preventDefault();
+					processImageFile(file);
+				}
+			}
+		}
+	}
+
+	async function addLinkAttachment() {
+		let urlStr = linkUrl.trim();
+		if (!urlStr) return;
+
+		if (!/^https?:\/\//i.test(urlStr)) {
+			urlStr = 'https://' + urlStr;
+		}
+
+		isLoadingLink = true;
+		try {
+			const res = await fetch(`/api/scrape?url=${encodeURIComponent(urlStr)}`);
+			const data = await res.json();
+			if (data.error) {
+				alert(`Failed to fetch link: ${data.error}`);
+			} else {
+				const id = Math.random().toString(36).substring(2, 9);
+				let host = urlStr;
+				try {
+					host = new URL(urlStr).hostname;
+				} catch (e) {}
+
+				attachments = [...attachments, {
+					id,
+					type: 'link',
+					name: host,
+					content: `URL: ${urlStr}\n\nContent:\n${data.text}`
+				}];
+				linkUrl = '';
+				showLinkInput = false;
+			}
+		} catch (err: any) {
+			alert(`Failed to fetch link: ${err.message || err}`);
+		} finally {
+			isLoadingLink = false;
+		}
+	}
+
+	function handleLinkKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			addLinkAttachment();
+		}
+	}
+
+	function removeAttachment(id: string) {
+		const item = attachments.find((a: Attachment) => a.id === id);
+		if (item && item.previewUrl) {
+			URL.revokeObjectURL(item.previewUrl);
+		}
+		attachments = attachments.filter((a: Attachment) => a.id !== id);
+	}
+
+	onDestroy(() => {
+		// Clean up object URLs to prevent leaks
+		attachments.forEach((attr: Attachment) => {
+			if (attr.previewUrl) {
+				URL.revokeObjectURL(attr.previewUrl);
+			}
+		});
+	});
+
+	// Focus the link input popover when it appears
+	$effect(() => {
+		if (showLinkInput && linkInputEl) {
+			linkInputEl.focus();
+		}
+	});
 </script>
 
 <div class="input-container">
 	<div class="input-wrapper">
-		<!-- Pill Input Box (Single Row Layout) -->
+		<!-- Pill Input Box -->
 		<div class="pill-box-single">
-			<!-- Prompt Textarea on the left -->
-			<textarea
-				bind:this={textareaElement}
-				class="prompt-textarea"
-				placeholder="Ask anything, type a prompt..."
-				bind:value={input}
-				onkeydown={handleKeydown}
-				oninput={adjustHeight}
-				rows="1"
-				disabled={isGenerating}
-			></textarea>
+			
+			<!-- Row 1: Attachment Pills (Only displays if attachments exist) -->
+			{#if attachments.length > 0}
+				<div class="attachments-list">
+					{#each attachments as attr (attr.id)}
+						<div class="attachment-pill">
+							{#if attr.type === 'image'}
+								<img class="attachment-thumb" src={attr.previewUrl || attr.content} alt={attr.name} />
+							{:else if attr.type === 'link'}
+								<svg class="attachment-icon link-icon" viewBox="0 0 24 24" width="14" height="14">
+									<path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+								</svg>
+							{:else}
+								<svg class="attachment-icon file-icon" viewBox="0 0 24 24" width="14" height="14">
+									<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+								</svg>
+							{/if}
+							<div class="attachment-info" title={attr.name}>
+								<span class="attachment-name">{attr.name}</span>
+							</div>
+							<button class="remove-attachment" onclick={() => removeAttachment(attr.id)} title="Remove">
+								<svg viewBox="0 0 24 24" width="12" height="12">
+									<path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+								</svg>
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
 
-			<!-- Model Selector on the right of the message -->
-			<div class="model-selector-wrapper">
-				<svg class="model-icon" viewBox="0 0 24 24" width="16" height="16">
-					<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-				</svg>
-				<select 
-					class="model-select" 
-					bind:value={selectedModel}
-					disabled={isGenerating || models.length === 0}
-				>
-					{#if models.length === 0}
-						<option value="">No models found</option>
-					{:else}
-						{#each models as model}
-							<option value={model.name}>{model.name}</option>
-						{/each}
+			<!-- Row 2: Input Controls (Horizontal Align) -->
+			<div class="input-row">
+				<!-- Prompt Textarea on the left -->
+				<textarea
+					bind:this={textareaElement}
+					class="prompt-textarea"
+					placeholder="Ask anything, type a prompt..."
+					bind:value={input}
+					onkeydown={handleKeydown}
+					oninput={adjustHeight}
+					onpaste={handlePaste}
+					rows="1"
+					disabled={isGenerating}
+				></textarea>
+
+				<!-- Model Selector on the right of prompt -->
+				<div class="model-selector-wrapper">
+					<svg class="model-icon" viewBox="0 0 24 24" width="16" height="16">
+						<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+					</svg>
+					<select 
+						class="model-select" 
+						bind:value={selectedModel}
+						disabled={isGenerating || models.length === 0}
+					>
+						{#if models.length === 0}
+							<option value="">No models found</option>
+						{:else}
+							{#each models as model}
+								<option value={model.name}>{model.name}</option>
+							{/each}
+						{/if}
+					</select>
+					<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
+						<path fill="currentColor" d="M7 10l5 5 5-5z"/>
+					</svg>
+				</div>
+
+				<!-- Action Buttons on the far right -->
+				<div class="action-buttons">
+					<input 
+						type="file" 
+						bind:this={fileInputEl} 
+						onchange={handleFileChange} 
+						style="display: none;" 
+						multiple 
+					/>
+
+					{#if !isGenerating}
+						<!-- Plus Attach File Button -->
+						<button 
+							class="control-btn attach-btn" 
+							onclick={triggerFileInput}
+							title="Attach file or image"
+						>
+							<svg viewBox="0 0 24 24" width="18" height="18">
+								<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+							</svg>
+						</button>
+
+						<!-- Globe URL Link Button -->
+						<div class="link-btn-wrapper">
+							<button 
+								class="control-btn link-btn" 
+								onclick={() => showLinkInput = !showLinkInput}
+								title="Attach URL link"
+							>
+								<svg viewBox="0 0 24 24" width="18" height="18">
+									<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+								</svg>
+							</button>
+
+							{#if showLinkInput}
+								<div class="link-input-popover">
+									<input 
+										type="url" 
+										placeholder="Paste link here..." 
+										bind:value={linkUrl} 
+										onkeydown={handleLinkKeydown} 
+										bind:this={linkInputEl}
+										disabled={isLoadingLink}
+									/>
+									<button class="link-add-btn" onclick={addLinkAttachment} disabled={isLoadingLink || !linkUrl.trim()}>
+										{#if isLoadingLink}
+											<span class="spinner"></span>
+										{:else}
+											Add
+										{/if}
+									</button>
+									<button class="link-cancel-btn" onclick={() => showLinkInput = false} disabled={isLoadingLink}>
+										Cancel
+									</button>
+								</div>
+							{/if}
+						</div>
 					{/if}
-				</select>
-				<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
-					<path fill="currentColor" d="M7 10l5 5 5-5z"/>
-				</svg>
+
+					{#if isGenerating}
+						<button 
+							class="control-btn stop-btn" 
+							onclick={onStop}
+							title="Stop generating"
+						>
+							<svg viewBox="0 0 24 24" width="18" height="18">
+								<path fill="currentColor" d="M6 6h12v12H6V6z"/>
+							</svg>
+						</button>
+					{:else}
+						<button 
+							class="control-btn send-btn" 
+							class:active={(input.trim().length > 0 || attachments.length > 0) && models.length > 0}
+							onclick={onSend}
+							disabled={(input.trim().length === 0 && attachments.length === 0) || models.length === 0}
+							title="Send prompt"
+						>
+							<svg viewBox="0 0 24 24" width="18" height="18">
+								<path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+							</svg>
+						</button>
+					{/if}
+				</div>
 			</div>
 
-			<!-- Action Button on the far right -->
-			<div class="action-buttons">
-				{#if isGenerating}
-					<button 
-						class="control-btn stop-btn" 
-						onclick={onStop}
-						title="Stop generating"
-					>
-						<svg viewBox="0 0 24 24" width="18" height="18">
-							<path fill="currentColor" d="M6 6h12v12H6V6z"/>
-						</svg>
-					</button>
-				{:else}
-					<button 
-						class="control-btn send-btn" 
-						class:active={input.trim().length > 0 && models.length > 0}
-						onclick={onSend}
-						disabled={!input.trim() || models.length === 0}
-						title="Send prompt"
-					>
-						<svg viewBox="0 0 24 24" width="18" height="18">
-							<path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-						</svg>
-					</button>
-				{/if}
-			</div>
 		</div>
 	</div>
 </div>
@@ -139,19 +375,27 @@
 		width: 100%;
 		background-color: var(--bg-secondary);
 		border: 1px solid var(--border-color);
-		border-radius: 28px;
-		padding: 8px 12px 8px 16px;
+		border-radius: 24px;
+		padding: 10px 14px;
 		box-shadow: var(--shadow-md);
 		transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 		display: flex;
-		flex-direction: row;
-		align-items: flex-end;
-		gap: 12px;
+		flex-direction: column;
+		gap: 10px;
+		box-sizing: border-box;
 	}
 
 	.pill-box-single:focus-within {
 		border-color: var(--accent-blue);
 		box-shadow: 0 0 0 1px var(--accent-blue), var(--shadow-lg);
+	}
+
+	.input-row {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-end;
+		gap: 12px;
+		width: 100%;
 	}
 
 	.prompt-textarea {
@@ -253,14 +497,27 @@
 		align-items: center;
 		justify-content: center;
 		transition: all var(--transition-fast);
-		color: var(--text-muted);
-		background-color: transparent;
+		color: var(--text-secondary);
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.control-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+	}
+
+	.control-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.send-btn {
-		background-color: var(--bg-primary);
-		border: 1px solid var(--border-color);
 		cursor: not-allowed;
+		color: var(--text-muted);
 	}
 
 	.send-btn.active {
@@ -289,13 +546,164 @@
 		box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
 	}
 
+	/* Link Button & Popover */
+	.link-btn-wrapper {
+		position: relative;
+		display: inline-block;
+	}
+
+	.link-input-popover {
+		position: absolute;
+		bottom: 44px;
+		right: 0;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		padding: 10px;
+		display: flex;
+		gap: 8px;
+		box-shadow: var(--shadow-lg);
+		z-index: 100;
+		width: 300px;
+		box-sizing: border-box;
+	}
+
+	.link-input-popover input {
+		flex: 1;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 6px 10px;
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		outline: none;
+	}
+
+	.link-input-popover input:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.link-add-btn {
+		background: linear-gradient(135deg, #4285f4, #9b72cb);
+		color: #ffffff;
+		border: none;
+		border-radius: 6px;
+		padding: 6px 12px;
+		font-size: 0.82rem;
+		font-weight: 500;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 50px;
+	}
+
+	.link-add-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.link-cancel-btn {
+		background: transparent;
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 6px 12px;
+		color: var(--text-secondary);
+		font-size: 0.82rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.link-cancel-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.spinner {
+		width: 14px;
+		height: 14px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+		border-top-color: #ffffff;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	/* Attachments List styling */
+	.attachments-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid var(--border-color);
+		width: 100%;
+	}
+
+	.attachment-pill {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		padding: 5px 8px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.8rem;
+		color: var(--text-primary);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.attachment-thumb {
+		width: 20px;
+		height: 20px;
+		border-radius: 3px;
+		object-fit: cover;
+		flex-shrink: 0;
+	}
+
+	.attachment-icon {
+		color: var(--accent-blue);
+		flex-shrink: 0;
+	}
+
+	.attachment-info {
+		max-width: 120px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.attachment-name {
+		font-weight: 500;
+	}
+
+	.remove-attachment {
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		padding: 2px;
+		border-radius: 50%;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.remove-attachment:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
 	@media (max-width: 768px) {
 		.input-container {
 			padding: 0 12px 16px 12px;
 		}
 
 		.pill-box-single {
-			padding: 6px 10px;
+			padding: 8px 10px;
 			border-radius: 20px;
 			gap: 8px;
 		}
@@ -306,6 +714,11 @@
 
 		.model-select {
 			max-width: 90px;
+		}
+
+		.link-input-popover {
+			width: 260px;
+			right: -40px;
 		}
 	}
 </style>

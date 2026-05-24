@@ -1,9 +1,19 @@
+export interface Attachment {
+	id: string;
+	type: 'image' | 'file' | 'link';
+	name: string;
+	content: string; // base64 for images, text content for files/links
+	previewUrl?: string; // object URL for previewing image
+}
+
 export interface Message {
 	id: string;
 	role: 'user' | 'assistant' | 'system';
 	content: string;
 	timestamp: number;
 	model?: string;
+	images?: string[]; // base64 strings for Ollama API
+	attachments?: Attachment[]; // full attachment details for history rendering
 }
 
 export interface Conversation {

@@ -79,6 +79,74 @@ const renderer = {
 			<pre class="language-${language}"><code class="language-${language}">${highlighted}</code></pre>
 			<template id="${id}">${encodeURIComponent(text)}</template>
 		</div>`;
+	},
+	table(this: any, token: any) {
+		let headerCells = '';
+		for (let i = 0; i < token.header.length; i++) {
+			headerCells += this.tablecell(token.header[i]);
+		}
+		const headerHtml = this.tablerow({ text: headerCells });
+
+		let bodyRows = '';
+		for (let i = 0; i < token.rows.length; i++) {
+			let rowCells = '';
+			const row = token.rows[i];
+			for (let j = 0; j < row.length; j++) {
+				rowCells += this.tablecell(row[j]);
+			}
+			bodyRows += this.tablerow({ text: rowCells });
+		}
+		
+		const tbodyHtml = bodyRows ? `<tbody>${bodyRows}</tbody>` : '';
+		const tableHtml = `<table>
+<thead>
+${headerHtml}</thead>
+${tbodyHtml}</table>`;
+
+		// Generate TSV string
+		const escapeTsvCell = (text: string) => {
+			let escaped = text;
+			if (/[\"\t\n\r]/.test(escaped)) {
+				escaped = '"' + escaped.replace(/"/g, '""') + '"';
+			}
+			return escaped;
+		};
+
+		const tsvRows: string[] = [];
+		
+		// Header row
+		const headerRow = token.header.map((cell: any) => escapeTsvCell(cell.text)).join('\t');
+		tsvRows.push(headerRow);
+		
+		// Body rows
+		for (const row of token.rows) {
+			const rowStr = row.map((cell: any) => escapeTsvCell(cell.text)).join('\t');
+			tsvRows.push(rowStr);
+		}
+		
+		const tsvString = tsvRows.join('\n');
+		const id = `table-${Math.random().toString(36).slice(2, 11)}`;
+
+		return `<div class="table-block-wrapper">
+			<div class="table-block-header">
+				<span class="table-block-title">
+					<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+						<path d="M10 10.02h5V21h-5V10.02zM17 21h3c1.1 0 2-.9 2-2v-9h-5v11zm3-18H5c-1.1 0-2 .9-2 2v3h19V5c0-1.1-.9-2-2-2zM3 19c0 1.1.9 2 2 2h3V10H3v9zm5-9H5v9H3v-9h5z"/>
+					</svg>
+					Table
+				</span>
+				<button class="copy-table-btn" onclick="window.copyTableToClipboard('${id}')" data-table-id="${id}">
+					<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+						<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+					</svg>
+					Copy Table
+				</button>
+			</div>
+			<div class="table-scroll-container" id="table-container-${id}">
+				${tableHtml}
+			</div>
+			<template id="tsv-${id}">${encodeURIComponent(tsvString)}</template>
+		</div>`;
 	}
 };
 
@@ -117,5 +185,60 @@ if (typeof window !== 'undefined') {
 				}, 2000);
 			}
 		});
+	};
+
+	(window as any).copyTableToClipboard = (id: string) => {
+		const tsvTemplate = document.getElementById(`tsv-${id}`) as HTMLTemplateElement;
+		const tableContainer = document.getElementById(`table-container-${id}`);
+		if (!tsvTemplate || !tableContainer) return;
+
+		const tsvText = decodeURIComponent(tsvTemplate.innerHTML);
+		const htmlText = tableContainer.innerHTML;
+
+		// Create blobs for clipboard
+		const clipboardData: Record<string, Blob> = {
+			'text/plain': new Blob([tsvText], { type: 'text/plain' })
+		};
+
+		try {
+			clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
+		} catch (e) {
+			console.warn('Could not create HTML blob for clipboard', e);
+		}
+
+		const btn = document.querySelector(`[data-table-id="${id}"]`);
+		const updateButton = (success: boolean) => {
+			if (btn) {
+				const originalHtml = btn.innerHTML;
+				btn.innerHTML = success ? `
+					<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+						<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+					</svg>
+					Copied!
+				` : `Failed!`;
+				btn.classList.add('copied');
+				setTimeout(() => {
+					btn.innerHTML = originalHtml;
+					btn.classList.remove('copied');
+				}, 2000);
+			}
+		};
+
+		if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+			navigator.clipboard.write([
+				new ClipboardItem(clipboardData)
+			]).then(() => {
+				updateButton(true);
+			}).catch(err => {
+				console.error('ClipboardItem write failed, falling back to writeText:', err);
+				navigator.clipboard.writeText(tsvText)
+					.then(() => updateButton(true))
+					.catch(() => updateButton(false));
+			});
+		} else {
+			navigator.clipboard.writeText(tsvText)
+				.then(() => updateButton(true))
+				.catch(() => updateButton(false));
+		}
 	};
 }

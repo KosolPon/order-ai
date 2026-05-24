@@ -1,17 +1,19 @@
 <script lang="ts">
-	import type { Conversation, Message } from '$lib/types';
+	import type { Conversation, Message, Attachment } from '$lib/types';
 	import { renderMarkdown } from '$lib/markdown';
 	import { tick, untrack } from 'svelte';
 
 	let {
 		conversation = null,
 		isGenerating = false,
+		isInitialized = false,
 		onSendPrompt,
 		onEditPrompt,
 		onStopGeneration
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
+		isInitialized: boolean;
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
@@ -21,6 +23,80 @@
 	let fontSize = $state(15);
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageContent = $state('');
+
+	let isExportMenuOpen = $state(false);
+
+	// Close dropdown when clicking outside
+	$effect(() => {
+		if (isExportMenuOpen) {
+			const handleOutsideClick = (e: MouseEvent) => {
+				const target = e.target as HTMLElement;
+				if (!target.closest('.export-controls')) {
+					isExportMenuOpen = false;
+				}
+			};
+			window.addEventListener('click', handleOutsideClick);
+			return () => {
+				window.removeEventListener('click', handleOutsideClick);
+			};
+		}
+	});
+
+	function exportToMarkdown() {
+		if (!conversation) return;
+		isExportMenuOpen = false;
+
+		let mdContent = `# ${conversation.title}\n\n`;
+		mdContent += `- **Model**: ${conversation.model || 'Unknown'}\n`;
+		mdContent += `- **Date**: ${new Date(conversation.createdAt).toLocaleString()}\n\n`;
+		mdContent += `---\n\n`;
+
+		conversation.messages.forEach((msg: Message) => {
+			if (msg.role === 'assistant' && msg.content === '') return;
+			const roleName = msg.role === 'user' ? 'User' : `Assistant (${msg.model || conversation.model || 'Ollama'})`;
+			mdContent += `### ${roleName}\n`;
+			
+			// Include attachments if any
+			if (msg.attachments && msg.attachments.length > 0) {
+				mdContent += `**Attachments:**\n`;
+				msg.attachments.forEach((att: Attachment) => {
+					if (att.type === 'image') {
+						mdContent += `- [Image] ${att.name}\n`;
+					} else {
+						mdContent += `- [${att.type}] ${att.name}\n`;
+					}
+				});
+				mdContent += `\n`;
+			}
+
+			mdContent += `${msg.content}\n\n`;
+			mdContent += `---\n\n`;
+		});
+
+		// Trigger download
+		const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		
+		// Clean file name
+		const safeTitle = conversation.title
+			.toLowerCase()
+			.replace(/[^a-z0-9\u0e00-\u0e7f]+/g, '-') // Allow Thai characters and alphanumeric
+			.replace(/(^-|-$)/g, '');
+		const fileName = safeTitle ? `${safeTitle}.md` : `chat-export.md`;
+
+		link.setAttribute('download', fileName);
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
+	function exportToPdf() {
+		isExportMenuOpen = false;
+		window.print();
+	}
 
 	// Show thinking loader only before the first response chunk arrives
 	const showThinking = $derived(
@@ -124,38 +200,80 @@
 			{/if}
 		</div>
 
-		<div class="font-controls">
-			<button 
-				class="font-btn" 
-				onclick={decreaseFont} 
-				disabled={fontSize <= 10}
-				title="Decrease font size"
-			>
-				A-
-			</button>
-			<button 
-				class="font-indicator-btn" 
-				onclick={() => {
-					fontSize = 15;
-					localStorage.setItem('chat_font_size', '15');
-				}}
-				title="Reset to 100%"
-			>
-				{Math.round((fontSize / 15) * 100)}%
-			</button>
-			<button 
-				class="font-btn" 
-				onclick={increaseFont} 
-				disabled={fontSize >= 30}
-				title="Increase font size"
-			>
-				A+
-			</button>
+		<div class="header-actions">
+			{#if conversation && conversation.messages.length > 0}
+				<div class="export-controls">
+					<button 
+						class="export-btn" 
+						onclick={() => isExportMenuOpen = !isExportMenuOpen}
+						aria-expanded={isExportMenuOpen}
+						title="Export Chat"
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+						</svg>
+						<span>Export</span>
+						<svg class="chevron-down" class:open={isExportMenuOpen} viewBox="0 0 24 24" width="12" height="12">
+							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+						</svg>
+					</button>
+
+					{#if isExportMenuOpen}
+						<div class="export-controls-dropdown animate-fade-in">
+							<button class="dropdown-item" onclick={exportToMarkdown}>
+								<svg viewBox="0 0 24 24" width="14" height="14">
+									<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+								</svg>
+								<span>Export as Markdown (.md)</span>
+							</button>
+							<button class="dropdown-item" onclick={exportToPdf}>
+								<svg viewBox="0 0 24 24" width="14" height="14">
+									<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 8.5c0 .83-.67 1.5-1.5 1.5H7v1.5H5.5V9H8c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V9H13c.83 0 1.5.67 1.5 1.5v3zm4-3.5h-2.5v1H18v1.5h-1.5V14H15V9h4v1.5zM9 11.5H8v-1h1v1zm4 1.5h-1v-2h1v2z"/>
+								</svg>
+								<span>Export as PDF (.pdf)</span>
+							</button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<div class="font-controls">
+				<button 
+					class="font-btn" 
+					onclick={decreaseFont} 
+					disabled={fontSize <= 10}
+					title="Decrease font size"
+				>
+					A-
+				</button>
+				<button 
+					class="font-indicator-btn" 
+					onclick={() => {
+						fontSize = 15;
+						localStorage.setItem('chat_font_size', '15');
+					}}
+					title="Reset to 100%"
+				>
+					{Math.round((fontSize / 15) * 100)}%
+				</button>
+				<button 
+					class="font-btn" 
+					onclick={increaseFont} 
+					disabled={fontSize >= 30}
+					title="Increase font size"
+				>
+					A+
+				</button>
+			</div>
 		</div>
 	</header>
 
 	<div class="chat-viewport" bind:this={chatContainer} style="--chat-font-size: {fontSize}px">
-		{#if !conversation || conversation.messages.length === 0}
+		{#if !isInitialized}
+			<div class="chat-loading-placeholder">
+				<div class="spinner-glow"></div>
+			</div>
+		{:else if !conversation || conversation.messages.length === 0}
 			<!-- Gemini-style Welcome Screen -->
 			<div class="welcome-container animate-fade-in">
 				<div class="welcome-header">
@@ -233,7 +351,35 @@
 										</div>
 									{:else}
 										<div class="user-message-container">
-											<pre class="user-text-pre">{msg.content}</pre>
+											<div class="user-message-bubble-wrapper">
+												{#if msg.attachments && msg.attachments.length > 0}
+													<div class="message-attachments-grid">
+														{#each msg.attachments as attr (attr.id)}
+															<div class="msg-attachment-card">
+																{#if attr.type === 'image'}
+																	<img class="msg-attachment-image" src={attr.content} alt={attr.name} />
+																{:else}
+																	<div class="msg-attachment-info">
+																		{#if attr.type === 'link'}
+																			<svg class="msg-attachment-icon link-icon" viewBox="0 0 24 24" width="14" height="14">
+																				<path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+																			</svg>
+																		{:else}
+																			<svg class="msg-attachment-icon file-icon" viewBox="0 0 24 24" width="14" height="14">
+																				<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+																			</svg>
+																		{/if}
+																		<span class="msg-attachment-name" title={attr.name}>{attr.name}</span>
+																	</div>
+																{/if}
+															</div>
+														{/each}
+													</div>
+												{/if}
+												{#if msg.content}
+													<pre class="user-text-pre">{msg.content}</pre>
+												{/if}
+											</div>
 											<button 
 												class="message-edit-trigger" 
 												onclick={() => startEditPrompt(msg)}
@@ -280,17 +426,7 @@
 			</div>
 		{/if}
 	</div>
-
-	{#if isGenerating}
-		<div class="floating-stop-container">
-			<button class="floating-stop-btn" onclick={onStopGeneration}>
-				<svg viewBox="0 0 24 24" width="16" height="16">
-					<path fill="currentColor" d="M6 6h12v12H6V6z"/>
-				</svg>
-				<span>Stop Generating</span>
-			</button>
-		</div>
-	{/if}
+	
 </div>
 
 <style>
@@ -327,6 +463,87 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 60%;
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.export-controls {
+		position: relative;
+	}
+
+	.export-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 20px;
+		padding: 6px 14px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.export-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+	}
+
+	.export-btn svg {
+		flex-shrink: 0;
+	}
+
+	.chevron-down {
+		color: var(--text-muted);
+		transition: transform var(--transition-normal);
+	}
+
+	.chevron-down.open {
+		transform: rotate(180deg);
+	}
+
+	.export-controls-dropdown {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 8px);
+		background-color: rgba(30, 31, 32, 0.95);
+		backdrop-filter: blur(12px);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		box-shadow: var(--shadow-lg);
+		padding: 6px 0;
+		width: 230px;
+		z-index: 100;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.dropdown-item {
+		width: 100%;
+		text-align: left;
+		padding: 10px 16px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.dropdown-item:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.dropdown-item svg {
+		color: var(--accent-blue);
+		flex-shrink: 0;
 	}
 
 	.font-controls {
@@ -655,40 +872,7 @@
 		}
 	}
 
-	/* User message edit prompt & Floating stop styles */
-	.floating-stop-container {
-		position: absolute;
-		bottom: 24px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 10;
-		animation: fadeIn var(--transition-fast) forwards;
-	}
-
-	.floating-stop-btn {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		padding: 10px 18px;
-		border-radius: 99px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: var(--text-primary);
-		box-shadow: var(--shadow-lg);
-		transition: background-color var(--transition-fast), transform var(--transition-fast);
-	}
-
-	.floating-stop-btn:hover {
-		background-color: var(--bg-hover);
-		transform: translateY(-1px);
-		border-color: #ff6b6b;
-	}
-
-	.floating-stop-btn svg {
-		color: #ff6b6b;
-	}
+	/* User message edit prompt styles */
 
 	.user-message-container {
 		display: flex;
@@ -789,5 +973,82 @@
 	.edit-btn.submit:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+
+	/* User Message Attachments Grid */
+	.user-message-bubble-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		max-width: 90%;
+		align-items: flex-start;
+	}
+
+	.message-attachments-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-bottom: 2px;
+	}
+
+	.msg-attachment-card {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		overflow: hidden;
+		max-width: 220px;
+		display: flex;
+		flex-direction: column;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.msg-attachment-image {
+		max-width: 100%;
+		max-height: 150px;
+		object-fit: cover;
+		display: block;
+	}
+
+	.msg-attachment-info {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		font-size: 0.8rem;
+		color: var(--text-primary);
+	}
+
+	.msg-attachment-icon {
+		color: var(--accent-blue);
+		flex-shrink: 0;
+	}
+
+	.msg-attachment-name {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 140px;
+		font-weight: 500;
+	}
+
+	/* Loading Placeholder */
+	.chat-loading-placeholder {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.spinner-glow {
+		width: 32px;
+		height: 32px;
+		border: 3px solid rgba(66, 133, 244, 0.1);
+		border-radius: 50%;
+		border-top-color: var(--accent-blue);
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 </style>

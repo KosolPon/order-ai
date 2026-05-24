@@ -258,21 +258,136 @@ pre[class*="language-"] {
 	color: var(--text-secondary);
 }
 
+/* Table block wrapper & modern design */
+.table-block-wrapper {
+	margin: 1.25rem 0;
+	border: 1px solid var(--border-color);
+	border-radius: 12px;
+	overflow: hidden;
+	background: var(--bg-secondary);
+	box-shadow: var(--shadow-md);
+}
+
+.table-block-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.6rem 1.25rem;
+	background-color: #2b2c2e;
+	border-bottom: 1px solid var(--border-color);
+	font-family: var(--font-title);
+	font-size: 0.82rem;
+	font-weight: 500;
+	color: var(--text-secondary);
+}
+
+.table-block-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-primary);
+	font-weight: 600;
+}
+
+.copy-table-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid var(--border-color);
+	color: var(--text-secondary);
+	font-size: 0.75rem;
+	padding: 4px 10px;
+	border-radius: 6px;
+	transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.copy-table-btn:hover {
+	background-color: var(--bg-hover);
+	color: var(--text-primary);
+	border-color: var(--border-light);
+}
+
+.copy-table-btn svg {
+	width: 14px;
+	height: 14px;
+	fill: currentColor;
+	transition: transform var(--transition-fast);
+}
+
+.copy-table-btn:active svg {
+	transform: scale(0.9);
+}
+
+.copy-table-btn.copied {
+	color: #81c995; /* Accent green for successful copy */
+	border-color: rgba(129, 201, 149, 0.3);
+	background-color: rgba(129, 201, 149, 0.05);
+}
+
+.table-scroll-container {
+	overflow-x: auto;
+	width: 100%;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+	height: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+	background: var(--border-color);
+	border-radius: 99px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}
+
+/* Beautiful modern tables inside markdown */
 .markdown-body table {
 	width: 100%;
 	border-collapse: collapse;
-	margin-bottom: 1rem;
-}
-
-.markdown-body th,
-.markdown-body td {
-	padding: 0.5rem 0.75rem;
-	border: 1px solid var(--border-color);
+	font-size: 0.92rem;
+	line-height: 1.5;
+	color: var(--text-primary);
+	background-color: transparent;
 }
 
 .markdown-body th {
-	background-color: var(--bg-secondary);
+	padding: 0.8rem 1rem;
+	background-color: rgba(255, 255, 255, 0.02);
+	font-family: var(--font-title);
+	font-weight: 600;
+	color: var(--text-primary);
+	border-bottom: 2px solid var(--border-color);
 	text-align: left;
+}
+
+.markdown-body td {
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+	color: var(--text-secondary);
+	transition: color var(--transition-fast);
+}
+
+.markdown-body tr {
+	transition: background-color var(--transition-fast);
+}
+
+.markdown-body tr:nth-child(even) {
+	background-color: rgba(255, 255, 255, 0.015);
+}
+
+.markdown-body tr:hover {
+	background-color: rgba(168, 199, 250, 0.04); /* Subtle glow matching blue theme */
+}
+
+.markdown-body tr:hover td {
+	color: var(--text-primary);
+}
+
+.markdown-body tr:last-child td {
+	border-bottom: none;
 }
 
 .markdown-body inline-code,
@@ -354,3 +469,249 @@ pre[class*="language-"] {
 		--sidebar-width: 0px;
 	}
 }
+
+/* Print Styles for Export to PDF */
+@media print {
+	/* Hide UI chrome, input area, buttons, avatars, edit/copy controls */
+	.sidebar,
+	.chat-header .font-controls,
+	.chat-header .export-controls-dropdown,
+	.chat-header .export-btn,
+	.input-area,
+	.message-edit-trigger,
+	.copy-btn,
+	.suggestions-grid,
+	.welcome-container,
+	.chat-loading-placeholder,
+	.status-tag,
+	.typing-indicator {
+		display: none !important;
+	}
+
+	/* Reset layout to allow natural page flows and margins */
+	html, body {
+		height: auto !important;
+		overflow: visible !important;
+		background-color: #ffffff !important;
+		color: #1a1a1a !important;
+		font-size: 14px;
+	}
+
+	.app-layout {
+		display: block !important;
+		height: auto !important;
+		width: 100% !important;
+		overflow: visible !important;
+		background: #ffffff !important;
+	}
+
+	.main-content {
+		display: block !important;
+		height: auto !important;
+		width: 100% !important;
+		overflow: visible !important;
+	}
+
+	.chat-area {
+		display: block !important;
+		height: auto !important;
+		width: 100% !important;
+		overflow: visible !important;
+		background-color: #ffffff !important;
+	}
+
+	.chat-header {
+		position: static !important;
+		border-bottom: 2px solid #1a1a1a !important;
+		background-color: transparent !important;
+		padding: 0 0 10px 0 !important;
+		margin-bottom: 24px !important;
+		height: auto !important;
+	}
+
+	.chat-title {
+		font-size: 1.6rem !important;
+		font-weight: 700 !important;
+		color: #1a1a1a !important;
+		max-width: 100% !important;
+		white-space: normal !important;
+	}
+
+	.chat-viewport {
+		display: block !important;
+		height: auto !important;
+		overflow: visible !important;
+		padding: 0 !important;
+	}
+
+	.messages-list {
+		display: block !important;
+		max-width: 100% !important;
+		width: 100% !important;
+		gap: 0 !important;
+	}
+
+	/* Print Layout structure for individual messages */
+	.message-wrapper {
+		display: block !important;
+		page-break-inside: avoid;
+		border-bottom: 1px solid #e5e7eb !important;
+		padding: 20px 0 !important;
+		margin: 0 !important;
+		width: 100% !important;
+	}
+
+	.message-wrapper.user {
+		background-color: #f9fafb !important;
+		padding-left: 12px !important;
+		padding-right: 12px !important;
+		border-radius: 8px;
+	}
+
+	.message-avatar {
+		display: none !important; /* Hide avatars on printed paper to keep layout clean */
+	}
+
+	.message-body {
+		width: 100% !important;
+	}
+
+	.message-info {
+		margin-bottom: 8px !important;
+	}
+
+	.sender-name {
+		color: #111827 !important;
+		font-weight: 700 !important;
+	}
+
+	.timestamp {
+		color: #6b7280 !important;
+	}
+
+	.user-text-pre {
+		background-color: transparent !important;
+		border: none !important;
+		padding: 0 !important;
+		max-width: 100% !important;
+		color: #1f2937 !important;
+		font-size: 14px !important;
+	}
+
+	.markdown-body {
+		color: #1f2937 !important;
+		font-size: 14px !important;
+	}
+
+	.markdown-body a {
+		color: #2563eb !important;
+		text-decoration: underline !important;
+	}
+
+	/* Code Block Printing adjustments (Light Theme GitHub style) */
+	.code-block-wrapper {
+		page-break-inside: avoid;
+		border: 1px solid #d1d5db !important;
+		border-radius: 6px !important;
+		background-color: #f3f4f6 !important;
+		box-shadow: none !important;
+		margin: 12px 0 !important;
+	}
+
+	.code-block-header {
+		background-color: #e5e7eb !important;
+		color: #374151 !important;
+		border-bottom: 1px solid #d1d5db !important;
+		padding: 6px 12px !important;
+	}
+
+	pre[class*="language-"] {
+		background-color: #f3f4f6 !important;
+		padding: 12px !important;
+	}
+
+	code[class*="language-"],
+	pre[class*="language-"] {
+		color: #111827 !important;
+	}
+
+	/* Code syntax token overrides for light print background */
+	.token.comment,
+	.token.prolog,
+	.token.doctype,
+	.token.cdata {
+		color: #6b7280 !important;
+		font-style: italic;
+	}
+
+	.token.punctuation {
+		color: #111827 !important;
+	}
+
+	.token.property,
+	.token.tag,
+	.token.boolean,
+	.token.number,
+	.token.constant,
+	.token.symbol,
+	.token.deleted {
+		color: #b45309 !important;
+	}
+
+	.token.selector,
+	.token.attr-name,
+	.token.string,
+	.token.char,
+	.token.builtin,
+	.token.inserted {
+		color: #047857 !important;
+	}
+
+	.token.operator,
+	.token.entity,
+	.token.url {
+		color: #111827 !important;
+	}
+
+	.token.atrule,
+	.token.attr-value,
+	.token.keyword {
+		color: #be185d !important;
+		font-weight: bold;
+	}
+
+	.token.function,
+	.token.class-name {
+		color: #4338ca !important;
+	}
+
+	.token.regex,
+	.token.important,
+	.token.variable {
+		color: #b45309 !important;
+	}
+
+	/* Tables */
+	.markdown-body table {
+		page-break-inside: auto;
+	}
+	.markdown-body tr {
+		page-break-inside: avoid;
+		page-break-after: auto;
+	}
+	.markdown-body th {
+		background-color: #f3f4f6 !important;
+		color: #111827 !important;
+		border-color: #d1d5db !important;
+	}
+	.markdown-body td {
+		border-color: #d1d5db !important;
+		color: #374151 !important;
+	}
+
+	/* Page margins */
+	@page {
+		margin: 20mm 15mm 20mm 15mm;
+	}
+}
+

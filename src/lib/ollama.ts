@@ -47,10 +47,36 @@ export async function streamChat(
 
 	try {
 		// Prepare chat payload
-		const chatMessages = messages.map((m) => ({
-			role: m.role,
-			content: m.content
-		}));
+		const chatMessages = messages.map((m) => {
+			let content = m.content;
+			
+			// Append file and link attachments as system context to the user message
+			if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
+				const nonImages = m.attachments.filter(a => a.type !== 'image');
+				if (nonImages.length > 0) {
+					content += '\n\n---';
+					content += '\n[Attached Reference Context]:';
+					for (const attr of nonImages) {
+						if (attr.type === 'file') {
+							content += `\n\nFile "${attr.name}":\n\`\`\`\n${attr.content}\n\`\`\``;
+						} else if (attr.type === 'link') {
+							content += `\n\nWebpage Content from "${attr.name}":\n${attr.content}`;
+						}
+					}
+				}
+			}
+
+			const msg: any = {
+				role: m.role,
+				content: content
+			};
+
+			if (m.images && m.images.length > 0) {
+				msg.images = m.images.map(img => img.replace(/^data:image\/[a-z]+;base64,/, ''));
+			}
+
+			return msg;
+		});
 
 		if (systemPrompt) {
 			chatMessages.unshift({

@@ -4,7 +4,7 @@
 	import InputArea from '$lib/components/InputArea.svelte';
 	import { untrack } from 'svelte';
 	
-	import type { Conversation, Message, OllamaModel } from '$lib/types';
+	import type { Conversation, Message, OllamaModel, Attachment } from '$lib/types';
 	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL } from '$lib/ollama';
 
 	// Reactive States
@@ -17,6 +17,8 @@
 	let isGenerating = $state<boolean>(false);
 	let input = $state<string>('');
 	let drafts = $state<Record<string, string>>({});
+	let attachments = $state<Attachment[]>([]);
+	let isInitialized = $state(false);
 
 	// Abort controller to cancel streaming
 	let abortController: AbortController | null = null;
@@ -65,6 +67,8 @@
 			if (drafts[activeKey]) {
 				input = drafts[activeKey];
 			}
+
+			isInitialized = true;
 		});
 	});
 
@@ -205,14 +209,15 @@
 	// Send message to assistant
 	async function handleSendPrompt(promptText: string = input) {
 		const cleanPrompt = promptText.trim();
-		if (!cleanPrompt || !selectedModel) return;
+		if ((!cleanPrompt && attachments.length === 0) || !selectedModel) return;
 
 		// 1. Ensure there is an active conversation, create one if not
 		let activeConvId = currentConversationId;
+		const titleBase = cleanPrompt || (attachments.length > 0 ? attachments[0].name : 'New Conversation');
 		if (!activeConvId) {
 			const newConv: Conversation = {
 				id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-				title: cleanPrompt.slice(0, 30) + (cleanPrompt.length > 30 ? '...' : ''),
+				title: titleBase.slice(0, 30) + (titleBase.length > 30 ? '...' : ''),
 				messages: [],
 				createdAt: Date.now(),
 				model: selectedModel
@@ -222,19 +227,27 @@
 			currentConversationId = activeConvId;
 		}
 
+		const msgAttachments = [...attachments];
+		const msgImages = attachments.filter(a => a.type === 'image').map(a => a.content);
+
 		const userMessage: Message = {
 			id: `msg-${Date.now()}-user`,
 			role: 'user',
 			content: cleanPrompt,
-			timestamp: Date.now()
+			timestamp: Date.now(),
+			images: msgImages.length > 0 ? msgImages : undefined,
+			attachments: msgAttachments.length > 0 ? msgAttachments : undefined
 		};
+
+		// Clear active attachments
+		attachments = [];
 
 		// 2. Add user message to conversation
 		conversations = conversations.map((conv) => {
 			if (conv.id === activeConvId) {
 				// If default title, update title based on first prompt
 				const title = conv.title === 'New Conversation' 
-					? cleanPrompt.slice(0, 30) + (cleanPrompt.length > 30 ? '...' : '')
+					? titleBase.slice(0, 30) + (titleBase.length > 30 ? '...' : '')
 					: conv.title;
 				return {
 					...conv,
@@ -465,6 +478,7 @@
 		<ChatArea 
 			conversation={currentConversation}
 			{isGenerating}
+			{isInitialized}
 			onSendPrompt={handleSendPrompt}
 			onEditPrompt={handleEditPrompt}
 			onStopGeneration={handleStopGeneration}
@@ -475,6 +489,7 @@
 			bind:input
 			{models}
 			bind:selectedModel
+			bind:attachments
 			{isGenerating}
 			onSend={() => handleSendPrompt()}
 			onStop={handleStopGeneration}
