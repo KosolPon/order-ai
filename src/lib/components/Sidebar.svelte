@@ -179,6 +179,21 @@
 						<span class="text-success">Connected. Found {models.length} models.</span>
 					{:else}
 						<span class="text-error">Disconnected. Make sure Ollama is running.</span>
+						{#if typeof window !== 'undefined' && 
+							(window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') && 
+							(ollamaUrl.includes('localhost') || ollamaUrl.includes('127.0.0.1'))}
+							<div class="cors-help">
+								<p class="cors-tip-title">To connect local Ollama from a deployed site:</p>
+								<ol>
+									<li>Close the Ollama app.</li>
+									<li>Run in Terminal to allow CORS:
+										<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
+									</li>
+									<li>Restart Ollama.</li>
+								</ol>
+								<p class="cors-tip-note">Alternatively, use ngrok to create a secure HTTPS URL for Ollama.</p>
+							</div>
+						{/if}
 					{/if}
 				</div>
 			</div>
@@ -483,6 +498,57 @@
 
 	.connection-status {
 		font-size: 0.75rem;
+	}
+
+	.cors-help {
+		margin-top: 10px;
+		padding: 10px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		font-size: 0.8rem;
+		line-height: 1.45;
+		color: var(--text-secondary);
+		text-align: left;
+	}
+
+	.cors-tip-title {
+		margin: 0 0 6px 0;
+		color: var(--text-primary);
+		font-weight: 600;
+	}
+
+	.cors-help ol {
+		margin: 0;
+		padding-left: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.cors-help li {
+		margin-bottom: 2px;
+	}
+
+	.cors-help pre {
+		background-color: var(--bg-tertiary);
+		padding: 4px 6px;
+		border-radius: 4px;
+		margin: 4px 0;
+		overflow-x: auto;
+		border: 1px solid var(--border-light);
+	}
+
+	.cors-help code {
+		font-family: var(--font-mono, monospace);
+		font-size: 0.75rem;
+		color: var(--accent-blue, #a8c7fa);
+	}
+
+	.cors-tip-note {
+		margin: 8px 0 0 0;
+		font-size: 0.75rem;
+		color: var(--text-muted);
 	}
 
 	.text-success {

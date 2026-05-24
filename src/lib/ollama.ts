@@ -4,15 +4,48 @@ import type { OllamaModel, Message } from './types';
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 /**
- * Fetch available Ollama models from local service (via SvelteKit proxy)
+ * Helper to determine the correct Ollama endpoint URL.
+ * If the site is deployed publicly and the user targets localhost, we fetch directly.
+ * Otherwise, we route via SvelteKit proxy to handle CORS/local dev.
+ */
+function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy: boolean } {
+	const isBrowser = typeof window !== 'undefined';
+	const isPageLocal = isBrowser && 
+		(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+	let isTargetLocal = false;
+	try {
+		const parsed = new URL(ollamaUrl);
+		isTargetLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+	} catch (e) {
+		isTargetLocal = ollamaUrl.includes('localhost') || ollamaUrl.includes('127.0.0.1');
+	}
+
+	if (isBrowser && !isPageLocal && isTargetLocal) {
+		return {
+			url: `${ollamaUrl}/${path}`,
+			useProxy: false
+		};
+	}
+
+	return {
+		url: `/api/ollama/${path}`,
+		useProxy: true
+	};
+}
+
+/**
+ * Fetch available Ollama models from local service (via SvelteKit proxy or direct fetch)
  */
 export async function fetchModels(ollamaUrl: string = DEFAULT_OLLAMA_URL): Promise<OllamaModel[]> {
 	try {
-		const res = await fetch('/api/ollama/api/tags', {
-			headers: {
-				'x-ollama-url': ollamaUrl
-			}
-		});
+		const target = getTargetUrl('api/tags', ollamaUrl);
+		const headers: Record<string, string> = {};
+		if (target.useProxy) {
+			headers['x-ollama-url'] = ollamaUrl;
+		}
+
+		const res = await fetch(target.url, { headers });
 
 		if (!res.ok) {
 			const errorData = await res.json().catch(() => ({}));
@@ -28,7 +61,7 @@ export async function fetchModels(ollamaUrl: string = DEFAULT_OLLAMA_URL): Promi
 }
 
 /**
- * Stream a chat completion from Ollama (via SvelteKit proxy)
+ * Stream a chat completion from Ollama (via SvelteKit proxy or direct fetch)
  */
 export async function streamChat(
 	options: {
@@ -85,12 +118,17 @@ export async function streamChat(
 			});
 		}
 
-		const response = await fetch('/api/ollama/api/chat', {
+		const target = getTargetUrl('api/chat', ollamaUrl);
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+		if (target.useProxy) {
+			headers['x-ollama-url'] = ollamaUrl;
+		}
+
+		const response = await fetch(target.url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-ollama-url': ollamaUrl
-			},
+			headers,
 			body: JSON.stringify({
 				model,
 				messages: chatMessages,
