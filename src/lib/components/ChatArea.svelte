@@ -1,22 +1,37 @@
 <script lang="ts">
 	import type { Conversation, Message, Attachment } from '$lib/types';
-	import { renderMarkdown } from '$lib/markdown';
+	import { renderMarkdown, parseThinking } from '$lib/markdown';
 	import { tick, untrack } from 'svelte';
+	import { fade } from 'svelte/transition';
 
 	let {
 		conversation = null,
 		isGenerating = false,
 		isInitialized = false,
+		showContextPanel = false,
+		showSidebar = true,
+		theme = 'dark',
 		onSendPrompt,
 		onEditPrompt,
-		onStopGeneration
+		onStopGeneration,
+		onToggleContextPanel,
+		onOpenThinking,
+		onToggleSidebar,
+		onToggleTheme
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
 		isInitialized: boolean;
+		showContextPanel: boolean;
+		showSidebar: boolean;
+		theme: 'dark' | 'light';
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
+		onToggleContextPanel: () => void;
+		onOpenThinking: (messageId: string) => void;
+		onToggleSidebar: () => void;
+		onToggleTheme: () => void;
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
@@ -25,6 +40,399 @@
 	let editingMessageContent = $state('');
 
 	let isExportMenuOpen = $state(false);
+
+	let lightboxImage = $state<string | null>(null);
+	let lightboxAlt = $state('');
+
+	if (typeof window !== 'undefined') {
+		(window as any).showMediaLightbox = (src: string, altEscaped: string) => {
+			lightboxImage = src;
+			lightboxAlt = decodeURIComponent(altEscaped || '');
+		};
+	}
+
+	function closeLightbox() {
+		lightboxImage = null;
+		lightboxAlt = '';
+	}
+
+	// Close lightbox on Escape key
+	$effect(() => {
+		if (lightboxImage) {
+			const handleKeyDown = (e: KeyboardEvent) => {
+				if (e.key === 'Escape') {
+					closeLightbox();
+				}
+			};
+			window.addEventListener('keydown', handleKeyDown);
+			return () => {
+				window.removeEventListener('keydown', handleKeyDown);
+			};
+		}
+	});
+
+	// Mermaid states
+	let mermaidLib = $state<any>(null);
+	let lightboxMermaidCode = $state<string | null>(null);
+	let lightboxMermaidScale = $state(1);
+	let lightboxMermaidOffset = $state({ x: 0, y: 0 });
+	let lightboxMermaidIsDragging = $state(false);
+	let lightboxMermaidDragStart = $state({ x: 0, y: 0 });
+	let lightboxMermaidContainer = $state<HTMLDivElement | null>(null);
+
+	// Dynamically load Mermaid on client-side and re-initialize when theme changes
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			const initMermaid = (m: any) => {
+				m.initialize({
+					startOnLoad: false,
+					theme: theme === 'dark' ? 'base' : 'neutral',
+					securityLevel: 'loose',
+					fontFamily: 'var(--font-main)',
+					themeVariables: theme === 'dark' ? {
+						background: '#1a1a1b',
+						primaryColor: '#c2d9ff', // Soft light blue for node background
+						primaryTextColor: '#111827', // Dark gray for node text
+						primaryBorderColor: '#4b5563', // Grey node border
+						lineColor: '#8e918f', // Grey arrow line color
+						secondaryColor: '#e5e7eb',
+						tertiaryColor: '#f3f4f6',
+						labelTextColor: '#c4c7c5', // Light text for edge labels
+						edgeLabelBackground: '#1a1a1b' // Dark background for edge labels to hide lines behind
+					} : {
+						background: '#f6f8fa',
+						primaryColor: '#d3e3fd', // Soft light blue for node background
+						primaryTextColor: '#1f1f1f', // Dark gray for node text
+						primaryBorderColor: '#9ca3af', // Grey node border
+						lineColor: '#757575', // Grey arrow line color
+						secondaryColor: '#f0f4f9',
+						tertiaryColor: '#ffffff',
+						labelTextColor: '#444746', // Darker text for edge labels
+						edgeLabelBackground: '#f6f8fa' // Light background for edge labels
+					}
+				});
+				renderAllMermaid(true);
+			};
+
+			if (!mermaidLib) {
+				import('mermaid').then((m) => {
+					mermaidLib = m.default;
+					initMermaid(mermaidLib);
+				}).catch((err) => {
+					console.error('Failed to load mermaid:', err);
+				});
+			} else {
+				// Re-initialize when theme changes
+				initMermaid(mermaidLib);
+			}
+		}
+	});
+
+	// Re-render mermaid whenever conversation changes or generation ends
+	$effect(() => {
+		if (conversation && conversation.messages && mermaidLib) {
+			// Watch isGenerating to re-trigger rendering once generation completes
+			const _ = isGenerating;
+			tick().then(() => {
+				renderAllMermaid();
+			});
+		}
+	});
+
+	function sanitizeMermaidCode(code: string): string {
+		if (!code) return '';
+		
+		const lines = code.split('\n');
+		const specialCharRegex = /[()/\&:+%,-]/;
+		
+		const sanitizedLines = lines.map(line => {
+			let trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('%%')) {
+				return line;
+			}
+			
+			// 1. Stadium shape: ID([text])
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\(\s*\[([^"\]]+)\]\s*\)/g, (match, id, text) => {
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}(["${escapedText}"])`;
+				}
+				return match;
+			});
+
+			// 2. Subroutine shape: ID[[text]]
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\[\s*\[([^"\]]+)\]\s*\]/g, (match, id, text) => {
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}[["${escapedText}"]]`;
+				}
+				return match;
+			});
+
+			// 3. Cylinder shape: ID[(text)]
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\[\s*\(([^")]+)\)\s*\]/g, (match, id, text) => {
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}[("${escapedText}")]`;
+				}
+				return match;
+			});
+
+			// 4. Circle shape: ID((text))
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\(\s*\(([^")]+)\)\s*\)/g, (match, id, text) => {
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}(("${escapedText}"))`;
+				}
+				return match;
+			});
+
+			// 5. Hexagon shape: ID{{text}}
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\{\s*\{([^"}]+)\}\s*\}/g, (match, id, text) => {
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}{{"${escapedText}"}}`;
+				}
+				return match;
+			});
+
+			// 6. Rhombus/Decision shape: ID{text}
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\{\s*([^"}]+)\s*\}/g, (match, id, text) => {
+				if (text.startsWith('{') || text.endsWith('}')) return match;
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}{"${escapedText}"}`;
+				}
+				return match;
+			});
+
+			// 7. Round shape: ID(text)
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\(\s*([^")]+)\s*\)/g, (match, id, text) => {
+				if (text.startsWith('(') || text.endsWith(')')) return match;
+				if (id === 'graph' || id === 'flowchart') return match;
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}("${escapedText}")`;
+				}
+				return match;
+			});
+
+			// 8. Square shape: ID[text]
+			line = line.replace(/(\b[a-zA-Z0-9_-]+)\[\s*([^"\]]+)\s*\]/g, (match, id, text) => {
+				if (text.startsWith('[') || text.endsWith(']')) return match;
+				if (specialCharRegex.test(text)) {
+					const escapedText = text.replace(/"/g, '\\"');
+					return `${id}["${escapedText}"]`;
+				}
+				return match;
+			});
+
+			return line;
+		});
+		
+		return sanitizedLines.join('\n');
+	}
+
+	async function renderAllMermaid(force: boolean = false) {
+		if (!mermaidLib) return;
+		
+		const containers = document.querySelectorAll('.mermaid-preview-container');
+		for (const container of containers) {
+			const id = container.id.replace('container-', '');
+			const template = document.getElementById(id) as HTMLTemplateElement;
+			if (!template) continue;
+			
+			const rawCode = decodeURIComponent(template.innerHTML).trim();
+			const code = sanitizeMermaidCode(rawCode);
+			const lastCode = container.getAttribute('data-last-code');
+			
+			// Avoid re-rendering if code is exactly the same and already processed, unless forced (e.g. theme changed)
+			if (!force && lastCode === code && container.getAttribute('data-processed') === 'true') {
+				continue;
+			}
+			
+			if (force) {
+				container.removeAttribute('data-processed');
+				container.removeAttribute('data-last-code');
+			}
+			
+			container.setAttribute('data-last-code', code);
+			
+			try {
+				// Parse to validate syntax
+				await mermaidLib.parse(code);
+				
+				// Generate a completely unique element ID for mermaid.render to avoid collisions
+				const renderId = `svg-${id}-${Math.random().toString(36).slice(2, 7)}`;
+				
+				// Render diagram
+				const { svg } = await mermaidLib.render(renderId, code);
+				container.innerHTML = svg;
+				container.setAttribute('data-processed', 'true');
+				container.classList.remove('has-error');
+			} catch (err: any) {
+				// If not generating, show error block. If generating, keep loading/partial preview
+				if (!isGenerating) {
+					console.error('Mermaid render error:', err);
+					container.innerHTML = `
+						<div class="mermaid-error">
+							<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align: middle; margin-right: 8px; display: inline-block;">
+								<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+							</svg>
+							<span>Error rendering flowchart: ${err.message || 'Syntax error'}</span>
+						</div>
+					`;
+					container.classList.add('has-error');
+					container.setAttribute('data-processed', 'true');
+				} else {
+					if (!container.innerHTML || container.innerHTML.includes('mermaid-error')) {
+						container.innerHTML = `
+							<div class="mermaid-loading">
+								<div class="spinner-glow small"></div>
+								<span>Generating flowchart...</span>
+							</div>
+						`;
+					}
+				}
+			}
+		}
+	}
+
+	// Register global handlers for tab switching & fullscreen zoom
+	if (typeof window !== 'undefined') {
+		(window as any).zoomMermaid = (id: string) => {
+			const template = document.getElementById(id) as HTMLTemplateElement;
+			if (!template) return;
+			const code = decodeURIComponent(template.innerHTML);
+			lightboxMermaidCode = code;
+			lightboxMermaidScale = 1;
+			lightboxMermaidOffset = { x: 0, y: 0 };
+		};
+
+		(window as any).switchMermaidTab = (id: string, tab: 'preview' | 'code') => {
+			const wrapper = document.getElementById(`wrapper-${id}`);
+			if (!wrapper) return;
+			
+			const previewContainer = document.getElementById(`container-${id}`);
+			const codeContainer = document.getElementById(`code-container-${id}`);
+			const zoomBtn = document.getElementById(`zoom-btn-${id}`);
+			const tabs = wrapper.querySelectorAll('.mermaid-tab');
+			
+			if (tab === 'preview') {
+				previewContainer?.classList.remove('hidden');
+				codeContainer?.classList.add('hidden');
+				zoomBtn?.classList.remove('hidden');
+				tabs[0]?.classList.add('active');
+				tabs[1]?.classList.remove('active');
+			} else {
+				previewContainer?.classList.add('hidden');
+				codeContainer?.classList.remove('hidden');
+				zoomBtn?.classList.add('hidden');
+				tabs[0]?.classList.remove('active');
+				tabs[1]?.classList.add('active');
+			}
+		};
+	}
+
+	function closeMermaidLightbox() {
+		lightboxMermaidCode = null;
+	}
+
+	function zoomIn(e: MouseEvent) {
+		e.stopPropagation();
+		lightboxMermaidScale = Math.min(lightboxMermaidScale + 0.15, 3);
+	}
+
+	function zoomOut(e: MouseEvent) {
+		e.stopPropagation();
+		lightboxMermaidScale = Math.max(lightboxMermaidScale - 0.15, 0.3);
+	}
+
+	function zoomReset(e: MouseEvent) {
+		e.stopPropagation();
+		lightboxMermaidScale = 1;
+		lightboxMermaidOffset = { x: 0, y: 0 };
+	}
+
+	function startDrag(e: MouseEvent) {
+		if (e.button !== 0) return; // Only left click
+		lightboxMermaidIsDragging = true;
+		lightboxMermaidDragStart = {
+			x: e.clientX - lightboxMermaidOffset.x,
+			y: e.clientY - lightboxMermaidOffset.y
+		};
+	}
+
+	function drag(e: MouseEvent) {
+		if (!lightboxMermaidIsDragging) return;
+		lightboxMermaidOffset = {
+			x: e.clientX - lightboxMermaidDragStart.x,
+			y: e.clientY - lightboxMermaidDragStart.y
+		};
+	}
+
+	function endDrag() {
+		lightboxMermaidIsDragging = false;
+	}
+
+	// Close mermaid lightbox on Escape key
+	$effect(() => {
+		if (lightboxMermaidCode) {
+			const handleKeyDown = (e: KeyboardEvent) => {
+				if (e.key === 'Escape') {
+					closeMermaidLightbox();
+				}
+			};
+			window.addEventListener('keydown', handleKeyDown);
+			return () => {
+				window.removeEventListener('keydown', handleKeyDown);
+			};
+		}
+	});
+
+	// Handle wheel zoom inside viewport without passive listeners warning
+	$effect(() => {
+		if (lightboxMermaidCode && typeof window !== 'undefined') {
+			const viewport = document.querySelector('.lightbox-mermaid-viewport');
+			if (viewport) {
+				const preventDefaultWheel = (e: WheelEvent) => {
+					e.preventDefault();
+					const zoomFactor = 0.08;
+					const direction = e.deltaY < 0 ? 1 : -1;
+					const newScale = lightboxMermaidScale + direction * zoomFactor;
+					lightboxMermaidScale = Math.max(0.3, Math.min(newScale, 4));
+				};
+				viewport.addEventListener('wheel', preventDefaultWheel as any, { passive: false });
+				return () => {
+					viewport.removeEventListener('wheel', preventDefaultWheel as any);
+				};
+			}
+		}
+	});
+
+	// Watch for lightbox opening to render the Mermaid SVG into it
+	$effect(() => {
+		if (lightboxMermaidCode && lightboxMermaidContainer && mermaidLib) {
+			const code = sanitizeMermaidCode(lightboxMermaidCode);
+			const container = lightboxMermaidContainer;
+			const renderId = `lightbox-svg-${Math.random().toString(36).slice(2, 7)}`;
+			
+			mermaidLib.render(renderId, code).then(({ svg }: { svg: string }) => {
+				if (container) {
+					container.innerHTML = svg;
+				}
+			}).catch((err: any) => {
+				console.error('Lightbox Mermaid render error:', err);
+				if (container) {
+					container.innerHTML = `
+						<div class="mermaid-error">
+							<span>Error rendering flowchart: ${err.message || 'Syntax error'}</span>
+						</div>
+					`;
+				}
+			});
+		}
+	});
 
 	// Close dropdown when clicking outside
 	$effect(() => {
@@ -192,15 +600,67 @@
 <div class="chat-area">
 	<!-- Sticky Header Bar -->
 	<header class="chat-header">
-		<div class="chat-title">
-			{#if conversation}
-				{conversation.title}
-			{:else}
-				New Conversation
-			{/if}
+		<div class="chat-title-group">
+			<button 
+				class="sidebar-toggle-btn" 
+				onclick={onToggleSidebar}
+				title={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
+				aria-label={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
+			>
+				<svg viewBox="0 0 24 24" width="20" height="20">
+					{#if showSidebar}
+						<!-- Sidebar Shown Icon -->
+						<path fill="currentColor" d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 4v10h4V8H4zm6 0v10h10V8H10z"/>
+					{:else}
+						<!-- Sidebar Hidden Icon -->
+						<path fill="currentColor" d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 4v10h16V8H4z"/>
+					{/if}
+				</svg>
+			</button>
+			<div class="chat-title">
+				{#if conversation}
+					{conversation.title}
+				{:else}
+					New Conversation
+				{/if}
+			</div>
 		</div>
 
 		<div class="header-actions">
+			<!-- Theme Toggle Button -->
+			<button 
+				class="theme-toggle-btn"
+				onclick={onToggleTheme}
+				title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+				aria-label={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+			>
+				{#if theme === 'dark'}
+					<!-- Sun Icon -->
+					<svg viewBox="0 0 24 24" width="18" height="18">
+						<path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41zm-12.37 12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41z"/>
+					</svg>
+				{:else}
+					<!-- Moon Icon -->
+					<svg viewBox="0 0 24 24" width="18" height="18">
+						<path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+					</svg>
+				{/if}
+			</button>
+
+			{#if conversation}
+				<button 
+					class="context-toggle-btn-header" 
+					class:active-panel={showContextPanel}
+					onclick={onToggleContextPanel}
+					title="Toggle Context Settings"
+				>
+					<svg viewBox="0 0 24 24" width="16" height="16">
+						<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+					</svg>
+					<span>Context</span>
+				</button>
+			{/if}
+
 			{#if conversation && conversation.messages.length > 0}
 				<div class="export-controls">
 					<button 
@@ -392,8 +852,45 @@
 										</div>
 									{/if}
 								{:else}
-									<!-- Render parsed markdown -->
-									{@html renderMarkdown(msg.content)}
+									<!-- Render parsed markdown with thinking block extraction -->
+									{@const parsed = parseThinking(msg.content)}
+									{#if parsed.thinking}
+										<details class="thoughts-details" open={parsed.isThinking}>
+											<summary class="thoughts-summary">
+												<span class="thinking-icon-wrapper">
+													<svg class="thinking-icon" class:animate-pulse={parsed.isThinking} viewBox="0 0 24 24" width="14" height="14">
+														<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+													</svg>
+												</span>
+												<span class="thinking-text-label">
+													{parsed.isThinking ? 'Thinking Process...' : 'Thought Process'}
+												</span>
+												<button 
+													type="button" 
+													class="open-thinking-pane-inline-btn" 
+													onclick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenThinking(msg.id); }}
+													title="Open thinking process in right pane"
+												>
+													View in Right Pane ↗
+												</button>
+											</summary>
+											<div class="thoughts-content markdown-body">
+												{@html renderMarkdown(parsed.thinking)}
+											</div>
+										</details>
+									{/if}
+
+									{#if parsed.response}
+										<div class="assistant-response-content">
+											{@html renderMarkdown(parsed.response)}
+										</div>
+									{:else if parsed.isThinking}
+										<div class="thinking-placeholder-msg">
+											<div class="typing-indicator small-indicator">
+												<span></span><span></span><span></span>
+											</div>
+										</div>
+									{/if}
 								{/if}
 							</div>
 						</div>
@@ -427,6 +924,65 @@
 		{/if}
 	</div>
 	
+	{#if lightboxImage}
+		<div class="lightbox-overlay" onclick={closeLightbox} onkeydown={(e) => e.key === 'Escape' && closeLightbox()} role="button" tabindex="-1" aria-label="Close Lightbox" transition:fade={{ duration: 150 }}>
+			<button class="lightbox-close" onclick={closeLightbox} aria-label="Close Lightbox">&times;</button>
+			<div onclick={(e) => e.stopPropagation()} role="presentation">
+				<img src={lightboxImage} alt={lightboxAlt} class="lightbox-content" />
+			</div>
+			{#if lightboxAlt}
+				<div class="lightbox-caption">{lightboxAlt}</div>
+			{/if}
+		</div>
+	{/if}
+
+	{#if lightboxMermaidCode}
+		<div 
+			class="lightbox-overlay mermaid-lightbox" 
+			onclick={closeMermaidLightbox} 
+			onkeydown={(e) => e.key === 'Escape' && closeMermaidLightbox()} 
+			role="button" 
+			tabindex="-1" 
+			aria-label="Close Lightbox" 
+			transition:fade={{ duration: 150 }}
+		>
+			<button class="lightbox-close" onclick={closeMermaidLightbox} aria-label="Close Lightbox">&times;</button>
+			
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="lightbox-mermaid-header" onclick={(e) => e.stopPropagation()}>
+				<span class="lightbox-mermaid-title">Interactive Flowchart Viewer</span>
+				<div class="lightbox-mermaid-controls">
+					<button class="control-btn" onclick={zoomIn} title="Zoom In">+</button>
+					<span class="zoom-indicator">{Math.round(lightboxMermaidScale * 100)}%</span>
+					<button class="control-btn" onclick={zoomOut} title="Zoom Out">-</button>
+					<button class="control-btn" onclick={zoomReset} title="Reset View">Reset</button>
+				</div>
+			</div>
+
+			<div 
+				class="lightbox-mermaid-viewport" 
+				onclick={(e) => e.stopPropagation()}
+				onmousedown={startDrag}
+				onmousemove={drag}
+				onmouseup={endDrag}
+				onmouseleave={endDrag}
+				role="presentation"
+				style="cursor: {lightboxMermaidIsDragging ? 'grabbing' : 'grab'}"
+			>
+				<div 
+					class="lightbox-mermaid-content"
+					bind:this={lightboxMermaidContainer}
+					style="transform: translate({lightboxMermaidOffset.x}px, {lightboxMermaidOffset.y}px) scale({lightboxMermaidScale}); transform-origin: center;"
+				>
+					<div class="mermaid-loading">
+						<div class="spinner-glow small"></div>
+						<span>Rendering flowchart...</span>
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -442,7 +998,7 @@
 	.chat-header {
 		height: var(--header-height, 56px);
 		border-bottom: 1px solid var(--border-color);
-		background-color: rgba(19, 19, 20, 0.8);
+		background-color: var(--header-bg);
 		backdrop-filter: blur(8px);
 		display: flex;
 		align-items: center;
@@ -454,6 +1010,33 @@
 		flex-shrink: 0;
 	}
 
+	.chat-title-group {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-width: 0;
+		flex: 1;
+		margin-right: 16px;
+	}
+
+	.sidebar-toggle-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 6px;
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.sidebar-toggle-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
 	.chat-title {
 		font-family: var(--font-title);
 		font-weight: 500;
@@ -462,7 +1045,7 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 60%;
+		min-width: 0;
 	}
 
 	.header-actions {
@@ -512,7 +1095,7 @@
 		position: absolute;
 		right: 0;
 		top: calc(100% + 8px);
-		background-color: rgba(30, 31, 32, 0.95);
+		background-color: var(--bg-secondary);
 		backdrop-filter: blur(12px);
 		border: 1px solid var(--border-color);
 		border-radius: 12px;
@@ -1050,5 +1633,199 @@
 
 	@keyframes spin {
 		to { transform: rotate(360deg); }
+	}
+
+	.context-toggle-btn-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 20px;
+		padding: 6px 14px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+		cursor: pointer;
+	}
+
+	.context-toggle-btn-header:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+	}
+
+	.context-toggle-btn-header.active-panel {
+		background-color: rgba(168, 199, 250, 0.15);
+		color: var(--accent-blue);
+		border-color: var(--accent-blue);
+	}
+
+	/* Collapsible thoughts/thinking block styling */
+	.thoughts-details {
+		background-color: var(--bg-tertiary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		margin-bottom: 12px;
+		overflow: hidden;
+		transition: border-color var(--transition-fast);
+	}
+
+	.thoughts-details[open] {
+		border-color: var(--border-light);
+	}
+
+	.thoughts-summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		cursor: pointer;
+		user-select: none;
+		font-weight: 500;
+	}
+
+	.thoughts-summary:hover {
+		color: var(--text-secondary);
+		background-color: rgba(255, 255, 255, 0.01);
+	}
+
+	.thinking-icon-wrapper {
+		color: #e2a54b;
+		display: flex;
+		align-items: center;
+	}
+
+	.thinking-text-label {
+		flex: 1;
+	}
+
+	.open-thinking-pane-inline-btn {
+		background: none;
+		border: none;
+		color: var(--accent-blue);
+		font-size: 0.75rem;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 2px 6px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+		margin-left: auto;
+	}
+
+	.open-thinking-pane-inline-btn:hover {
+		background-color: rgba(168, 199, 250, 0.1);
+		color: var(--text-primary);
+		text-decoration: underline;
+	}
+
+	.thoughts-content {
+		padding: 10px 14px;
+		border-top: 1px solid var(--border-light);
+		background-color: rgba(0, 0, 0, 0.05);
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.thoughts-content :global(p) {
+		margin-bottom: 0.5rem;
+		font-size: 0.8rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.thoughts-content :global(p:last-child) {
+		margin-bottom: 0;
+	}
+
+	.thoughts-content :global(h1),
+	.thoughts-content :global(h2),
+	.thoughts-content :global(h3),
+	.thoughts-content :global(h4),
+	.thoughts-content :global(h5),
+	.thoughts-content :global(h6) {
+		font-size: 0.85rem;
+		margin-top: 10px;
+		margin-bottom: 4px;
+		color: var(--text-secondary);
+	}
+
+	.thoughts-content :global(ul),
+	.thoughts-content :global(ol) {
+		margin-bottom: 8px;
+		padding-left: 20px;
+	}
+
+	.thoughts-content :global(li) {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		margin-bottom: 2px;
+	}
+
+	.thoughts-content :global(code) {
+		font-size: 0.82em;
+	}
+
+	.thoughts-content :global(.code-block-wrapper) {
+		margin: 8px 0;
+		font-size: 0.8rem;
+	}
+
+	.thoughts-content :global(.code-block-header) {
+		padding: 4px 10px;
+	}
+
+	.thoughts-content :global(pre[class*="language-"]) {
+		padding: 8px 12px;
+	}
+
+	.thinking-placeholder-msg {
+		display: flex;
+		align-items: center;
+		padding: 8px 0;
+	}
+
+	.small-indicator {
+		padding: 0;
+		gap: 4px;
+	}
+
+	.small-indicator span {
+		width: 6px;
+		height: 6px;
+	}
+
+	.theme-toggle-btn {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-secondary);
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.theme-toggle-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+		transform: scale(1.05);
+	}
+
+	.theme-toggle-btn:active {
+		transform: scale(0.95);
+	}
+
+	.theme-toggle-btn svg {
+		width: 18px;
+		height: 18px;
+		fill: currentColor;
 	}
 </style>

@@ -38,6 +38,7 @@ function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy:
  * Fetch available Ollama models from local service (via SvelteKit proxy or direct fetch)
  */
 export async function fetchModels(ollamaUrl: string = DEFAULT_OLLAMA_URL): Promise<OllamaModel[]> {
+	if (typeof window === 'undefined') return [];
 	try {
 		const target = getTargetUrl('api/tags', ollamaUrl);
 		const headers: Record<string, string> = {};
@@ -111,6 +112,23 @@ export async function streamChat(
 			return msg;
 		});
 
+		// Find the last user message to append the system prompt.
+		// This guarantees that models (like deepseek-r1, gemma, etc.) which often ignore the 'system' role
+		// will still receive the reference files and instructions in their direct user message.
+		if (systemPrompt && chatMessages.length > 0) {
+			let lastUserMsg = null;
+			for (let i = chatMessages.length - 1; i >= 0; i--) {
+				if (chatMessages[i].role === 'user') {
+					lastUserMsg = chatMessages[i];
+					break;
+				}
+			}
+
+			if (lastUserMsg) {
+				lastUserMsg.content += `\n\n---\n[System Instructions & Reference Context]:\n${systemPrompt}`;
+			}
+		}
+
 		if (systemPrompt) {
 			chatMessages.unshift({
 				role: 'system',
@@ -153,6 +171,8 @@ export async function streamChat(
 		const decoder = new TextDecoder('utf-8');
 		let buffer = '';
 		let fullResponseText = '';
+		let hasStartedThinking = false;
+		let hasFinishedThinking = false;
 
 		while (true) {
 			const { done, value } = await reader.read();
@@ -172,13 +192,31 @@ export async function streamChat(
 					if (json.error) {
 						throw new Error(json.error);
 					}
+					
+					const thinking = json.message?.thinking || json.message?.reasoning || '';
 					const content = json.message?.content || '';
-					if (content) {
-						fullResponseText += content;
-						onChunk(content);
+					let chunkToStream = '';
+
+					if (thinking) {
+						if (!hasStartedThinking) {
+							chunkToStream += '<think>';
+							hasStartedThinking = true;
+						}
+						chunkToStream += thinking;
+					} else if (content) {
+						if (hasStartedThinking && !hasFinishedThinking) {
+							chunkToStream += '</think>';
+							hasFinishedThinking = true;
+						}
+						chunkToStream += content;
 					}
+
+					if (chunkToStream) {
+						fullResponseText += chunkToStream;
+						onChunk(chunkToStream);
+					}
+					
 					if (json.done) {
-						// Stream is finished
 						break;
 					}
 				} catch (e: any) {
@@ -187,18 +225,49 @@ export async function streamChat(
 			}
 		}
 
+		// Ensure we close the think tag if the stream finished while thinking
+		if (hasStartedThinking && !hasFinishedThinking) {
+			onChunk('</think>');
+			fullResponseText += '</think>';
+			hasFinishedThinking = true;
+		}
+
 		// Handle any remaining text in buffer
 		if (buffer.trim()) {
 			try {
 				const json = JSON.parse(buffer);
+				const thinking = json.message?.thinking || json.message?.reasoning || '';
 				const content = json.message?.content || '';
-				if (content) {
-					fullResponseText += content;
-					onChunk(content);
+				let chunkToStream = '';
+
+				if (thinking) {
+					if (!hasStartedThinking) {
+						chunkToStream += '<think>';
+						hasStartedThinking = true;
+					}
+					chunkToStream += thinking;
+				} else if (content) {
+					if (hasStartedThinking && !hasFinishedThinking) {
+						chunkToStream += '</think>';
+						hasFinishedThinking = true;
+					}
+					chunkToStream += content;
+				}
+
+				if (chunkToStream) {
+					fullResponseText += chunkToStream;
+					onChunk(chunkToStream);
 				}
 			} catch (e) {
 				// Ignore trailing syntax details
 			}
+		}
+
+		// Double check closing tag
+		if (hasStartedThinking && !hasFinishedThinking) {
+			onChunk('</think>');
+			fullResponseText += '</think>';
+			hasFinishedThinking = true;
 		}
 
 		onDone(fullResponseText);

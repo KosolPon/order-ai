@@ -16,12 +16,29 @@ export interface Message {
 	attachments?: Attachment[]; // full attachment details for history rendering
 }
 
+export interface ProjectFile {
+	id: string;
+	name: string;
+	content: string; // The text content of the file
+	size: number; // File size in bytes
+}
+
+export interface Project {
+	id: string;
+	name: string;
+	context: string;
+	createdAt: number;
+	files?: ProjectFile[]; // Project-level reference files
+}
+
 export interface Conversation {
 	id: string;
 	title: string;
 	messages: Message[];
 	createdAt: number;
 	model: string;
+	projectId?: string; // Links chat to a project
+	context?: string; // Chat-specific system context
 }
 
 export interface OllamaModel {

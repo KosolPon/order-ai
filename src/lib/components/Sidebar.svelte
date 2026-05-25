@@ -1,9 +1,11 @@
 <script lang="ts">
-	import type { Conversation, OllamaModel } from '$lib/types';
+	import type { Conversation, OllamaModel, Project, ProjectFile } from '$lib/types';
 	
 	let {
 		conversations = [],
 		currentConversationId = null,
+		projects = [],
+		globalContext = $bindable(''),
 		ollamaUrl = $bindable(),
 		isConnected = false,
 		models = [],
@@ -11,10 +13,17 @@
 		onNewConversation,
 		onDeleteConversation,
 		onUpdateTitle,
-		onRefreshModels
+		onRefreshModels,
+		onCreateProject,
+		onUpdateProject,
+		onDeleteProject,
+		onNewConversationInProject,
+		projectSettingsToOpenId = $bindable(null)
 	} = $props<{
 		conversations: Conversation[];
 		currentConversationId: string | null;
+		projects: Project[];
+		globalContext: string;
 		ollamaUrl: string;
 		isConnected: boolean;
 		models: OllamaModel[];
@@ -23,11 +32,30 @@
 		onDeleteConversation: (id: string) => void;
 		onUpdateTitle: (id: string, newTitle: string) => void;
 		onRefreshModels: () => void;
+		onCreateProject: (name: string, context?: string) => void;
+		onUpdateProject: (id: string, name: string, context: string) => void;
+		onDeleteProject: (id: string, deleteChats: boolean) => void;
+		onNewConversationInProject: (projectId: string) => void;
+		projectSettingsToOpenId: string | null;
 	}>();
 
 	let editingId = $state<string | null>(null);
 	let editTitle = $state<string>('');
 	let isSettingsOpen = $state(false);
+
+	// Projects state
+	let collapsedProjects = $state<Record<string, boolean>>({});
+	let isProjectSettingsOpen = $state(false);
+	let selectedProjectForSettings = $state<Project | null>(null);
+	let projectSettingsName = $state('');
+	let projectSettingsContext = $state('');
+	let projectSettingsFiles = $state<ProjectFile[]>([]);
+	let deleteProjectChatsOption = $state(false);
+
+	// File upload states
+	let fileInputRef = $state<HTMLInputElement | null>(null);
+	let isReadingFile = $state(false);
+	let fileError = $state<string | null>(null);
 
 	function startEdit(conv: Conversation, e: Event) {
 		e.stopPropagation();
@@ -53,6 +81,126 @@
 	function autofocus(node: HTMLElement) {
 		node.focus();
 	}
+
+	// Project operations
+	function toggleProject(projectId: string) {
+		collapsedProjects[projectId] = !collapsedProjects[projectId];
+	}
+
+	function openCreateProjectModal() {
+		selectedProjectForSettings = null;
+		projectSettingsName = '';
+		projectSettingsContext = '';
+		projectSettingsFiles = [];
+		fileError = null;
+		isProjectSettingsOpen = true;
+	}
+
+	function openProjectSettings(project: Project, e: Event) {
+		e.stopPropagation();
+		selectedProjectForSettings = project;
+		projectSettingsName = project.name;
+		projectSettingsContext = project.context || '';
+		projectSettingsFiles = project.files ? [...project.files] : [];
+		fileError = null;
+		deleteProjectChatsOption = false;
+		isProjectSettingsOpen = true;
+	}
+
+	function closeProjectSettings() {
+		isProjectSettingsOpen = false;
+		selectedProjectForSettings = null;
+	}
+
+	function saveProjectSettings() {
+		if (!projectSettingsName.trim()) return;
+		if (selectedProjectForSettings) {
+			onUpdateProject(selectedProjectForSettings.id, projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles);
+		} else {
+			onCreateProject(projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles);
+		}
+		closeProjectSettings();
+	}
+
+	function handleDeleteProjectClick() {
+		if (!selectedProjectForSettings) return;
+		onDeleteProject(selectedProjectForSettings.id, deleteProjectChatsOption);
+		closeProjectSettings();
+	}
+
+	function handleNewChatInProject(projectId: string, e: Event) {
+		e.stopPropagation();
+		collapsedProjects[projectId] = false; // Make sure it's expanded
+		onNewConversationInProject(projectId);
+	}
+
+	function handleFileUpload(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const fileList = target.files;
+		if (!fileList || fileList.length === 0) return;
+		
+		isReadingFile = true;
+		fileError = null;
+
+		const file = fileList[0];
+		
+		// 1.5MB Limit to prevent localStorage QuotaExceededError
+		if (file.size > 1.5 * 1024 * 1024) {
+			fileError = `File "${file.name}" is too large (> 1.5 MB). Please choose a smaller reference file.`;
+			isReadingFile = false;
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			const content = event.target?.result as string;
+			const newFile: ProjectFile = {
+				id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+				name: file.name,
+				content,
+				size: file.size
+			};
+			projectSettingsFiles = [...projectSettingsFiles, newFile];
+			isReadingFile = false;
+			if (fileInputRef) fileInputRef.value = '';
+		};
+		reader.onerror = () => {
+			fileError = `Failed to read file "${file.name}".`;
+			isReadingFile = false;
+		};
+		reader.readAsText(file);
+	}
+
+	function removeProjectFile(fileId: string) {
+		projectSettingsFiles = projectSettingsFiles.filter(f => f.id !== fileId);
+	}
+
+	const totalFilesSize = $derived(
+		projectSettingsFiles.reduce((acc, f) => acc + f.size, 0)
+	);
+
+	const independentConvs = $derived(conversations.filter((c: Conversation) => !c.projectId));
+
+	function isProjectActive(projectId: string): boolean {
+		const activeConv = conversations.find((c: Conversation) => c.id === currentConversationId);
+		return activeConv?.projectId === projectId;
+	}
+
+	// Listen to externally triggered project settings requests
+	$effect(() => {
+		if (projectSettingsToOpenId) {
+			const proj = projects.find((p: Project) => p.id === projectSettingsToOpenId);
+			if (proj) {
+				selectedProjectForSettings = proj;
+				projectSettingsName = proj.name;
+				projectSettingsContext = proj.context || '';
+				projectSettingsFiles = proj.files ? [...proj.files] : [];
+				deleteProjectChatsOption = false;
+				isProjectSettingsOpen = true;
+			}
+			projectSettingsToOpenId = null;
+		}
+	});
 </script>
 
 <aside class="sidebar">
@@ -74,12 +222,126 @@
 
 	<!-- History Navigation -->
 	<div class="history-container">
-		<div class="history-title">Conversations</div>
-		{#if conversations.length === 0}
-			<div class="empty-history">No conversations yet</div>
+		<div class="history-header">
+			<div class="history-title">Projects</div>
+			<button class="add-project-btn" onclick={openCreateProjectModal} title="Create New Project">
+				<svg viewBox="0 0 24 24" width="16" height="16">
+					<path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/>
+				</svg>
+			</button>
+		</div>
+
+		<div class="projects-list">
+			{#if projects.length === 0}
+				<div class="empty-projects-message text-muted">No projects yet. Create one to organize chats.</div>
+			{:else}
+				{#each projects as project (project.id)}
+					<div class="project-folder-group">
+						<!-- Project Folder Header -->
+						<div class="project-folder-header" class:active-project={isProjectActive(project.id)}>
+							<button class="project-toggle-btn" onclick={() => toggleProject(project.id)}>
+								<svg class="folder-chevron" class:collapsed={collapsedProjects[project.id]} viewBox="0 0 24 24" width="14" height="14">
+									<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+								</svg>
+								<svg class="folder-icon" viewBox="0 0 24 24" width="16" height="16">
+									<path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+								</svg>
+								<span class="project-name">{project.name}</span>
+							</button>
+
+							<div class="project-actions">
+								<button class="project-action-btn" onclick={(e) => openProjectSettings(project, e)} title="Project Settings & Context">
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+									</svg>
+								</button>
+								<button class="project-action-btn" onclick={(e) => handleNewChatInProject(project.id, e)} title="New Conversation in Project">
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+									</svg>
+								</button>
+							</div>
+						</div>
+
+						<!-- Project Chat List -->
+						{#if !collapsedProjects[project.id]}
+							<div class="project-chats-list">
+								{#if conversations.filter((c: Conversation) => c.projectId === project.id).length === 0}
+									<div class="empty-project-chats">No conversations in project</div>
+								{:else}
+									<div class="conversation-list">
+										{#each conversations.filter((c: Conversation) => c.projectId === project.id) as conv (conv.id)}
+											<div 
+												class="conversation-item" 
+												class:active={currentConversationId === conv.id}
+												onclick={() => onSelectConversation(conv.id)}
+												role="button"
+												tabindex="0"
+												onkeydown={(e) => e.key === 'Enter' && onSelectConversation(conv.id)}
+											>
+												<svg class="chat-icon" viewBox="0 0 24 24" width="16" height="16">
+													<path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+												</svg>
+
+												{#if editingId === conv.id}
+													<input 
+														type="text" 
+														class="title-edit-input" 
+														bind:value={editTitle}
+														onclick={(e) => e.stopPropagation()}
+														onblur={() => saveEdit(conv.id)}
+														onkeydown={(e) => handleKeydown(e, conv.id)}
+														use:autofocus
+													/>
+												{:else}
+													<span class="conv-title">{conv.title}</span>
+												{/if}
+
+												<div class="actions">
+													{#if editingId !== conv.id}
+														<button 
+															class="action-btn" 
+															onclick={(e) => startEdit(conv, e)} 
+															title="Rename"
+														>
+															<svg viewBox="0 0 24 24" width="14" height="14">
+																<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+															</svg>
+														</button>
+													{/if}
+													<button 
+														class="action-btn delete" 
+														onclick={(e) => {
+															e.stopPropagation();
+															onDeleteConversation(conv.id);
+														}} 
+														title="Delete"
+													>
+														<svg viewBox="0 0 24 24" width="14" height="14">
+															<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+														</svg>
+													</button>
+												</div>
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			{/if}
+		</div>
+
+		<div class="history-header unassigned-header">
+			<div class="history-title">Independent Chats</div>
+		</div>
+
+		{#if independentConvs.length === 0}
+			<div class="empty-history">No independent chats</div>
 		{:else}
 			<div class="conversation-list">
-				{#each conversations as conv (conv.id)}
+				{#each independentConvs as conv (conv.id)}
 					<div 
 						class="conversation-item" 
 						class:active={currentConversationId === conv.id}
@@ -174,6 +436,17 @@
 					</div>
 				</div>
 
+				<div class="setting-item">
+					<label for="sidebar-global-context">Global Context (All Chats)</label>
+					<textarea 
+						id="sidebar-global-context"
+						placeholder="Enter global system instructions..." 
+						bind:value={globalContext}
+						rows="3"
+						class="global-context-textarea"
+					></textarea>
+				</div>
+
 				<div class="connection-status text-muted">
 					{#if isConnected}
 						<span class="text-success">Connected. Found {models.length} models.</span>
@@ -199,6 +472,131 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Project Settings Modal (rendered relative to viewport) -->
+	{#if isProjectSettingsOpen}
+		<div class="modal-backdrop" onclick={closeProjectSettings} onkeydown={(e) => e.key === 'Escape' && closeProjectSettings()} role="button" tabindex="-1">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<div class="project-modal-content animate-zoom-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+				<div class="modal-header">
+					<h3>{selectedProjectForSettings ? 'Project Settings' : 'Create New Project'}</h3>
+					<button class="modal-close-btn" onclick={closeProjectSettings} title="Close dialog">✕</button>
+				</div>
+				
+				<div class="modal-body">
+					<div class="modal-form-item">
+						<label for="project-name-input">Project Name</label>
+						<input 
+							id="project-name-input"
+							type="text" 
+							bind:value={projectSettingsName} 
+							placeholder="Enter project name (e.g. Book, monitor)"
+						/>
+					</div>
+					
+					<div class="modal-form-item">
+						<label for="project-context-textarea">Project Context (System Instruction)</label>
+						<textarea 
+							id="project-context-textarea"
+							bind:value={projectSettingsContext} 
+							placeholder="Enter context instructions that will apply to all chats in this project..." 
+							rows="5"
+						></textarea>
+						<p class="modal-help-text">This context prompt will be automatically injected into all chats inside this project.</p>
+					</div>
+
+					<div class="modal-form-item">
+						<div class="files-section-header">
+							<span class="files-section-title">Reference Files (.txt, .md, etc.)</span>
+							<span class="files-size-indicator" class:size-warning={totalFilesSize > 1.2 * 1024 * 1024}>
+								{Math.round(totalFilesSize / 1024)} KB / 1536 KB
+							</span>
+						</div>
+						
+						<!-- Files List -->
+						<div class="modal-files-list">
+							{#if projectSettingsFiles.length === 0}
+								<div class="empty-files-message text-muted">No reference files attached yet.</div>
+							{:else}
+								{#each projectSettingsFiles as file}
+									<div class="project-file-item">
+										<div class="file-item-left">
+											<svg class="file-icon" viewBox="0 0 24 24" width="16" height="16">
+												<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+											</svg>
+											<span class="project-file-name" title={file.name}>{file.name}</span>
+											<span class="project-file-size">({Math.round(file.size / 1024)} KB)</span>
+										</div>
+										<button class="remove-file-btn" onclick={() => removeProjectFile(file.id)} title="Remove File">
+											✕
+										</button>
+									</div>
+								{/each}
+							{/if}
+						</div>
+
+						<!-- File Upload Input -->
+						<div class="file-upload-wrapper">
+							<input 
+								type="file" 
+								id="project-file-upload" 
+								accept=".txt,.md,.js,.ts,.json,.css,.html,.svelte" 
+								onchange={handleFileUpload} 
+								bind:this={fileInputRef}
+								style="display: none;"
+							/>
+							<button 
+								type="button" 
+								class="upload-trigger-btn" 
+								onclick={() => fileInputRef?.click()}
+								disabled={isReadingFile || totalFilesSize >= 1.5 * 1024 * 1024}
+							>
+								{#if isReadingFile}
+									<div class="upload-spinner"></div>
+									<span>Reading file...</span>
+								{:else}
+									<svg viewBox="0 0 24 24" width="16" height="16">
+										<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+									</svg>
+									<span>Attach Reference File</span>
+								{/if}
+							</button>
+						</div>
+						
+						{#if fileError}
+							<div class="file-upload-error">{fileError}</div>
+						{/if}
+					</div>
+
+					{#if selectedProjectForSettings}
+						<div class="modal-delete-section">
+							<div class="danger-title">Danger Zone</div>
+							<div class="delete-controls">
+								<label class="checkbox-label" for="delete-chats-checkbox">
+									<input type="checkbox" id="delete-chats-checkbox" bind:checked={deleteProjectChatsOption} />
+									<span>Also delete all chats inside this project</span>
+								</label>
+								<button class="delete-project-btn" onclick={handleDeleteProjectClick}>
+									Delete Project
+								</button>
+							</div>
+						</div>
+					{/if}
+				</div>
+				
+				<div class="modal-footer">
+					<button class="modal-btn secondary" onclick={closeProjectSettings}>Cancel</button>
+					<button 
+						class="modal-btn primary" 
+						onclick={saveProjectSettings}
+						disabled={!projectSettingsName.trim()}
+					>
+						{selectedProjectForSettings ? 'Save Changes' : 'Create Project'}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </aside>
 
 <style>
@@ -557,6 +955,555 @@
 
 	.text-error {
 		color: #ff6b6b;
+	}
+
+	/* Projects & Modal CSS */
+	.history-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 8px;
+		padding: 0 4px 0 12px;
+	}
+
+	.add-project-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 6px;
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.add-project-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.projects-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-bottom: 20px;
+	}
+
+	.empty-projects-message {
+		font-size: 0.78rem;
+		padding: 12px;
+		text-align: center;
+		border: 1px dashed var(--border-color);
+		border-radius: 8px;
+		margin: 0 4px;
+	}
+
+	.project-folder-group {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.project-folder-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 6px 8px;
+		border-radius: 8px;
+		transition: background-color var(--transition-fast);
+	}
+
+	.project-folder-header:hover {
+		background-color: rgba(255, 255, 255, 0.03);
+	}
+
+	.project-folder-header.active-project {
+		background-color: rgba(168, 199, 250, 0.04);
+	}
+
+	.project-toggle-btn {
+		background: none;
+		border: none;
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--text-secondary);
+		font-size: 0.88rem;
+		font-weight: 600;
+		text-align: left;
+		cursor: pointer;
+		padding: 4px;
+		min-width: 0;
+	}
+
+	.project-toggle-btn:hover {
+		color: var(--text-primary);
+	}
+
+	.folder-chevron {
+		color: var(--text-muted);
+		transition: transform var(--transition-normal);
+		flex-shrink: 0;
+	}
+
+	.folder-chevron.collapsed {
+		transform: rotate(-90deg);
+	}
+
+	.folder-icon {
+		color: var(--accent-blue);
+		opacity: 0.85;
+		flex-shrink: 0;
+	}
+
+	.project-name {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.project-actions {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		opacity: 0;
+		transition: opacity var(--transition-fast);
+	}
+
+	.project-folder-header:hover .project-actions {
+		opacity: 1;
+	}
+
+	.project-action-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.project-action-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.project-chats-list {
+		padding-left: 20px;
+		border-left: 1px solid var(--border-light);
+		margin-left: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: 2px;
+		margin-bottom: 4px;
+	}
+
+	.empty-project-chats {
+		font-size: 0.78rem;
+		color: var(--text-muted);
+		padding: 6px 12px;
+		font-style: italic;
+	}
+
+	.unassigned-header {
+		margin-top: 10px;
+		border-top: 1px solid var(--border-light);
+		padding-top: 14px;
+	}
+
+	.global-context-textarea {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 8px;
+		color: var(--text-primary);
+		font-size: 0.82rem;
+		resize: vertical;
+		outline: none;
+		font-family: inherit;
+		line-height: 1.4;
+	}
+
+	.global-context-textarea:focus {
+		border-color: var(--accent-blue);
+	}
+
+	/* Modal Overlay CSS */
+	.modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background-color: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 999;
+	}
+
+	.project-modal-content {
+		width: 480px;
+		max-width: 90%;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		box-shadow: var(--shadow-lg);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.modal-header {
+		padding: 16px 20px;
+		border-bottom: 1px solid var(--border-light);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.modal-header h3 {
+		font-family: var(--font-title);
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.modal-close-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 1.1rem;
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast);
+	}
+
+	.modal-close-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.modal-body {
+		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.modal-form-item {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.modal-form-item label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+	}
+
+	.modal-form-item input {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 10px 12px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		outline: none;
+		transition: border-color var(--transition-fast);
+	}
+
+	.modal-form-item input:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.modal-form-item textarea {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 10px 12px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		outline: none;
+		resize: vertical;
+		transition: border-color var(--transition-fast);
+		font-family: inherit;
+		line-height: 1.4;
+	}
+
+	.modal-form-item textarea:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.modal-help-text {
+		margin: 0;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.modal-delete-section {
+		margin-top: 8px;
+		border-top: 1px solid var(--border-light);
+		padding-top: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.danger-title {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #ff6b6b;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.delete-controls {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.82rem;
+		color: var(--text-secondary);
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.checkbox-label input {
+		cursor: pointer;
+	}
+
+	.delete-project-btn {
+		background-color: rgba(255, 107, 107, 0.1);
+		border: 1px solid rgba(255, 107, 107, 0.2);
+		color: #ff6b6b;
+		padding: 8px 14px;
+		border-radius: 6px;
+		font-size: 0.82rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.delete-project-btn:hover {
+		background-color: rgba(255, 107, 107, 0.2);
+		border-color: rgba(255, 107, 107, 0.3);
+	}
+
+	.modal-footer {
+		padding: 16px 20px;
+		border-top: 1px solid var(--border-light);
+		background-color: var(--bg-tertiary);
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 10px;
+	}
+
+	.modal-btn {
+		padding: 10px 18px;
+		border-radius: 8px;
+		font-size: 0.88rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.modal-btn.primary {
+		background-color: var(--accent-blue);
+		border: 1px solid var(--accent-blue);
+		color: #ffffff;
+	}
+
+	.modal-btn.primary:hover:not(:disabled) {
+		background-color: #7baaf7;
+		border-color: #7baaf7;
+	}
+
+	.modal-btn.primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.modal-btn.secondary {
+		background: none;
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+	}
+
+	.modal-btn.secondary:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.animate-zoom-in {
+		animation: zoomIn var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	}
+
+	@keyframes zoomIn {
+		from {
+			opacity: 0;
+			transform: scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	/* Project files styling */
+	.files-section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 2px;
+	}
+
+	.files-section-title {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+	}
+
+	.files-size-indicator {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+
+	.files-size-indicator.size-warning {
+		color: #ffaa00;
+	}
+
+	.modal-files-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 10px;
+		max-height: 150px;
+		overflow-y: auto;
+	}
+
+	.empty-files-message {
+		font-size: 0.8rem;
+		text-align: center;
+		padding: 8px 0;
+	}
+
+	.project-file-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 6px 10px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+	}
+
+	.file-item-left {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+
+	.project-file-name {
+		font-size: 0.82rem;
+		font-weight: 500;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 220px;
+	}
+
+	.project-file-size {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.remove-file-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.8rem;
+		cursor: pointer;
+		padding: 2px 4px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.remove-file-btn:hover {
+		background-color: rgba(255, 107, 107, 0.1);
+		color: #ff6b6b;
+	}
+
+	.file-upload-wrapper {
+		display: flex;
+		width: 100%;
+	}
+
+	.upload-trigger-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		width: 100%;
+		padding: 10px;
+		background-color: var(--bg-primary);
+		border: 1px dashed var(--border-color);
+		border-radius: 8px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+		cursor: pointer;
+	}
+
+	.upload-trigger-btn:hover:not(:disabled) {
+		background-color: var(--bg-hover);
+		border-color: var(--accent-blue);
+		color: var(--text-primary);
+	}
+
+	.upload-trigger-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.upload-spinner {
+		width: 14px;
+		height: 14px;
+		border: 2px solid rgba(168, 199, 250, 0.2);
+		border-radius: 50%;
+		border-top-color: var(--accent-blue);
+		animation: spin 0.8s linear infinite;
+	}
+
+	.file-upload-error {
+		font-size: 0.78rem;
+		color: #ff6b6b;
+		margin-top: 4px;
 	}
 
 	@media (max-width: 768px) {

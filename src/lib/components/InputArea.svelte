@@ -26,6 +26,82 @@
 	let linkUrl = $state('');
 	let isLoadingLink = $state(false);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
+	let isListening = $state(false);
+	let recognition: any = null;
+	let baseInput = '';
+
+	function initSpeechRecognition() {
+		if (typeof window === 'undefined') return;
+		const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+		if (!SpeechRecognition) {
+			alert('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge.');
+			return;
+		}
+
+		recognition = new SpeechRecognition();
+		recognition.continuous = true;
+		recognition.interimResults = true;
+		recognition.lang = 'th-TH';
+
+		recognition.onstart = () => {
+			isListening = true;
+			baseInput = input;
+		};
+
+		recognition.onend = () => {
+			isListening = false;
+		};
+
+		recognition.onerror = (e: any) => {
+			console.error('Speech recognition error:', e);
+			if (e.error !== 'no-speech') {
+				isListening = false;
+			}
+		};
+
+		recognition.onresult = (event: any) => {
+			let interimTranscript = '';
+			let finalTranscript = '';
+
+			for (let i = event.resultIndex; i < event.results.length; ++i) {
+				if (event.results[i].isFinal) {
+					finalTranscript += event.results[i][0].transcript;
+				} else {
+					interimTranscript += event.results[i][0].transcript;
+				}
+			}
+
+			let currentInput = baseInput;
+			if (finalTranscript || interimTranscript) {
+				const transcript = (finalTranscript + interimTranscript).trim();
+				if (transcript) {
+					currentInput = baseInput ? `${baseInput} ${transcript}` : transcript;
+				}
+			}
+			input = currentInput;
+			adjustHeight();
+		};
+	}
+
+	function toggleSpeech() {
+		if (!recognition) {
+			initSpeechRecognition();
+		}
+
+		if (!recognition) return;
+
+		if (isListening) {
+			recognition.stop();
+		} else {
+			try {
+				recognition.start();
+			} catch (err) {
+				console.error('Failed to start speech recognition:', err);
+				initSpeechRecognition();
+				recognition?.start();
+			}
+		}
+	}
 
 	// Auto-resize textarea logic
 	$effect(() => {
@@ -183,6 +259,9 @@
 				URL.revokeObjectURL(attr.previewUrl);
 			}
 		});
+		if (recognition) {
+			recognition.stop();
+		}
 	});
 
 	// Focus the link input popover when it appears
@@ -335,6 +414,19 @@
 							</svg>
 						</button>
 					{:else}
+						<!-- Microphone Voice Input Button -->
+						<button 
+							class="control-btn mic-btn" 
+							class:listening={isListening}
+							onclick={toggleSpeech}
+							title={isListening ? "Stop listening" : "Use Voice Input"}
+							type="button"
+						>
+							<svg viewBox="0 0 24 24" width="18" height="18">
+								<path fill="currentColor" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+							</svg>
+						</button>
+
 						<button 
 							class="control-btn send-btn" 
 							class:active={(input.trim().length > 0 || attachments.length > 0) && models.length > 0}
@@ -544,6 +636,34 @@
 		background-color: #fa5252;
 		transform: scale(1.05);
 		box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+	}
+
+	.mic-btn {
+		transition: all var(--transition-fast);
+	}
+
+	.mic-btn.listening {
+		background: linear-gradient(135deg, #ea4335, #c5221f);
+		color: #ffffff;
+		border: none;
+		cursor: pointer;
+		animation: pulse-mic 1.5s infinite;
+		box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.7);
+	}
+
+	@keyframes pulse-mic {
+		0% {
+			transform: scale(1);
+			box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.7);
+		}
+		50% {
+			transform: scale(1.08);
+			box-shadow: 0 0 0 8px rgba(234, 67, 53, 0);
+		}
+		100% {
+			transform: scale(1);
+			box-shadow: 0 0 0 0 rgba(234, 67, 53, 0);
+		}
 	}
 
 	/* Link Button & Popover */

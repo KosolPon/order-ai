@@ -2,10 +2,12 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import ChatArea from '$lib/components/ChatArea.svelte';
 	import InputArea from '$lib/components/InputArea.svelte';
+	import ContextPanel from '$lib/components/ContextPanel.svelte';
 	import { untrack } from 'svelte';
 	
-	import type { Conversation, Message, OllamaModel, Attachment } from '$lib/types';
+	import type { Conversation, Message, OllamaModel, Attachment, Project, ProjectFile } from '$lib/types';
 	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL } from '$lib/ollama';
+	import { parseThinking } from '$lib/markdown';
 
 	// Reactive States
 	let conversations = $state<Conversation[]>([]);
@@ -19,6 +21,25 @@
 	let drafts = $state<Record<string, string>>({});
 	let attachments = $state<Attachment[]>([]);
 	let isInitialized = $state(false);
+	let theme = $state<'dark' | 'light'>('dark');
+
+	// Context and Project States
+	let projects = $state<Project[]>([]);
+	let globalContext = $state<string>('');
+	let showContextPanel = $state<boolean>(false);
+	let projectSettingsToOpenId = $state<string | null>(null);
+
+	// UI layout state
+	let showSidebar = $state<boolean>(true);
+	let sidebarWidth = $state<number>(280);
+	let contextPanelWidth = $state<number>(320);
+	let isResizingLeft = $state<boolean>(false);
+	let isResizingRight = $state<boolean>(false);
+
+	// Thinking / Reasoning states
+	let rightPaneTab = $state<'context' | 'thinking'>('context');
+	let lastOpenedThinkingMsgId = $state<string | null>(null);
+	let selectedThinkingMsgId = $state<string | null>(null);
 
 	// Abort controller to cancel streaming
 	let abortController: AbortController | null = null;
@@ -27,6 +48,59 @@
 	const currentConversation = $derived(
 		conversations.find((c) => c.id === currentConversationId) || null
 	);
+
+	// Computed: active thinking process
+	const activeThinking = $derived.by(() => {
+		if (!currentConversation || currentConversation.messages.length === 0) return null;
+		
+		// If a specific message's thinking is selected, show that
+		if (selectedThinkingMsgId) {
+			const msg = currentConversation.messages.find(m => m.id === selectedThinkingMsgId);
+			if (msg && msg.role === 'assistant') {
+				const parsed = parseThinking(msg.content);
+				if (parsed.thinking) return parsed;
+			}
+		}
+		
+		// Otherwise, search backwards for the most recent assistant message with thinking
+		for (let i = currentConversation.messages.length - 1; i >= 0; i--) {
+			const msg = currentConversation.messages[i];
+			if (msg.role === 'assistant') {
+				const parsed = parseThinking(msg.content);
+				if (parsed.thinking) {
+					return parsed;
+				}
+			}
+		}
+		return null;
+	});
+
+	// Switch to Thinking tab if Right Panel is already open and thinking starts
+	$effect(() => {
+		if (currentConversation && currentConversation.messages.length > 0) {
+			const lastMsg = currentConversation.messages[currentConversation.messages.length - 1];
+			if (lastMsg.role === 'assistant' && lastMsg.id !== lastOpenedThinkingMsgId) {
+				const parsed = parseThinking(lastMsg.content);
+				if (parsed.thinking) {
+					untrack(() => {
+						lastOpenedThinkingMsgId = lastMsg.id;
+						if (showContextPanel) {
+							rightPaneTab = 'thinking';
+						}
+					});
+				}
+			}
+		}
+	});
+
+	// Auto open Sidebar on opening Project Settings
+	$effect(() => {
+		if (projectSettingsToOpenId) {
+			untrack(() => {
+				showSidebar = true;
+			});
+		}
+	});
 
 	// Load data from localStorage on Mount
 	$effect(() => {
@@ -62,14 +136,77 @@
 				}
 			}
 			
+			// Load projects
+			const storedProjects = localStorage.getItem('ollama_projects');
+			if (storedProjects) {
+				try {
+					projects = JSON.parse(storedProjects);
+				} catch (e) {
+					console.error('Failed to parse projects from localStorage:', e);
+				}
+			}
+
+			// Load global context
+			const storedGlobalContext = localStorage.getItem('ollama_global_context');
+			if (storedGlobalContext) {
+				globalContext = storedGlobalContext;
+			}
+			
 			// Load initial draft for current conversation
 			const activeKey = currentConversationId || 'new-chat';
 			if (drafts[activeKey]) {
 				input = drafts[activeKey];
 			}
 
+			// Load UI layout states
+			const storedShowSidebar = localStorage.getItem('ollama_show_sidebar');
+			if (storedShowSidebar !== null) {
+				showSidebar = storedShowSidebar === 'true';
+			}
+
+			const storedShowContextPanel = localStorage.getItem('ollama_show_context_panel');
+			if (storedShowContextPanel !== null) {
+				showContextPanel = storedShowContextPanel === 'true';
+			}
+
+			const storedRightPaneTab = localStorage.getItem('ollama_right_pane_tab');
+			if (storedRightPaneTab === 'context' || storedRightPaneTab === 'thinking') {
+				rightPaneTab = storedRightPaneTab;
+			}
+
+			const storedSidebarWidth = localStorage.getItem('ollama_sidebar_width');
+			if (storedSidebarWidth) {
+				sidebarWidth = parseInt(storedSidebarWidth, 10);
+			}
+
+			const storedContextPanelWidth = localStorage.getItem('ollama_context_panel_width');
+			if (storedContextPanelWidth) {
+				contextPanelWidth = parseInt(storedContextPanelWidth, 10);
+			}
+
+			// Load theme preference
+			const storedTheme = localStorage.getItem('theme');
+			if (storedTheme === 'light' || storedTheme === 'dark') {
+				theme = storedTheme;
+			} else {
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				theme = prefersDark ? 'dark' : 'light';
+			}
+
 			isInitialized = true;
 		});
+	});
+
+	// Sync theme to document element and meta tag
+	$effect(() => {
+		if (theme === 'light') {
+			document.documentElement.setAttribute('data-theme', 'light');
+			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f0f4f9');
+		} else {
+			document.documentElement.setAttribute('data-theme', 'dark');
+			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#131314');
+		}
+		localStorage.setItem('theme', theme);
 	});
 
 	// Save data to localStorage on state changes
@@ -100,6 +237,55 @@
 		localStorage.setItem('ollama_drafts', JSON.stringify(drafts));
 	});
 
+	// Save projects to localStorage with quota protection
+	$effect(() => {
+		try {
+			localStorage.setItem('ollama_projects', JSON.stringify(projects));
+		} catch (error: any) {
+			if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+				alert(`Storage Limit Exceeded!\n\nThe attached reference files are too large to fit in browser LocalStorage (limit is 5MB). Your latest project changes could not be saved.\n\nPlease open project settings and delete some files or use smaller files.`);
+			} else {
+				console.error('Failed to save projects to localStorage:', error);
+			}
+		}
+	});
+
+	// Save global context to localStorage
+	$effect(() => {
+		localStorage.setItem('ollama_global_context', globalContext);
+	});
+
+	// Save UI layout states to localStorage
+	$effect(() => {
+		if (isInitialized) {
+			localStorage.setItem('ollama_show_sidebar', String(showSidebar));
+		}
+	});
+
+	$effect(() => {
+		if (isInitialized) {
+			localStorage.setItem('ollama_show_context_panel', String(showContextPanel));
+		}
+	});
+
+	$effect(() => {
+		if (isInitialized) {
+			localStorage.setItem('ollama_right_pane_tab', rightPaneTab);
+		}
+	});
+
+	$effect(() => {
+		if (isInitialized) {
+			localStorage.setItem('ollama_sidebar_width', String(sidebarWidth));
+		}
+	});
+
+	$effect(() => {
+		if (isInitialized) {
+			localStorage.setItem('ollama_context_panel_width', String(contextPanelWidth));
+		}
+	});
+
 	// Watch for input changes to update drafts
 	$effect(() => {
 		const activeKey = currentConversationId || 'new-chat';
@@ -127,6 +313,7 @@
 
 	// Fetch models from Ollama
 	async function loadModels() {
+		if (typeof window === 'undefined') return;
 		try {
 			const fetchedModels = await fetchModels(ollamaUrl);
 			models = fetchedModels;
@@ -152,7 +339,7 @@
 	// Create a new conversation
 	function handleNewConversation() {
 		// If there is already an empty conversation, just select it instead of creating a duplicate
-		const emptyConv = conversations.find(c => c.messages.length === 0);
+		const emptyConv = conversations.find(c => c.messages.length === 0 && !c.projectId);
 		if (emptyConv) {
 			currentConversationId = emptyConv.id;
 			return;
@@ -196,6 +383,7 @@
 	// Select a conversation
 	function handleSelectConversation(id: string) {
 		currentConversationId = id;
+		selectedThinkingMsgId = null;
 	}
 
 	// Stop assistant generation
@@ -206,8 +394,111 @@
 		}
 	}
 
+	// Project operations
+	function handleCreateProject(name: string, context: string = '', files: ProjectFile[] = []) {
+		const newProject: Project = {
+			id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+			name,
+			context,
+			files,
+			createdAt: Date.now()
+		};
+		projects = [...projects, newProject];
+	}
+
+	// Update project name, context, and files
+	function handleUpdateProject(id: string, name: string, context: string, files: ProjectFile[] = []) {
+		projects = projects.map((p) => (p.id === id ? { ...p, name, context, files } : p));
+	}
+
+	// Delete project and handle chats
+	function handleDeleteProject(id: string, deleteChats: boolean) {
+		projects = projects.filter((p) => p.id !== id);
+		if (deleteChats) {
+			conversations = conversations.filter((c) => c.projectId !== id);
+			if (currentConversationId && !conversations.some((c) => c.id === currentConversationId)) {
+				currentConversationId = conversations.length > 0 ? conversations[0].id : null;
+			}
+		} else {
+			conversations = conversations.map((c) => (c.projectId === id ? { ...c, projectId: undefined } : c));
+		}
+	}
+
+	// Create new chat inside a specific project
+	function handleNewConversationInProject(projectId: string) {
+		const emptyConv = conversations.find(c => c.messages.length === 0 && c.projectId === projectId);
+		if (emptyConv) {
+			currentConversationId = emptyConv.id;
+			return;
+		}
+
+		const newConv: Conversation = {
+			id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+			title: 'New Conversation',
+			messages: [],
+			createdAt: Date.now(),
+			model: selectedModel,
+			projectId
+		};
+		conversations = [newConv, ...conversations];
+		currentConversationId = newConv.id;
+	}
+
+	// Update chat-level context
+	function handleUpdateChatContext(chatId: string, context: string) {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, context } : c));
+	}
+
+	// Update chat-level project assignment
+	function handleUpdateChatProject(chatId: string, projectId: string | undefined) {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, projectId } : c));
+	}
+
+	// Build combined system prompt from Global + Project + Chat levels
+	function getCombinedSystemPrompt(conv: Conversation | null): string {
+		if (!conv) return '';
+		const parts: string[] = [];
+
+		if (globalContext?.trim()) {
+			parts.push(`[Global Context]:\n${globalContext.trim()}`);
+		}
+
+		if (conv.projectId) {
+			const project = projects.find((p) => p.id === conv.projectId);
+			if (project) {
+				let projectPrompt = '';
+				if (project.context?.trim()) {
+					projectPrompt += `[Project Context - ${project.name}]:\n${project.context.trim()}`;
+				}
+				
+				// Inject file contents if present
+				if (project.files && project.files.length > 0) {
+					if (projectPrompt) projectPrompt += '\n\n';
+					projectPrompt += `[Project Reference Files - ${project.name}]:\n`;
+					projectPrompt += `CRITICAL DIRECTIVE: You must use the following files as your primary reference and knowledge source for all your answers in this conversation. If there are any differences between these files and your pre-trained knowledge (e.g. Svelte 5 runes syntax vs older versions), you MUST prioritize the information and syntax described in these files:`;
+					for (const file of project.files) {
+						projectPrompt += `\n\nFile "${file.name}":\n\`\`\`\n${file.content}\n\`\`\``;
+					}
+				}
+				
+				if (projectPrompt) {
+					parts.push(projectPrompt);
+				}
+			}
+		}
+
+		if (conv.context?.trim()) {
+			parts.push(`[Chat Context]:\n${conv.context.trim()}`);
+		}
+
+		const combined = parts.join('\n\n');
+		console.log('[System Context Debug] Calculated System Prompt:', combined);
+		return combined;
+	}
+
 	// Send message to assistant
 	async function handleSendPrompt(promptText: string = input) {
+		selectedThinkingMsgId = null;
 		const cleanPrompt = promptText.trim();
 		if ((!cleanPrompt && attachments.length === 0) || !selectedModel) return;
 
@@ -288,10 +579,13 @@
 		});
 
 		// 3. Initiate streaming
+		const activeConv = conversations.find(c => c.id === activeConvId);
+		const systemPrompt = getCombinedSystemPrompt(activeConv || null);
 		await streamChat(
 			{
-				messages: currentConversation?.messages.slice(0, -1) || [], // send messages excluding the empty assistant placeholder
+				messages: activeConv?.messages.slice(0, -1) || [], // send messages excluding the empty assistant placeholder
 				model: selectedModel,
+				systemPrompt,
 				ollamaUrl
 			},
 			// onChunk callback
@@ -344,6 +638,7 @@
 
 	// Resubmit prompt from a specific state (without appending a duplicate user message)
 	async function handleResubmit(activeConvId: string) {
+		selectedThinkingMsgId = null;
 		// Stop any current generation first
 		handleStopGeneration();
 
@@ -372,10 +667,12 @@
 
 		// Initiate streaming
 		const conv = conversations.find(c => c.id === activeConvId);
+		const systemPrompt = getCombinedSystemPrompt(conv || null);
 		await streamChat(
 			{
 				messages: conv?.messages.slice(0, -1) || [], // send all messages excluding the assistant placeholder
 				model: selectedModel,
+				systemPrompt,
 				ollamaUrl
 			},
 			// onChunk callback
@@ -456,13 +753,81 @@
 		// Trigger resubmit for the conversation
 		await handleResubmit(activeConvId);
 	}
+
+	function handleMouseDownLeft(e: MouseEvent) {
+		e.preventDefault();
+		isResizingLeft = true;
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+		
+		const handleMouseMove = (moveEvent: MouseEvent) => {
+			if (!isResizingLeft) return;
+			// Constrain left pane width between 180px and 600px
+			const newWidth = Math.max(180, Math.min(600, moveEvent.clientX));
+			sidebarWidth = newWidth;
+		};
+		
+		const handleMouseUp = () => {
+			isResizingLeft = false;
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseup', handleMouseUp);
+		};
+		
+		window.addEventListener('mousemove', handleMouseMove);
+		window.addEventListener('mouseup', handleMouseUp);
+	}
+
+	function handleMouseDownRight(e: MouseEvent) {
+		e.preventDefault();
+		isResizingRight = true;
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+		
+		const handleMouseMove = (moveEvent: MouseEvent) => {
+			if (!isResizingRight) return;
+			// Constrain right pane width between 250px and 800px
+			const newWidth = Math.max(250, Math.min(800, window.innerWidth - moveEvent.clientX));
+			contextPanelWidth = newWidth;
+		};
+		
+		const handleMouseUp = () => {
+			isResizingRight = false;
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseup', handleMouseUp);
+		};
+		
+		window.addEventListener('mousemove', handleMouseMove);
+		window.addEventListener('mouseup', handleMouseUp);
+	}
 </script>
 
-<div class="app-layout">
+<div 
+	id="app"
+	class="app-layout"
+	class:resizing-left={isResizingLeft}
+	class:resizing-right={isResizingRight}
+	style="
+		--sidebar-width: {showSidebar ? sidebarWidth : 0}px;
+		--sidebar-border: {showSidebar ? '1px solid var(--border-color)' : 'none'};
+		--sidebar-transform: {showSidebar ? '0' : '-100%'};
+		--context-panel-width: {showContextPanel ? contextPanelWidth : 0}px;
+	"
+>
+	{#if showSidebar}
+		<!-- Mobile Sidebar Backdrop -->
+		<div class="sidebar-backdrop" onclick={() => showSidebar = false} role="presentation"></div>
+	{/if}
+
 	<!-- Sidebar -->
 	<Sidebar 
 		{conversations}
 		{currentConversationId}
+		{projects}
+		bind:globalContext
 		bind:ollamaUrl
 		{isConnected}
 		{models}
@@ -471,7 +836,22 @@
 		onDeleteConversation={handleDeleteConversation}
 		onUpdateTitle={handleUpdateTitle}
 		onRefreshModels={loadModels}
+		onCreateProject={handleCreateProject}
+		onUpdateProject={handleUpdateProject}
+		onDeleteProject={handleDeleteProject}
+		onNewConversationInProject={handleNewConversationInProject}
+		bind:projectSettingsToOpenId
 	/>
+
+	{#if showSidebar}
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="resizer-bar left-resizer" 
+			role="separator"
+			aria-label="Sidebar Resizer"
+			onmousedown={handleMouseDownLeft}
+		></div>
+	{/if}
 
 	<!-- Main Chat Area -->
 	<main class="main-content">
@@ -479,9 +859,19 @@
 			conversation={currentConversation}
 			{isGenerating}
 			{isInitialized}
+			{showContextPanel}
+			{showSidebar}
+			{theme}
+			onToggleTheme={() => theme = theme === 'dark' ? 'light' : 'dark'}
+			onToggleSidebar={() => showSidebar = !showSidebar}
 			onSendPrompt={handleSendPrompt}
 			onEditPrompt={handleEditPrompt}
 			onStopGeneration={handleStopGeneration}
+			onToggleContextPanel={() => showContextPanel = !showContextPanel}
+			onOpenThinking={() => {
+				showContextPanel = true;
+				rightPaneTab = 'thinking';
+			}}
 		/>
 
 		<!-- Input Area at the bottom -->
@@ -495,6 +885,34 @@
 			onStop={handleStopGeneration}
 		/>
 	</main>
+
+	{#if showContextPanel}
+		<!-- Mobile Context Panel Backdrop -->
+		<div class="context-panel-backdrop" onclick={() => showContextPanel = false} role="presentation"></div>
+
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="resizer-bar right-resizer" 
+			role="separator"
+			aria-label="Context Panel Resizer"
+			onmousedown={handleMouseDownRight}
+		></div>
+
+		<ContextPanel 
+			conversation={currentConversation}
+			{projects}
+			{globalContext}
+			{activeThinking}
+			activeTab={rightPaneTab}
+			onChangeTab={(tab) => rightPaneTab = tab}
+			onUpdateChatContext={handleUpdateChatContext}
+			onUpdateChatProject={handleUpdateChatProject}
+			onEditProjectSettings={(projectId) => {
+				projectSettingsToOpenId = projectId;
+			}}
+			onClose={() => showContextPanel = false}
+		/>
+	{/if}
 </div>
 
 <style>
@@ -515,9 +933,99 @@
 		overflow: hidden;
 	}
 
+	/* Resizer styling */
+	.resizer-bar {
+		width: 4px;
+		cursor: col-resize;
+		background-color: transparent;
+		transition: background-color var(--transition-fast);
+		z-index: 20;
+		flex-shrink: 0;
+	}
+
+	.left-resizer {
+		margin-left: -2px;
+		margin-right: -2px;
+	}
+
+	.right-resizer {
+		margin-left: -2px;
+		margin-right: -2px;
+	}
+
+	.resizer-bar:hover,
+	.app-layout.resizing-left .left-resizer,
+	.app-layout.resizing-right .right-resizer {
+		background-color: var(--accent-blue);
+		box-shadow: 0 0 4px rgba(168, 199, 250, 0.4);
+	}
+
+	/* Global overrides for Sidebar border when collapsed */
+	:global(.sidebar) {
+		border-right: var(--sidebar-border, 1px solid var(--border-color)) !important;
+	}
+
+	/* Backdrops for mobile overlay */
+	.sidebar-backdrop,
+	.context-panel-backdrop {
+		display: none;
+	}
+
 	@media (max-width: 768px) {
 		.app-layout {
 			flex-direction: column;
+		}
+
+		.resizer-bar {
+			display: none !important;
+		}
+
+		.sidebar-backdrop {
+			display: block;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: rgba(0, 0, 0, 0.6);
+			backdrop-filter: blur(2px);
+			z-index: 9;
+		}
+
+		.context-panel-backdrop {
+			display: block;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: rgba(0, 0, 0, 0.6);
+			backdrop-filter: blur(2px);
+			z-index: 8;
+		}
+
+		:global(.sidebar) {
+			position: absolute !important;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			z-index: 10;
+			width: 280px !important;
+			max-width: 80% !important;
+			box-shadow: var(--shadow-lg);
+			transform: translateX(var(--sidebar-transform, 0));
+			transition: transform var(--transition-normal);
+		}
+
+		:global(.context-panel) {
+			position: absolute !important;
+			right: 0;
+			top: 0;
+			bottom: 0;
+			z-index: 10;
+			width: 320px !important;
+			max-width: 85% !important;
+			box-shadow: var(--shadow-lg);
 		}
 	}
 </style>
