@@ -7,6 +7,7 @@
 	let {
 		conversation = null,
 		isGenerating = false,
+		isBusy = false,
 		isInitialized = false,
 		showContextPanel = false,
 		showSidebar = true,
@@ -21,6 +22,7 @@
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
+		isBusy?: boolean;
 		isInitialized: boolean;
 		showContextPanel: boolean;
 		showSidebar: boolean;
@@ -36,8 +38,25 @@
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
 	let fontSize = $state(15);
+	let userScrolledUp = $state(false);
+	let lastConversationId = $state<string | null>(null);
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageContent = $state('');
+
+	let openedThoughts = $state<Record<string, boolean>>({});
+
+	// Auto-open thought process for a message when it starts actively thinking
+	$effect(() => {
+		if (isGenerating && conversation && conversation.messages.length > 0) {
+			const lastMsg = conversation.messages[conversation.messages.length - 1];
+			if (lastMsg.role === 'assistant') {
+				const parsed = parseThinking(lastMsg.content);
+				if (parsed.isThinking && openedThoughts[lastMsg.id] === undefined) {
+					openedThoughts[lastMsg.id] = true;
+				}
+			}
+		}
+	});
 
 	let isExportMenuOpen = $state(false);
 
@@ -100,15 +119,15 @@
 						labelTextColor: '#c4c7c5', // Light text for edge labels
 						edgeLabelBackground: '#1a1a1b' // Dark background for edge labels to hide lines behind
 					} : {
-						background: '#f6f8fa',
-						primaryColor: '#d3e3fd', // Soft light blue for node background
-						primaryTextColor: '#1f1f1f', // Dark gray for node text
-						primaryBorderColor: '#9ca3af', // Grey node border
-						lineColor: '#757575', // Grey arrow line color
-						secondaryColor: '#f0f4f9',
+						background: '#faf8f5',
+						primaryColor: '#e2ddd2', // Soft warm sand for node background
+						primaryTextColor: '#2b2620', // Warm dark charcoal for node text
+						primaryBorderColor: '#dcd6ca', // Warm border
+						lineColor: '#857e75', // Warm grey arrow line color
+						secondaryColor: '#f5f2eb',
 						tertiaryColor: '#ffffff',
-						labelTextColor: '#444746', // Darker text for edge labels
-						edgeLabelBackground: '#f6f8fa' // Light background for edge labels
+						labelTextColor: '#57514a', // Warm secondary text for edge labels
+						edgeLabelBackground: '#faf8f5' // Warm code bg for edge labels
 					}
 				});
 				renderAllMermaid(true);
@@ -578,22 +597,83 @@
 		}
 	];
 
-	// Scroll to bottom whenever messages change or generation is active
+	// Smart scroll controller
 	$effect(() => {
-		if (conversation && conversation.messages) {
-			// Trigger scroll to bottom
-			scrollToBottom();
-		}
+		if (!conversation || !conversation.messages) return;
+		
+		const currentId = conversation.id;
+		const msgLength = conversation.messages.length;
+		const lastMsg = conversation.messages[msgLength - 1];
+		const lastMsgContent = lastMsg?.content || '';
+
+		untrack(() => {
+			// 1. Conversation switch
+			if (currentId !== lastConversationId) {
+				lastConversationId = currentId;
+				userScrolledUp = false;
+				openedThoughts = {}; // reset open thoughts record
+				scrollToBottom('auto');
+				return;
+			}
+
+			if (msgLength === 0) return;
+
+			// 2. Active AI generation (streaming response)
+			if (isGenerating && lastMsg && lastMsg.role === 'assistant') {
+				if (!userScrolledUp) {
+					scrollToBottom('auto');
+				}
+				return;
+			}
+
+			// 3. User message sent
+			if (lastMsg && lastMsg.role === 'user') {
+				userScrolledUp = false;
+				scrollToBottom('smooth');
+			}
+		});
 	});
 
-	async function scrollToBottom() {
+	function handleScroll() {
+		if (!chatContainer) return;
+		
+		const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+		// If the user scrolls to the bottom (within 80px), reset userScrolledUp
+		const isAtBottom = scrollHeight - scrollTop - clientHeight < 80;
+		
+		if (isAtBottom) {
+			userScrolledUp = false;
+		} else {
+			// If user scrolled up and is not near the bottom, mark userScrolledUp as true
+			userScrolledUp = true;
+		}
+	}
+
+	async function scrollToBottom(behavior: 'auto' | 'smooth' = 'smooth') {
 		await tick();
 		if (chatContainer) {
 			chatContainer.scrollTo({
 				top: chatContainer.scrollHeight,
-				behavior: 'smooth'
+				behavior
 			});
 		}
+	}
+
+	function autoScroll(node: HTMLElement, params: { active: boolean; text: string }) {
+		const scroll = () => {
+			if (params.active && node.scrollHeight > 0) {
+				node.scrollTop = node.scrollHeight;
+			}
+		};
+		// Scroll initially
+		setTimeout(scroll, 50);
+
+		return {
+			update(newParams: { active: boolean; text: string }) {
+				params = newParams;
+				setTimeout(scroll, 0);
+			}
+		};
 	}
 </script>
 
@@ -728,7 +808,12 @@
 		</div>
 	</header>
 
-	<div class="chat-viewport" bind:this={chatContainer} style="--chat-font-size: {fontSize}px">
+	<div 
+		class="chat-viewport" 
+		bind:this={chatContainer} 
+		onscroll={handleScroll}
+		style="--chat-font-size: {fontSize}px"
+	>
 		{#if !isInitialized}
 			<div class="chat-loading-placeholder">
 				<div class="spinner-glow"></div>
@@ -761,7 +846,7 @@
 		{:else}
 			<!-- Message Thread -->
 			<div class="messages-list">
-				{#each conversation.messages as msg (msg.id)}
+				{#each conversation.messages as msg, idx (msg.id)}
 					{#if msg.role !== 'assistant' || msg.content !== ''}
 						<div class="message-wrapper" class:user={msg.role === 'user'}>
 						<div class="message-avatar">
@@ -803,7 +888,7 @@
 												<button 
 													class="edit-btn submit" 
 													onclick={() => saveEditPrompt(msg.id)}
-													disabled={!editingMessageContent.trim() || isGenerating}
+													disabled={!editingMessageContent.trim() || isGenerating || isBusy}
 												>
 													Save & Submit
 												</button>
@@ -837,33 +922,48 @@
 													</div>
 												{/if}
 												{#if msg.content}
-													<pre class="user-text-pre">{msg.content}</pre>
+													<div class="user-text-container-with-edit">
+														<pre class="user-text-pre">{msg.content}</pre>
+														<button 
+															class="message-edit-trigger" 
+															onclick={() => startEditPrompt(msg)}
+															title="Edit prompt"
+														>
+															<svg viewBox="0 0 24 24" width="14" height="14">
+																<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+															</svg>
+														</button>
+													</div>
 												{/if}
 											</div>
-											<button 
-												class="message-edit-trigger" 
-												onclick={() => startEditPrompt(msg)}
-												title="Edit prompt"
-											>
-												<svg viewBox="0 0 24 24" width="14" height="14">
-													<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-												</svg>
-											</button>
+											{#if !msg.content}
+												<button 
+													class="message-edit-trigger" 
+													onclick={() => startEditPrompt(msg)}
+													title="Edit prompt"
+												>
+													<svg viewBox="0 0 24 24" width="14" height="14">
+														<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+													</svg>
+												</button>
+											{/if}
 										</div>
 									{/if}
 								{:else}
 									<!-- Render parsed markdown with thinking block extraction -->
 									{@const parsed = parseThinking(msg.content)}
+									{@const isLastMsg = idx === conversation.messages.length - 1}
+									{@const isActivelyThinking = parsed.isThinking && isGenerating && isLastMsg}
 									{#if parsed.thinking}
-										<details class="thoughts-details" open={parsed.isThinking}>
+										<details class="thoughts-details" bind:open={openedThoughts[msg.id]}>
 											<summary class="thoughts-summary">
 												<span class="thinking-icon-wrapper">
-													<svg class="thinking-icon" class:animate-pulse={parsed.isThinking} viewBox="0 0 24 24" width="14" height="14">
+													<svg class="thinking-icon" class:animate-pulse={isActivelyThinking} viewBox="0 0 24 24" width="14" height="14">
 														<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
 													</svg>
 												</span>
 												<span class="thinking-text-label">
-													{parsed.isThinking ? 'Thinking Process...' : 'Thought Process'}
+													{isActivelyThinking ? 'Thinking Process...' : 'Thought Process'}
 												</span>
 												<button 
 													type="button" 
@@ -874,7 +974,7 @@
 													View in Right Pane ↗
 												</button>
 											</summary>
-											<div class="thoughts-content markdown-body">
+											<div class="thoughts-content markdown-body" use:autoScroll={{ active: isActivelyThinking, text: parsed.thinking }}>
 												{@html renderMarkdown(parsed.thinking)}
 											</div>
 										</details>
@@ -884,7 +984,7 @@
 										<div class="assistant-response-content">
 											{@html renderMarkdown(parsed.response)}
 										</div>
-									{:else if parsed.isThinking}
+									{:else if isActivelyThinking}
 										<div class="thinking-placeholder-msg">
 											<div class="typing-indicator small-indicator">
 												<span></span><span></span><span></span>
@@ -909,7 +1009,9 @@
 						</div>
 						<div class="message-body">
 							<div class="message-info">
-								<span class="sender-name">Ollama</span>
+								<span class="sender-name">
+									{conversation.messages[conversation.messages.length - 1].model || conversation.model || 'Ollama'}
+								</span>
 								<span class="status-tag">Thinking...</span>
 							</div>
 							<div class="message-content markdown-body">
@@ -993,6 +1095,7 @@
 		flex-direction: column;
 		background-color: var(--bg-primary);
 		position: relative;
+		container-type: inline-size;
 	}
 
 	.chat-header {
@@ -1304,7 +1407,7 @@
 		position: relative;
 	}
 
-	@media (min-width: 1100px) {
+	@container (min-width: 1120px) {
 		.message-wrapper {
 			margin-left: -56px; /* Offset the avatar (36px width + 20px gap) to the left gutter */
 		}
@@ -1385,7 +1488,7 @@
 		padding: 12px 16px;
 		border-radius: 12px;
 		border: 1px solid var(--border-color);
-		max-width: 90%;
+		max-width: 100%;
 		display: inline-block;
 	}
 
@@ -1463,6 +1566,17 @@
 		gap: 12px;
 		position: relative;
 		width: 100%;
+	}
+
+	.user-text-container-with-edit {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		width: 100%;
+	}
+
+	.user-text-container-with-edit .user-text-pre {
+		max-width: calc(100% - 40px);
 	}
 
 	.user-message-container:hover .message-edit-trigger {
@@ -1734,7 +1848,7 @@
 		margin-bottom: 0.5rem;
 		font-size: 0.8rem;
 		line-height: 1.5;
-		color: var(--text-muted);
+		color: var(--text-secondary);
 	}
 
 	.thoughts-content :global(p:last-child) {
@@ -1761,7 +1875,7 @@
 
 	.thoughts-content :global(li) {
 		font-size: 0.8rem;
-		color: var(--text-muted);
+		color: var(--text-secondary);
 		margin-bottom: 2px;
 	}
 

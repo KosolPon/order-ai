@@ -71,13 +71,18 @@ export async function streamChat(
 		systemPrompt?: string;
 		ollamaUrl?: string;
 		temperature?: number;
+		topP?: number;
+		topK?: number;
+		numCtx?: number;
+		numPredict?: number;
+		repeatPenalty?: number;
 	},
 	onChunk: (chunk: string) => void,
 	onDone: (fullResponse: string) => void,
 	onError: (error: Error) => void,
 	signal?: AbortSignal
 ) {
-	const { messages, model, systemPrompt, ollamaUrl = DEFAULT_OLLAMA_URL, temperature = 0.7 } = options;
+	const { messages, model, systemPrompt, ollamaUrl = DEFAULT_OLLAMA_URL, temperature = 0.7, topP, topK, numCtx, numPredict, repeatPenalty } = options;
 
 	try {
 		// Prepare chat payload
@@ -112,10 +117,9 @@ export async function streamChat(
 			return msg;
 		});
 
-		// Find the last user message to append the system prompt.
-		// This guarantees that models (like deepseek-r1, gemma, etc.) which often ignore the 'system' role
-		// will still receive the reference files and instructions in their direct user message.
-		if (systemPrompt && chatMessages.length > 0) {
+		// Limit duplicating the system prompt into the user message only if it is short (e.g., < 1500 characters).
+		// Duplicating large reference files/contexts overflows the context window and causes reasoning loops.
+		if (systemPrompt && chatMessages.length > 0 && systemPrompt.length < 1500) {
 			let lastUserMsg = null;
 			for (let i = chatMessages.length - 1; i >= 0; i--) {
 				if (chatMessages[i].role === 'user') {
@@ -151,7 +155,12 @@ export async function streamChat(
 				model,
 				messages: chatMessages,
 				options: {
-					temperature
+					temperature,
+					top_p: topP,
+					top_k: topK,
+					num_ctx: numCtx,
+					num_predict: numPredict === 0 ? -1 : numPredict,
+					repeat_penalty: repeatPenalty
 				},
 				stream: true
 			}),
@@ -168,31 +177,93 @@ export async function streamChat(
 			throw new Error('Response body is not readable');
 		}
 
-		const decoder = new TextDecoder('utf-8');
-		let buffer = '';
-		let fullResponseText = '';
-		let hasStartedThinking = false;
-		let hasFinishedThinking = false;
+		try {
+			const decoder = new TextDecoder('utf-8');
+			let buffer = '';
+			let fullResponseText = '';
+			let hasStartedThinking = false;
+			let hasFinishedThinking = false;
+			let loopDetected = false;
 
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
+			while (true) {
+				if (signal?.aborted) {
+					throw new DOMException('The user aborted a request.', 'AbortError');
+				}
+				const { done, value } = await reader.read();
+				if (done) break;
 
-			buffer += decoder.decode(value, { stream: true });
-			
-			// Parse lines (Ollama responses are NDJSON)
-			const lines = buffer.split('\n');
-			// Keep the last partial line in the buffer
-			buffer = lines.pop() || '';
+				buffer += decoder.decode(value, { stream: true });
+				
+				// Parse lines (Ollama responses are NDJSON)
+				const lines = buffer.split('\n');
+				// Keep the last partial line in the buffer
+				buffer = lines.pop() || '';
 
-			for (const line of lines) {
-				if (!line.trim()) continue;
-				try {
-					const json = JSON.parse(line);
-					if (json.error) {
-						throw new Error(json.error);
+				for (const line of lines) {
+					if (!line.trim()) continue;
+					try {
+						const json = JSON.parse(line);
+						if (json.error) {
+							throw new Error(json.error);
+						}
+						
+						const thinking = json.message?.thinking || json.message?.reasoning || '';
+						const content = json.message?.content || '';
+						let chunkToStream = '';
+
+						if (thinking) {
+							if (!hasStartedThinking) {
+								chunkToStream += '<think>';
+								hasStartedThinking = true;
+							}
+							chunkToStream += thinking;
+						} else if (content) {
+							if (hasStartedThinking && !hasFinishedThinking) {
+								chunkToStream += '</think>';
+								hasFinishedThinking = true;
+							}
+							chunkToStream += content;
+						}
+
+						if (chunkToStream) {
+							fullResponseText += chunkToStream;
+							onChunk(chunkToStream);
+
+							// Check for repetition loop
+							const repetition = detectRepetition(fullResponseText);
+							if (repetition.detected) {
+								const warning = '\n\n⚠️ **[Repetition loop detected! Generation stopped / ตรวจพบข้อความวนซ้ำ ระบบจึงหยุดทำงาน]**';
+								onChunk(warning);
+								fullResponseText += warning;
+								loopDetected = true;
+								break;
+							}
+						}
+						
+						if (json.done) {
+							break;
+						}
+					} catch (e: any) {
+						console.warn('Error parsing stream JSON line:', e, line);
 					}
-					
+				}
+
+				if (loopDetected) {
+					break;
+				}
+			}
+
+			// Ensure we close the think tag if the stream finished while thinking
+			if (!loopDetected && hasStartedThinking && !hasFinishedThinking) {
+				onChunk('</think>');
+				fullResponseText += '</think>';
+				hasFinishedThinking = true;
+			}
+
+			// Handle any remaining text in buffer
+			if (!loopDetected && buffer.trim()) {
+				try {
+					const json = JSON.parse(buffer);
 					const thinking = json.message?.thinking || json.message?.reasoning || '';
 					const content = json.message?.content || '';
 					let chunkToStream = '';
@@ -215,62 +286,24 @@ export async function streamChat(
 						fullResponseText += chunkToStream;
 						onChunk(chunkToStream);
 					}
-					
-					if (json.done) {
-						break;
-					}
-				} catch (e: any) {
-					console.warn('Error parsing stream JSON line:', e, line);
+				} catch (e) {
+					// Ignore trailing syntax details
 				}
 			}
-		}
 
-		// Ensure we close the think tag if the stream finished while thinking
-		if (hasStartedThinking && !hasFinishedThinking) {
-			onChunk('</think>');
-			fullResponseText += '</think>';
-			hasFinishedThinking = true;
-		}
+			// Double check closing tag
+			if (!loopDetected && hasStartedThinking && !hasFinishedThinking) {
+				onChunk('</think>');
+				fullResponseText += '</think>';
+				hasFinishedThinking = true;
+			}
 
-		// Handle any remaining text in buffer
-		if (buffer.trim()) {
+			onDone(fullResponseText);
+		} finally {
 			try {
-				const json = JSON.parse(buffer);
-				const thinking = json.message?.thinking || json.message?.reasoning || '';
-				const content = json.message?.content || '';
-				let chunkToStream = '';
-
-				if (thinking) {
-					if (!hasStartedThinking) {
-						chunkToStream += '<think>';
-						hasStartedThinking = true;
-					}
-					chunkToStream += thinking;
-				} else if (content) {
-					if (hasStartedThinking && !hasFinishedThinking) {
-						chunkToStream += '</think>';
-						hasFinishedThinking = true;
-					}
-					chunkToStream += content;
-				}
-
-				if (chunkToStream) {
-					fullResponseText += chunkToStream;
-					onChunk(chunkToStream);
-				}
-			} catch (e) {
-				// Ignore trailing syntax details
-			}
+				await reader.cancel();
+			} catch (e) {}
 		}
-
-		// Double check closing tag
-		if (hasStartedThinking && !hasFinishedThinking) {
-			onChunk('</think>');
-			fullResponseText += '</think>';
-			hasFinishedThinking = true;
-		}
-
-		onDone(fullResponseText);
 	} catch (error: any) {
 		if (error.name === 'AbortError') {
 			// Request was cancelled by user
@@ -279,4 +312,60 @@ export async function streamChat(
 		console.error('Error during streaming chat:', error);
 		onError(error);
 	}
+}
+
+/**
+ * Detects if the given text ends with a sequence of characters repeated consecutively.
+ * Returns true and the repeated pattern if a loop is detected.
+ */
+export function detectRepetition(text: string, maxRepeats: number = 3): { detected: boolean; pattern: string } {
+	const minPatternLen = 10; // Avoid false positives on small phrases or formatting syntax
+	const textToCheck = text.trim();
+	// Limit pattern search space for performance on very long text histories
+	const maxPatternLen = Math.min(500, Math.floor(textToCheck.length / maxRepeats));
+
+	if (maxPatternLen < minPatternLen) {
+		return { detected: false, pattern: '' };
+	}
+
+	// Slice text once to keep the check area small
+	const charsNeeded = maxRepeats * maxPatternLen;
+	const checkArea = textToCheck.slice(-charsNeeded);
+	const checkAreaLen = checkArea.length;
+
+	for (let P = minPatternLen; P <= maxPatternLen; P++) {
+		const startIdx = checkAreaLen - (maxRepeats * P);
+		const chunk0 = checkArea.substring(startIdx, startIdx + P);
+		
+		let isRepetitive = true;
+		for (let r = 1; r < maxRepeats; r++) {
+			const currentChunk = checkArea.substring(startIdx + r * P, startIdx + (r + 1) * P);
+			if (currentChunk !== chunk0) {
+				isRepetitive = false;
+				break;
+			}
+		}
+		
+		if (isRepetitive) {
+			const trimmed = chunk0.trim();
+			
+			// Pattern should have a reasonable trimmed length
+			if (trimmed.length < 10) continue;
+			
+			// Avoid triggering on repeated single characters (e.g. '----------', '..........', '          ')
+			const firstChar = trimmed[0];
+			let allSame = true;
+			for (let i = 1; i < trimmed.length; i++) {
+				if (trimmed[i] !== firstChar) {
+					allSame = false;
+					break;
+				}
+			}
+			if (allSame) continue;
+			
+			return { detected: true, pattern: chunk0 };
+		}
+	}
+	
+	return { detected: false, pattern: '' };
 }

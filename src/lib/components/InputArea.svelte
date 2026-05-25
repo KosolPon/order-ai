@@ -6,16 +6,22 @@
 		input = $bindable(),
 		models = [],
 		selectedModel = $bindable(),
+		activeModels = [''],
+		onModelPillClick,
 		attachments = $bindable([]),
 		isGenerating = false,
+		isBusy = false,
 		onSend,
 		onStop
 	} = $props<{
 		input: string;
 		models: OllamaModel[];
 		selectedModel: string;
+		activeModels?: string[];
+		onModelPillClick: () => void;
 		attachments: Attachment[];
 		isGenerating: boolean;
+		isBusy?: boolean;
 		onSend: () => void;
 		onStop: () => void;
 	}>();
@@ -126,7 +132,7 @@
 		// Send message on Enter without shift
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			if ((input.trim() || attachments.length > 0) && !isGenerating) {
+			if ((input.trim() || attachments.length > 0) && !isGenerating && !isBusy) {
 				onSend();
 			}
 		}
@@ -322,26 +328,46 @@
 				></textarea>
 
 				<!-- Model Selector on the right of prompt -->
-				<div class="model-selector-wrapper">
-					<svg class="model-icon" viewBox="0 0 24 24" width="16" height="16">
-						<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-					</svg>
-					<select 
-						class="model-select" 
-						bind:value={selectedModel}
-						disabled={isGenerating || models.length === 0}
-					>
-						{#if models.length === 0}
-							<option value="">No models found</option>
-						{:else}
-							{#each models as model}
-								<option value={model.name}>{model.name}</option>
-							{/each}
-						{/if}
-					</select>
-					<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
-						<path fill="currentColor" d="M7 10l5 5 5-5z"/>
-					</svg>
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div 
+					class="model-selector-wrapper"
+					class:disabled={isGenerating || models.length === 0}
+					class:routing-active={activeModels.length > 1}
+					title={activeModels.length > 1 ? `โหมดลูกโซ่: ${activeModels.join(' ➔ ')}` : 'คลิกเพื่อเลือกโมเดล'}
+					onclick={activeModels.length > 1 ? onModelPillClick : undefined}
+				>
+					{#if activeModels.length > 1}
+						<svg class="model-icon collaboration-glow" viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+						</svg>
+						<span class="model-selected-text collaboration-text">
+							{activeModels.map(m => m.split(':')[0] || 'Unknown').join(' + ')}
+						</span>
+					{:else}
+						<svg class="model-icon" viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+						</svg>
+						<span class="model-selected-text">
+							{selectedModel || (models.length === 0 ? "No models found" : "Select model")}
+						</span>
+						<select 
+							class="model-select" 
+							bind:value={selectedModel}
+							disabled={isGenerating || models.length === 0}
+						>
+							{#if models.length === 0}
+								<option value="">No models found</option>
+							{:else}
+								{#each models as model}
+									<option value={model.name}>{model.name}</option>
+								{/each}
+							{/if}
+						</select>
+						<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
+							<path fill="currentColor" d="M7 10l5 5 5-5z"/>
+						</svg>
+					{/if}
 				</div>
 
 				<!-- Action Buttons on the far right -->
@@ -429,10 +455,10 @@
 
 						<button 
 							class="control-btn send-btn" 
-							class:active={(input.trim().length > 0 || attachments.length > 0) && models.length > 0}
+							class:active={(input.trim().length > 0 || attachments.length > 0) && models.length > 0 && !isBusy}
 							onclick={onSend}
-							disabled={(input.trim().length === 0 && attachments.length === 0) || models.length === 0}
-							title="Send prompt"
+							disabled={(input.trim().length === 0 && attachments.length === 0) || models.length === 0 || isBusy}
+							title={isBusy ? "AI กำลังประมวลผลแชตอื่นอยู่" : "Send prompt"}
 						>
 							<svg viewBox="0 0 24 24" width="18" height="18">
 								<path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -501,7 +527,7 @@
 		border: none;
 		background: none;
 		outline: none;
-		padding: 6px 0;
+		padding: 6px 0 6px 10px;
 		overflow-y: auto;
 	}
 
@@ -522,41 +548,61 @@
 		border: 1px solid var(--border-color);
 		border-radius: 17px;
 		height: 34px;
-		padding: 0 10px;
+		padding: 0 28px 0 10px; /* Space on right for absolute-positioned chevron */
 		box-sizing: border-box;
 		color: var(--text-secondary);
 		position: relative;
 		cursor: pointer;
-		transition: background-color var(--transition-fast);
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
 		flex-shrink: 0;
 		margin-bottom: 2px;
 	}
 
-	.model-selector-wrapper:hover {
+	.model-selector-wrapper:hover:not(.disabled) {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
+	}
+
+	.model-selector-wrapper.disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	.model-selector-wrapper:focus-within {
+		border-color: var(--accent-blue);
+		box-shadow: 0 0 0 1px var(--accent-blue);
 	}
 
 	.model-icon {
 		color: var(--accent-blue);
 		flex-shrink: 0;
+		pointer-events: none;
 	}
 
-	.model-select {
-		appearance: none;
-		-webkit-appearance: none;
-		padding-right: 18px;
+	.model-selected-text {
 		font-size: 0.85rem;
 		font-weight: 500;
-		cursor: pointer;
-		background: transparent;
-		border: none;
-		outline: none;
-		color: inherit;
 		max-width: 150px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	.model-select {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		cursor: pointer;
+		z-index: 2;
+		appearance: none;
+		-webkit-appearance: none;
+		border: none;
+		outline: none;
+		background: transparent;
 	}
 
 	.model-select:disabled {
@@ -570,6 +616,7 @@
 		transform: translateY(-50%);
 		pointer-events: none;
 		color: var(--text-muted);
+		z-index: 1;
 	}
 
 	/* Action Buttons */
@@ -832,7 +879,7 @@
 			font-size: 0.95rem;
 		}
 
-		.model-select {
+		.model-selected-text {
 			max-width: 90px;
 		}
 
@@ -840,5 +887,21 @@
 			width: 260px;
 			right: -40px;
 		}
+	}
+
+	.model-selector-wrapper.routing-active {
+		border-color: rgba(66, 133, 244, 0.4);
+		background-color: rgba(66, 133, 244, 0.05);
+		cursor: help;
+	}
+
+	.collaboration-glow {
+		color: #4285f4;
+		filter: drop-shadow(0 0 3px rgba(66, 133, 244, 0.3));
+	}
+
+	.collaboration-text {
+		color: var(--accent-blue) !important;
+		font-weight: 600;
 	}
 </style>

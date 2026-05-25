@@ -8,6 +8,7 @@
 		globalContext = '',
 		activeThinking = null,
 		activeTab = 'context',
+		isGenerating = false,
 		onChangeTab,
 		onUpdateChatContext,
 		onUpdateChatProject,
@@ -19,6 +20,7 @@
 		globalContext: string;
 		activeThinking: ParsedThinking | null;
 		activeTab: 'context' | 'thinking';
+		isGenerating: boolean;
 		onChangeTab: (tab: 'context' | 'thinking') => void;
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
@@ -76,6 +78,23 @@
 		const target = e.target as HTMLTextAreaElement;
 		onUpdateChatContext(conversation.id, target.value);
 	}
+
+	function autoScroll(node: HTMLElement, params: { active: boolean; text: string }) {
+		const scroll = () => {
+			if (params.active && node.scrollHeight > 0) {
+				node.scrollTop = node.scrollHeight;
+			}
+		};
+		// Scroll initially
+		setTimeout(scroll, 50);
+
+		return {
+			update(newParams: { active: boolean; text: string }) {
+				params = newParams;
+				setTimeout(scroll, 0);
+			}
+		};
+	}
 </script>
 
 {#if conversation}
@@ -114,11 +133,11 @@
 				onclick={() => onChangeTab('thinking')}
 				title="View reasoning thoughts"
 			>
-				<svg viewBox="0 0 24 24" width="14" height="14" class={activeThinking?.isThinking ? 'animate-pulse text-thinking' : ''}>
+				<svg viewBox="0 0 24 24" width="14" height="14" class={activeThinking?.isThinking && isGenerating ? 'animate-pulse text-thinking' : ''}>
 					<path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.04 19.64 10.46 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm1-9h-2v2h2V9zm0 4h-2v4h2v-4z"/>
 				</svg>
 				Thinking
-				{#if activeThinking?.isThinking}
+				{#if activeThinking?.isThinking && isGenerating}
 					<span class="thinking-dot"></span>
 				{/if}
 			</button>
@@ -232,7 +251,7 @@
 				{#if activeThinking}
 					<div class="thinking-header-row">
 						<h4>Reasoning Stream</h4>
-						{#if activeThinking.isThinking}
+						{#if activeThinking.isThinking && isGenerating}
 							<span class="thinking-status-active">
 								<span class="pulsing-circle"></span>
 								Thinking...
@@ -241,7 +260,7 @@
 							<span class="thinking-status-done">Completed</span>
 						{/if}
 					</div>
-					<div class="thinking-scroller markdown-body">
+					<div class="thinking-scroller markdown-body" use:autoScroll={{ active: !!(activeThinking.isThinking && isGenerating), text: activeThinking.thinking }}>
 						{@html renderMarkdown(activeThinking.thinking)}
 					</div>
 				{:else}

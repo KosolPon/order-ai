@@ -7,8 +7,16 @@
 		projects = [],
 		globalContext = $bindable(''),
 		ollamaUrl = $bindable(),
+		activeModels = $bindable(['']),
+		modelTemperatures = $bindable([0.7, 0.7, 0.7]),
+		topP = $bindable(0.9),
+		topK = $bindable(40),
+		numCtx = $bindable(4096),
+		numPredict = $bindable(0),
+		repeatPenalty = $bindable(1.1),
 		isConnected = false,
 		models = [],
+		generatingConversations = {},
 		onSelectConversation,
 		onNewConversation,
 		onDeleteConversation,
@@ -18,15 +26,24 @@
 		onUpdateProject,
 		onDeleteProject,
 		onNewConversationInProject,
-		projectSettingsToOpenId = $bindable(null)
+		projectSettingsToOpenId = $bindable(null),
+		isSettingsOpen = $bindable(false)
 	} = $props<{
 		conversations: Conversation[];
 		currentConversationId: string | null;
 		projects: Project[];
 		globalContext: string;
 		ollamaUrl: string;
+		activeModels: string[];
+		modelTemperatures: number[];
+		topP: number;
+		topK: number;
+		numCtx: number;
+		numPredict: number;
+		repeatPenalty: number;
 		isConnected: boolean;
 		models: OllamaModel[];
+		generatingConversations?: Record<string, boolean>;
 		onSelectConversation: (id: string) => void;
 		onNewConversation: () => void;
 		onDeleteConversation: (id: string) => void;
@@ -37,11 +54,37 @@
 		onDeleteProject: (id: string, deleteChats: boolean) => void;
 		onNewConversationInProject: (projectId: string) => void;
 		projectSettingsToOpenId: string | null;
+		isSettingsOpen?: boolean;
 	}>();
+
+	let showAdvancedSettings = $state(false);
+
+	function addModelStep() {
+		if (activeModels.length < 3) {
+			const nextModelName = models[0]?.name || '';
+			activeModels = [...activeModels, nextModelName];
+			const defaultTemp = activeModels.length === 2 ? 0.2 : 0.7;
+			modelTemperatures = [...modelTemperatures, defaultTemp];
+		}
+	}
+
+	function removeModelStep(index: number) {
+		if (index > 0) {
+			activeModels = activeModels.filter((_, i) => i !== index);
+			modelTemperatures = modelTemperatures.filter((_, i) => i !== index);
+		}
+	}
+
+	function updateModelStep(index: number, val: string) {
+		activeModels = activeModels.map((m, i) => i === index ? val : m);
+	}
+
+	function updateModelTemp(index: number, val: number) {
+		modelTemperatures = modelTemperatures.map((t, i) => i === index ? val : t);
+	}
 
 	let editingId = $state<string | null>(null);
 	let editTitle = $state<string>('');
-	let isSettingsOpen = $state(false);
 
 	// Projects state
 	let collapsedProjects = $state<Record<string, boolean>>({});
@@ -61,6 +104,39 @@
 		e.stopPropagation();
 		editingId = conv.id;
 		editTitle = conv.title;
+	}
+
+	// Dynamic relative time reactive update
+	let now = $state(Date.now());
+	$effect(() => {
+		const interval = setInterval(() => {
+			now = Date.now();
+		}, 30000);
+		return () => clearInterval(interval);
+	});
+
+	function getConversationLastActive(conv: Conversation): number {
+		if (conv.messages && conv.messages.length > 0) {
+			const lastMsg = conv.messages[conv.messages.length - 1];
+			return lastMsg.timestamp || conv.createdAt;
+		}
+		return conv.createdAt;
+	}
+
+	function formatRelativeTime(timestamp: number): string {
+		if (!timestamp) return '';
+		const diffMs = now - timestamp;
+		if (diffMs < 0) return 'now';
+		
+		const diffMins = Math.floor(diffMs / 60000);
+		if (diffMins < 1) return 'now';
+		if (diffMins < 60) return `${diffMins}m`;
+		
+		const diffHours = Math.floor(diffMins / 60);
+		if (diffHours < 24) return `${diffHours}h`;
+		
+		const diffDays = Math.floor(diffHours / 24);
+		return `${diffDays}d`;
 	}
 
 	function saveEdit(id: string) {
@@ -179,7 +255,12 @@
 		projectSettingsFiles.reduce((acc, f) => acc + f.size, 0)
 	);
 
-	const independentConvs = $derived(conversations.filter((c: Conversation) => !c.projectId));
+	// Sort conversations: most recently active first
+	const sortedConversations = $derived(
+		[...conversations].sort((a, b) => getConversationLastActive(b) - getConversationLastActive(a))
+	);
+
+	const independentConvs = $derived(sortedConversations.filter((c: Conversation) => !c.projectId));
 
 	function isProjectActive(projectId: string): boolean {
 		const activeConv = conversations.find((c: Conversation) => c.id === currentConversationId);
@@ -270,7 +351,7 @@
 									<div class="empty-project-chats">No conversations in project</div>
 								{:else}
 									<div class="conversation-list">
-										{#each conversations.filter((c: Conversation) => c.projectId === project.id) as conv (conv.id)}
+										{#each sortedConversations.filter((c: Conversation) => c.projectId === project.id) as conv (conv.id)}
 											<div 
 												class="conversation-item" 
 												class:active={currentConversationId === conv.id}
@@ -295,6 +376,15 @@
 													/>
 												{:else}
 													<span class="conv-title">{conv.title}</span>
+													{#if generatingConversations[conv.id]}
+														<span class="chat-time-indicator generating">
+															<svg class="time-spinner" viewBox="0 0 24 24" width="14" height="14">
+																<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="42" stroke-dashoffset="14" />
+															</svg>
+														</span>
+													{:else}
+														<span class="chat-time-indicator">{formatRelativeTime(getConversationLastActive(conv))}</span>
+													{/if}
 												{/if}
 
 												<div class="actions">
@@ -366,6 +456,15 @@
 							/>
 						{:else}
 							<span class="conv-title">{conv.title}</span>
+							{#if generatingConversations[conv.id]}
+								<span class="chat-time-indicator generating">
+									<svg class="time-spinner" viewBox="0 0 24 24" width="14" height="14">
+										<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="42" stroke-dashoffset="14" />
+									</svg>
+								</span>
+							{:else}
+								<span class="chat-time-indicator">{formatRelativeTime(getConversationLastActive(conv))}</span>
+							{/if}
 						{/if}
 
 						<div class="actions">
@@ -408,7 +507,7 @@
 			</div>
 			<svg 
 				class="chevron" 
-				class:open={isSettingsOpen} 
+				class:open={!isSettingsOpen} 
 				viewBox="0 0 24 24" 
 				width="16" 
 				height="16"
@@ -436,6 +535,103 @@
 					</div>
 				</div>
 
+				<!-- Model Chain Settings -->
+				<div class="setting-item model-chain-section">
+					<label style="font-weight: 600; color: var(--accent-blue); margin-bottom: 6px;">โครงสร้างโมเดล (Model Chain)</label>
+					
+					<div class="model-chain-list">
+						{#each activeModels as model, idx (idx)}
+							<div class="chain-step animate-fade-in">
+								<div class="chain-step-header">
+									<span class="step-badge">โมเดล {idx + 1}</span>
+									<span class="step-role-label">
+										{#if idx === 0}
+											(Chat / Refiner)
+										{:else if idx === 1 && activeModels.length === 2}
+											(Executor)
+										{:else if idx === 1}
+											(Executor Step 2)
+										{:else}
+											(Translator Step 3)
+										{/if}
+									</span>
+									{#if idx > 0}
+										<button 
+											class="remove-step-btn" 
+											onclick={() => removeModelStep(idx)}
+											title="Remove this model"
+										>
+											✕
+										</button>
+									{/if}
+								</div>
+
+								<select 
+									class="model-select-dropdown" 
+									value={model}
+									onchange={(e) => updateModelStep(idx, e.currentTarget.value)}
+								>
+									{#if models.length === 0}
+										<option value="">No models found</option>
+									{:else}
+										{#if !model}
+											<option value="">Select a model...</option>
+										{/if}
+										{#each models as m}
+											<option value={m.name}>{m.name}</option>
+										{/each}
+									{/if}
+								</select>
+
+								<!-- Temp slider for this model -->
+								<div class="step-temp-container">
+									<div class="setting-label-row">
+										<label style="font-size: 0.7rem;">จินตนาการ (Temp):</label>
+										<div class="setting-value-wrapper">
+											<button 
+												class="reset-individual-btn" 
+												onclick={() => modelTemperatures[idx] = (idx === 1 ? 0.2 : 0.7)} 
+												title="Reset Temperature"
+											>
+												<svg viewBox="0 0 24 24" width="10" height="10">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-value" style="font-size: 0.7rem; padding: 0 4px;">
+												{(modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7).toFixed(2)}
+											</span>
+										</div>
+									</div>
+									<div class="slider-container">
+										<input 
+											type="range" 
+											min="0" 
+											max="1.5" 
+											step="0.05" 
+											value={modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7}
+											oninput={(e) => updateModelTemp(idx, parseFloat(e.currentTarget.value))}
+											class="temperature-slider"
+										/>
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+
+					{#if activeModels.length < 3}
+						<button 
+							class="add-step-btn" 
+							onclick={addModelStep}
+							disabled={models.length === 0}
+						>
+							<svg viewBox="0 0 24 24" width="14" height="14">
+								<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+							</svg>
+							<span>เพิ่มโมเดลถัดไป (สูงสุด 3 โมเดล)</span>
+						</button>
+					{/if}
+				</div>
+
 				<div class="setting-item">
 					<label for="sidebar-global-context">Global Context (All Chats)</label>
 					<textarea 
@@ -445,6 +641,180 @@
 						rows="3"
 						class="global-context-textarea"
 					></textarea>
+				</div>
+
+				<!-- Collapsible Advanced Settings -->
+				<div class="advanced-settings-wrapper" style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 10px;">
+					<button 
+						type="button" 
+						class="advanced-settings-toggle-btn"
+						onclick={() => showAdvancedSettings = !showAdvancedSettings}
+					>
+						<span>การตั้งค่าขั้นสูง (Advanced Settings)</span>
+						<svg 
+							class="chevron" 
+							class:open={showAdvancedSettings} 
+							viewBox="0 0 24 24" 
+							width="14" 
+							height="14"
+						>
+							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+						</svg>
+					</button>
+
+					{#if showAdvancedSettings}
+						<div class="advanced-settings-panel animate-fade-in" style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+							<!-- Top P -->
+							<div class="setting-item">
+								<div class="setting-label-row">
+									<label for="topp-slider">สัดส่วนความน่าจะเป็นสะสม (Top P)</label>
+									<div class="setting-value-wrapper">
+										<button 
+											class="reset-individual-btn" 
+											onclick={() => topP = 0.9} 
+											title="คืนค่าเริ่มต้น Top P"
+										>
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+											</svg>
+										</button>
+										<span class="setting-value">{topP.toFixed(2)}</span>
+									</div>
+								</div>
+								<div class="slider-container">
+									<input 
+										id="topp-slider"
+										type="range" 
+										min="0" 
+										max="1" 
+										step="0.01" 
+										bind:value={topP}
+										class="temperature-slider"
+									/>
+								</div>
+							</div>
+
+							<!-- Top K -->
+							<div class="setting-item">
+								<div class="setting-label-row">
+									<label for="topk-slider">จำนวนกลุ่มคำที่มีโอกาสสูงสุด (Top K)</label>
+									<div class="setting-value-wrapper">
+										<button 
+											class="reset-individual-btn" 
+											onclick={() => topK = 40} 
+											title="คืนค่าเริ่มต้น Top K"
+										>
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+											</svg>
+										</button>
+										<span class="setting-value">{topK}</span>
+									</div>
+								</div>
+								<div class="slider-container">
+									<input 
+										id="topk-slider"
+										type="range" 
+										min="1" 
+										max="100" 
+										step="1" 
+										bind:value={topK}
+										class="temperature-slider"
+									/>
+								</div>
+							</div>
+
+							<!-- Context Limit -->
+							<div class="setting-item">
+								<div class="setting-label-row">
+									<label for="numctx-slider">หน่วยความจำแชต (Context Limit)</label>
+									<div class="setting-value-wrapper">
+										<button 
+											class="reset-individual-btn" 
+											onclick={() => numCtx = 4096} 
+											title="คืนค่าเริ่มต้น Context Limit"
+										>
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+											</svg>
+										</button>
+										<span class="setting-value">{numCtx}</span>
+									</div>
+								</div>
+								<div class="slider-container">
+									<input 
+										id="numctx-slider"
+										type="range" 
+										min="1024" 
+										max="32768" 
+										step="1024" 
+										bind:value={numCtx}
+										class="temperature-slider"
+									/>
+								</div>
+							</div>
+
+							<!-- Max Tokens -->
+							<div class="setting-item">
+								<div class="setting-label-row">
+									<label for="numpredict-slider">จำกัดคำตอบสูงสุด (Max Tokens)</label>
+									<div class="setting-value-wrapper">
+										<button 
+											class="reset-individual-btn" 
+											onclick={() => numPredict = 0} 
+											title="คืนค่าเริ่มต้น Max Tokens"
+										>
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+											</svg>
+										</button>
+										<span class="setting-value">{numPredict === 0 ? 'ไม่จำกัด' : numPredict}</span>
+									</div>
+								</div>
+								<div class="slider-container">
+									<input 
+										id="numpredict-slider"
+										type="range" 
+										min="0" 
+										max="8192" 
+										step="128" 
+										bind:value={numPredict}
+										class="temperature-slider"
+									/>
+								</div>
+							</div>
+
+							<!-- Repeat Penalty -->
+							<div class="setting-item">
+								<div class="setting-label-row">
+									<label for="repeatpenalty-slider">อัตราลดการพูดซ้ำ (Repeat Penalty)</label>
+									<div class="setting-value-wrapper">
+										<button 
+											class="reset-individual-btn" 
+											onclick={() => repeatPenalty = 1.1} 
+											title="คืนค่าเริ่มต้น Repeat Penalty"
+										>
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+											</svg>
+										</button>
+										<span class="setting-value">{repeatPenalty.toFixed(2)}</span>
+									</div>
+								</div>
+								<div class="slider-container">
+									<input 
+										id="repeatpenalty-slider"
+										type="range" 
+										min="0.5" 
+										max="2.0" 
+										step="0.05" 
+										bind:value={repeatPenalty}
+										class="temperature-slider"
+									/>
+								</div>
+							</div>
+						</div>
+					{/if}
 				</div>
 
 				<div class="connection-status text-muted">
@@ -729,6 +1099,36 @@
 		padding-right: 8px;
 	}
 
+	.chat-time-indicator {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		flex-shrink: 0;
+		margin-left: auto;
+		padding-right: 4px;
+		transition: opacity var(--transition-fast);
+	}
+
+	.conversation-item:hover .chat-time-indicator {
+		opacity: 0;
+	}
+
+	.chat-time-indicator.generating {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accent-blue);
+	}
+
+	.time-spinner {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
 	.title-edit-input {
 		flex: 1;
 		background: var(--bg-primary);
@@ -840,11 +1240,35 @@
 		transform: rotate(180deg);
 	}
 
+	.setting-value-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.reset-individual-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 2px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.reset-individual-btn:hover {
+		color: var(--accent-blue);
+		background-color: var(--bg-hover);
+	}
+
 	.settings-drawer {
-		padding: 8px 12px 12px 12px;
+		padding: 6px 10px 10px 10px;
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 8px;
 		background-color: var(--bg-primary);
 		border-radius: 8px;
 		border: 1px solid var(--border-color);
@@ -854,7 +1278,7 @@
 	.setting-item {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: 2px;
 	}
 
 	.setting-item label {
@@ -862,6 +1286,92 @@
 		font-weight: 600;
 		color: var(--text-muted);
 	}
+
+	.setting-label-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.setting-value {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--accent-blue);
+		background-color: var(--inline-code-bg);
+		padding: 1px 6px;
+		border-radius: 4px;
+		border: 1px solid var(--inline-code-border);
+		font-family: var(--font-mono);
+	}
+
+	.slider-container {
+		display: flex;
+		align-items: center;
+		padding: 2px 0;
+	}
+
+	.temperature-slider {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+		outline: none;
+		transition: background var(--transition-fast);
+		cursor: pointer;
+	}
+
+	.temperature-slider::-webkit-slider-runnable-track {
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+	}
+
+	.temperature-slider::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--accent-blue);
+		cursor: pointer;
+		margin-top: -4px;
+		box-shadow: 0 0 6px rgba(168, 199, 250, 0.4);
+		transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+	}
+
+	.temperature-slider::-webkit-slider-thumb:hover {
+		background: var(--accent-blue-hover);
+		transform: scale(1.2);
+		box-shadow: 0 0 8px rgba(168, 199, 250, 0.6);
+	}
+
+	.temperature-slider::-moz-range-track {
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+	}
+
+	.temperature-slider::-moz-range-thumb {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--accent-blue);
+		cursor: pointer;
+		border: none;
+		box-shadow: 0 0 6px rgba(168, 199, 250, 0.4);
+		transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+	}
+
+	.temperature-slider::-moz-range-thumb:hover {
+		background: var(--accent-blue-hover);
+		transform: scale(1.2);
+		box-shadow: 0 0 8px rgba(168, 199, 250, 0.6);
+	}
+
 
 	.url-input-group {
 		display: flex;
@@ -1328,16 +1838,25 @@
 	.modal-btn.primary {
 		background-color: var(--accent-blue);
 		border: 1px solid var(--accent-blue);
-		color: #ffffff;
+		color: #131314; /* Dark text for high contrast on light blue background in dark mode */
+		font-weight: 600;
+	}
+
+	:global([data-theme="light"]) .modal-btn.primary {
+		color: #ffffff; /* White text for high contrast on dark blue background in light mode */
+		font-weight: 500;
 	}
 
 	.modal-btn.primary:hover:not(:disabled) {
-		background-color: #7baaf7;
-		border-color: #7baaf7;
+		background-color: var(--accent-blue-hover);
+		border-color: var(--accent-blue-hover);
 	}
 
 	.modal-btn.primary:disabled {
-		opacity: 0.5;
+		background-color: var(--bg-tertiary);
+		border-color: var(--border-color);
+		color: var(--text-muted);
+		opacity: 0.6;
 		cursor: not-allowed;
 	}
 
@@ -1504,6 +2023,154 @@
 		font-size: 0.78rem;
 		color: #ff6b6b;
 		margin-top: 4px;
+	}
+
+	.model-chain-section {
+		border-top: 1px solid var(--border-light);
+		padding-top: 12px;
+		margin-top: 8px;
+	}
+
+	.model-chain-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-bottom: 8px;
+	}
+
+	.chain-step {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px;
+		background-color: var(--bg-secondary);
+		border-radius: 8px;
+		border: 1px solid var(--border-color);
+		position: relative;
+	}
+
+	.chain-step-header {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.step-badge {
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		background-color: var(--accent-blue);
+		color: #ffffff;
+		padding: 2px 6px;
+		border-radius: 4px;
+	}
+
+	.step-role-label {
+		font-size: 0.65rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+
+	.remove-step-btn {
+		margin-left: auto;
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		font-size: 0.75rem;
+		padding: 2px 6px;
+		border-radius: 4px;
+		transition: all var(--transition-fast);
+	}
+
+	.remove-step-btn:hover {
+		color: #ff6b6b;
+		background-color: var(--bg-hover);
+	}
+
+	.step-temp-container {
+		margin-top: 4px;
+		padding-top: 4px;
+		border-top: 1px dashed var(--border-light);
+	}
+
+	.add-step-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		width: 100%;
+		padding: 8px;
+		border-radius: 6px;
+		border: 1px dashed var(--border-color);
+		background: none;
+		color: var(--accent-blue);
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.add-step-btn:hover:not(:disabled) {
+		background-color: var(--bg-hover);
+		border-color: var(--accent-blue);
+	}
+
+	.add-step-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.advanced-settings-toggle-btn {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		background: none;
+		border: none;
+		color: var(--text-secondary);
+		font-size: 0.78rem;
+		font-weight: 600;
+		cursor: pointer;
+		padding: 4px 0;
+		transition: color var(--transition-fast);
+	}
+
+	.advanced-settings-toggle-btn:hover {
+		color: var(--text-primary);
+	}
+
+	.sub-setting-item {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.model-select-dropdown {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 6px 10px;
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		outline: none;
+		cursor: pointer;
+		width: 100%;
+		transition: border-color var(--transition-fast);
+	}
+
+	.model-select-dropdown:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		cursor: pointer;
+		user-select: none;
 	}
 
 	@media (max-width: 768px) {

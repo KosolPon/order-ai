@@ -333,12 +333,29 @@ const markedInstance = new Marked();
 // @ts-ignore
 markedInstance.use({ renderer });
 
+const markdownCache = new Map<string, string>();
+
 /**
  * Render markdown string to HTML with code block highlighting
  */
 export function renderMarkdown(markdown: string): string {
 	if (!markdown) return '';
-	return markedInstance.parse(markdown) as string;
+	
+	const cached = markdownCache.get(markdown);
+	if (cached) return cached;
+
+	const rendered = markedInstance.parse(markdown) as string;
+
+	// Limit cache size to 500 entries to prevent memory leaks
+	if (markdownCache.size > 500) {
+		const firstKey = markdownCache.keys().next().value;
+		if (firstKey !== undefined) {
+			markdownCache.delete(firstKey);
+		}
+	}
+
+	markdownCache.set(markdown, rendered);
+	return rendered;
 }
 
 // Bind helper globally for code block copy buttons
@@ -436,28 +453,39 @@ export function parseThinking(content: string): ParsedThinking {
 	if (!content) {
 		return { thinking: '', response: '', isThinking: false };
 	}
-	const thinkStart = content.indexOf('<think>');
-	if (thinkStart === -1) {
-		return { thinking: '', response: content, isThinking: false };
+
+	let thinkingParts: string[] = [];
+	let responseParts: string[] = [];
+	let isThinking = false;
+	
+	let remaining = content;
+	while (remaining.length > 0) {
+		const thinkStart = remaining.indexOf('<think>');
+		if (thinkStart === -1) {
+			responseParts.push(remaining);
+			break;
+		}
+		
+		// Add text before <think> to response
+		if (thinkStart > 0) {
+			responseParts.push(remaining.slice(0, thinkStart));
+		}
+		
+		const thinkEnd = remaining.indexOf('</think>', thinkStart);
+		if (thinkEnd === -1) {
+			thinkingParts.push(remaining.slice(thinkStart + 7));
+			isThinking = true;
+			break;
+		}
+		
+		thinkingParts.push(remaining.slice(thinkStart + 7, thinkEnd));
+		remaining = remaining.slice(thinkEnd + 8);
 	}
 
-	const thinkEnd = content.indexOf('</think>');
-	const beforeThink = content.slice(0, thinkStart);
-
-	if (thinkEnd === -1) {
-		return {
-			thinking: content.slice(thinkStart + 7),
-			response: beforeThink,
-			isThinking: true
-		};
-	}
-
-	const thinking = content.slice(thinkStart + 7, thinkEnd);
-	const afterThink = content.slice(thinkEnd + 8);
 	return {
-		thinking,
-		response: beforeThink + afterThink,
-		isThinking: false
+		thinking: thinkingParts.filter(p => p.trim()).join('\n\n'),
+		response: responseParts.join(''),
+		isThinking
 	};
 }
 

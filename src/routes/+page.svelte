@@ -15,6 +15,14 @@
 	let ollamaUrl = $state<string>(DEFAULT_OLLAMA_URL);
 	let models = $state<OllamaModel[]>([]);
 	let selectedModel = $state<string>('');
+	let activeModels = $state<string[]>(['']);
+	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
+	let topP = $state<number>(0.9);
+	let topK = $state<number>(40);
+	let numCtx = $state<number>(4096);
+	let numPredict = $state<number>(0);
+	let repeatPenalty = $state<number>(1.1);
+	let isSettingsOpen = $state<boolean>(false);
 	let isConnected = $state<boolean>(false);
 	let isGenerating = $state<boolean>(false);
 	let input = $state<string>('');
@@ -124,8 +132,47 @@
 				currentConversationId = conversations[0].id;
 			}
 
-			const storedModel = localStorage.getItem('ollama_selected_model');
-			if (storedModel) selectedModel = storedModel;
+			const storedActiveModels = localStorage.getItem('ollama_active_models');
+			if (storedActiveModels) {
+				try {
+					activeModels = JSON.parse(storedActiveModels);
+				} catch (e) {
+					console.error('Failed to parse active models from localStorage:', e);
+				}
+			} else {
+				const storedModel = localStorage.getItem('ollama_selected_model');
+				if (storedModel) {
+					activeModels = [storedModel];
+				}
+			}
+
+			const storedTemps = localStorage.getItem('ollama_model_temperatures');
+			if (storedTemps) {
+				try {
+					modelTemperatures = JSON.parse(storedTemps);
+				} catch (e) {
+					console.error('Failed to parse model temperatures from localStorage:', e);
+				}
+			}
+
+			if (activeModels[0]) {
+				selectedModel = activeModels[0];
+			}
+
+			const storedTopP = localStorage.getItem('ollama_topp');
+			if (storedTopP) topP = parseFloat(storedTopP);
+
+			const storedTopK = localStorage.getItem('ollama_topk');
+			if (storedTopK) topK = parseInt(storedTopK, 10);
+
+			const storedNumCtx = localStorage.getItem('ollama_numctx');
+			if (storedNumCtx) numCtx = parseInt(storedNumCtx, 10);
+
+			const storedNumPredict = localStorage.getItem('ollama_numpredict');
+			if (storedNumPredict) numPredict = parseInt(storedNumPredict, 10);
+
+			const storedRepeatPenalty = localStorage.getItem('ollama_repeatpenalty');
+			if (storedRepeatPenalty) repeatPenalty = parseFloat(storedRepeatPenalty);
 
 			const storedDrafts = localStorage.getItem('ollama_drafts');
 			if (storedDrafts) {
@@ -201,7 +248,7 @@
 	$effect(() => {
 		if (theme === 'light') {
 			document.documentElement.setAttribute('data-theme', 'light');
-			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f0f4f9');
+			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#faf8f5');
 		} else {
 			document.documentElement.setAttribute('data-theme', 'dark');
 			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#131314');
@@ -215,7 +262,9 @@
 	});
 
 	$effect(() => {
-		localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
+		if (!isGenerating) {
+			localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
+		}
 	});
 
 	$effect(() => {
@@ -226,15 +275,57 @@
 		}
 	});
 
+	// Synchronize selectedModel and activeModels[0]
 	$effect(() => {
-		if (selectedModel) {
-			localStorage.setItem('ollama_selected_model', selectedModel);
+		const firstActive = activeModels[0] || '';
+		if (selectedModel !== firstActive) {
+			if (activeModels[0] !== selectedModel) {
+				activeModels[0] = selectedModel;
+			} else {
+				selectedModel = firstActive;
+			}
 		}
 	});
 
-	// Save drafts to localStorage
+	// Save active models and temperatures to localStorage
 	$effect(() => {
-		localStorage.setItem('ollama_drafts', JSON.stringify(drafts));
+		if (activeModels && activeModels.length > 0) {
+			localStorage.setItem('ollama_active_models', JSON.stringify(activeModels));
+			localStorage.setItem('ollama_selected_model', activeModels[0]);
+		}
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_model_temperatures', JSON.stringify(modelTemperatures));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_topp', String(topP));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_topk', String(topK));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_numctx', String(numCtx));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_numpredict', String(numPredict));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_repeatpenalty', String(repeatPenalty));
+	});
+
+	// Save drafts to localStorage with 500ms debounce
+	$effect(() => {
+		const dataToSave = JSON.stringify(drafts);
+		const timeout = setTimeout(() => {
+			localStorage.setItem('ollama_drafts', dataToSave);
+		}, 500);
+		return () => clearTimeout(timeout);
 	});
 
 	// Save projects to localStorage with quota protection
@@ -274,17 +365,7 @@
 		}
 	});
 
-	$effect(() => {
-		if (isInitialized) {
-			localStorage.setItem('ollama_sidebar_width', String(sidebarWidth));
-		}
-	});
-
-	$effect(() => {
-		if (isInitialized) {
-			localStorage.setItem('ollama_context_panel_width', String(contextPanelWidth));
-		}
-	});
+	// Layout widths are saved once resizing finishes in mouseup events
 
 	// Watch for input changes to update drafts
 	$effect(() => {
@@ -496,6 +577,320 @@
 		return combined;
 	}
 
+	// Execute multi-model chain sequentially
+	async function executeModelChain(
+		activeConvId: string,
+		assistantMsgId: string,
+		initialMessages: Message[],
+		systemPrompt: string
+	) {
+		const chainLength = activeModels.length;
+		let currentPrompt = initialMessages[initialMessages.length - 1]?.content || '';
+
+		const appendToAssistantMessage = (text: string) => {
+			conversations = conversations.map((conv) => {
+				if (conv.id === activeConvId) {
+					return {
+						...conv,
+						messages: conv.messages.map((m) => {
+							if (m.id === assistantMsgId) {
+								return { ...m, content: m.content + text };
+							}
+							return m;
+						})
+					};
+				}
+				return conv;
+			});
+		};
+
+		const setAssistantMessageModel = (modelName: string) => {
+			conversations = conversations.map((conv) => {
+				if (conv.id === activeConvId) {
+					return {
+						...conv,
+						messages: conv.messages.map((m) => {
+							if (m.id === assistantMsgId) {
+								return { ...m, model: modelName };
+							}
+							return m;
+						})
+					};
+				}
+				return conv;
+			});
+		};
+
+		try {
+			if (chainLength === 1 || !activeModels[1]) {
+				// Normal mode (1 model)
+				const model = activeModels[0] || selectedModel;
+				const temp = modelTemperatures[0] !== undefined ? modelTemperatures[0] : 0.7;
+				setAssistantMessageModel(model);
+				await streamChat(
+					{
+						messages: initialMessages,
+						model,
+						systemPrompt,
+						ollamaUrl,
+						temperature: temp,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => appendToAssistantMessage(chunk),
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+			} else if (chainLength === 2 || !activeModels[2]) {
+				// 2-Model mode: Model 1 (Translator/Refiner) -> Model 2 (Executor)
+				const m1 = activeModels[0];
+				const temp1 = modelTemperatures[0] !== undefined ? modelTemperatures[0] : 0.7;
+				const m2 = activeModels[1];
+				const temp2 = modelTemperatures[1] !== undefined ? modelTemperatures[1] : 0.2;
+
+				// Step 1: Model 1
+				setAssistantMessageModel(m1);
+				appendToAssistantMessage(`<think>\n[Step 1: Translating/Refining Prompt with ${m1}]\n`);
+				
+				let m1FullResponse = '';
+				await streamChat(
+					{
+						messages: [
+							{
+								id: `m1-sys-${Date.now()}`,
+								role: 'system',
+								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.'
+							},
+							{
+								id: `m1-user-${Date.now()}`,
+								role: 'user',
+								content: currentPrompt
+							}
+						],
+						model: m1,
+						ollamaUrl,
+						temperature: temp1,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => {
+						const cleanChunk = chunk.replace(/<\/?think>/g, '');
+						m1FullResponse += cleanChunk;
+						appendToAssistantMessage(cleanChunk);
+					},
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+				appendToAssistantMessage('\n</think>\n');
+
+				if (abortController?.signal.aborted) {
+					throw new DOMException('The user aborted a request.', 'AbortError');
+				}
+
+				const parsedM1 = parseThinking(m1FullResponse);
+				const refinedPrompt = parsedM1.response.trim() || m1FullResponse.trim();
+
+				// Step 2: Model 2 (Final Model)
+				setAssistantMessageModel(`${m1} ➔ ${m2}`);
+
+				const m2Messages = [...initialMessages];
+				if (m2Messages.length > 0) {
+					m2Messages[m2Messages.length - 1] = {
+						...m2Messages[m2Messages.length - 1],
+						content: refinedPrompt
+					};
+				}
+
+				await streamChat(
+					{
+						messages: m2Messages,
+						model: m2,
+						systemPrompt,
+						ollamaUrl,
+						temperature: temp2,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => appendToAssistantMessage(chunk),
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+
+			} else {
+				// 3-Model mode: Model 1 (Refiner) -> Model 2 (Executor) -> Model 3 (Translator)
+				const m1 = activeModels[0];
+				const temp1 = modelTemperatures[0] !== undefined ? modelTemperatures[0] : 0.7;
+				const m2 = activeModels[1];
+				const temp2 = modelTemperatures[1] !== undefined ? modelTemperatures[1] : 0.2;
+				const m3 = activeModels[2];
+				const temp3 = modelTemperatures[2] !== undefined ? modelTemperatures[2] : 0.7;
+
+				// Step 1: Model 1
+				setAssistantMessageModel(m1);
+				appendToAssistantMessage(`<think>\n[Step 1: Translating/Refining Prompt with ${m1}]\n`);
+				
+				let m1FullResponse = '';
+				await streamChat(
+					{
+						messages: [
+							{
+								id: `m1-sys-${Date.now()}`,
+								role: 'system',
+								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.'
+							},
+							{
+								id: `m1-user-${Date.now()}`,
+								role: 'user',
+								content: currentPrompt
+							}
+						],
+						model: m1,
+						ollamaUrl,
+						temperature: temp1,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => {
+						const cleanChunk = chunk.replace(/<\/?think>/g, '');
+						m1FullResponse += cleanChunk;
+						appendToAssistantMessage(cleanChunk);
+					},
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+				appendToAssistantMessage('\n</think>\n');
+
+				if (abortController?.signal.aborted) {
+					throw new DOMException('The user aborted a request.', 'AbortError');
+				}
+
+				const parsedM1 = parseThinking(m1FullResponse);
+				const refinedPrompt = parsedM1.response.trim() || m1FullResponse.trim();
+
+				// Step 2: Model 2 (Intermediate Executor)
+				setAssistantMessageModel(`${m1} ➔ ${m2}`);
+				appendToAssistantMessage(`<think>\n[Step 2: Generating Solution in English with ${m2}]\n`);
+
+				const m2Messages = [...initialMessages];
+				if (m2Messages.length > 0) {
+					m2Messages[m2Messages.length - 1] = {
+						...m2Messages[m2Messages.length - 1],
+						content: refinedPrompt
+					};
+				}
+
+				let m2FullResponse = '';
+				await streamChat(
+					{
+						messages: m2Messages,
+						model: m2,
+						systemPrompt,
+						ollamaUrl,
+						temperature: temp2,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => {
+						const cleanChunk = chunk.replace(/<\/?think>/g, '');
+						m2FullResponse += cleanChunk;
+						appendToAssistantMessage(cleanChunk);
+					},
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+				appendToAssistantMessage('\n</think>\n');
+
+				if (abortController?.signal.aborted) {
+					throw new DOMException('The user aborted a request.', 'AbortError');
+				}
+
+				const parsedM2 = parseThinking(m2FullResponse);
+				const englishSolution = parsedM2.response.trim() || m2FullResponse.trim();
+
+				// Step 3: Model 3 (Final Translator)
+				setAssistantMessageModel(`${m1} ➔ ${m2} ➔ ${m3}`);
+
+				await streamChat(
+					{
+						messages: [
+							{
+								id: `m3-sys-${Date.now()}`,
+								role: 'system',
+								content: 'You are a professional translator and editor.\nTranslate the following English response into natural, fluent Thai.\nEnsure all technical terms, code blocks, and markdown formatting are preserved exactly as they are.\nOutput ONLY the translated Thai response. Do not add any extra explanations, introduction, or pleasantries.'
+							},
+							{
+								id: `m3-user-${Date.now()}`,
+								role: 'user',
+								content: englishSolution
+							}
+						],
+						model: m3,
+						ollamaUrl,
+						temperature: temp3,
+						topP,
+						topK,
+						numCtx,
+						numPredict,
+						repeatPenalty
+					},
+					(chunk) => appendToAssistantMessage(chunk),
+					() => {},
+					(err) => { throw err; },
+					abortController?.signal
+				);
+			}
+
+			isGenerating = false;
+			abortController = null;
+		} catch (error: any) {
+			if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+				isGenerating = false;
+				abortController = null;
+				return;
+			}
+			console.error('Error during execution chain:', error);
+			conversations = conversations.map((conv) => {
+				if (conv.id === activeConvId) {
+					return {
+						...conv,
+						messages: conv.messages.map((m) => {
+							if (m.id === assistantMsgId) {
+								return {
+									...m,
+									content: m.content + `\n\n**Error during model execution:** _${error.message}_`
+								};
+							}
+							return m;
+						})
+					};
+				}
+				return conv;
+			});
+			isGenerating = false;
+			abortController = null;
+		}
+	}
+
 	// Send message to assistant
 	async function handleSendPrompt(promptText: string = input) {
 		selectedThinkingMsgId = null;
@@ -581,58 +976,11 @@
 		// 3. Initiate streaming
 		const activeConv = conversations.find(c => c.id === activeConvId);
 		const systemPrompt = getCombinedSystemPrompt(activeConv || null);
-		await streamChat(
-			{
-				messages: activeConv?.messages.slice(0, -1) || [], // send messages excluding the empty assistant placeholder
-				model: selectedModel,
-				systemPrompt,
-				ollamaUrl
-			},
-			// onChunk callback
-			(chunk) => {
-				conversations = conversations.map((conv) => {
-					if (conv.id === activeConvId) {
-						return {
-							...conv,
-							messages: conv.messages.map((m) => {
-								if (m.id === assistantMsgId) {
-									return { ...m, content: m.content + chunk };
-								}
-								return m;
-							})
-						};
-					}
-					return conv;
-				});
-			},
-			// onDone callback
-			() => {
-				isGenerating = false;
-				abortController = null;
-			},
-			// onError callback
-			(error) => {
-				conversations = conversations.map((conv) => {
-					if (conv.id === activeConvId) {
-						return {
-							...conv,
-							messages: conv.messages.map((m) => {
-								if (m.id === assistantMsgId) {
-									return {
-										...m,
-										content: m.content + `\n\n**Error:** _${error.message}_`
-									};
-								}
-								return m;
-							})
-						};
-					}
-					return conv;
-				});
-				isGenerating = false;
-				abortController = null;
-			},
-			abortController.signal
+		await executeModelChain(
+			activeConvId,
+			assistantMsgId,
+			activeConv?.messages.slice(0, -1) || [],
+			systemPrompt
 		);
 	}
 
@@ -668,58 +1016,11 @@
 		// Initiate streaming
 		const conv = conversations.find(c => c.id === activeConvId);
 		const systemPrompt = getCombinedSystemPrompt(conv || null);
-		await streamChat(
-			{
-				messages: conv?.messages.slice(0, -1) || [], // send all messages excluding the assistant placeholder
-				model: selectedModel,
-				systemPrompt,
-				ollamaUrl
-			},
-			// onChunk callback
-			(chunk) => {
-				conversations = conversations.map((c) => {
-					if (c.id === activeConvId) {
-						return {
-							...c,
-							messages: c.messages.map((m) => {
-								if (m.id === assistantMsgId) {
-									return { ...m, content: m.content + chunk };
-								}
-								return m;
-							})
-						};
-					}
-					return c;
-				});
-			},
-			// onDone callback
-			() => {
-				isGenerating = false;
-				abortController = null;
-			},
-			// onError callback
-			(error) => {
-				conversations = conversations.map((c) => {
-					if (c.id === activeConvId) {
-						return {
-							...c,
-							messages: c.messages.map((m) => {
-								if (m.id === assistantMsgId) {
-									return {
-										...m,
-										content: m.content + `\n\n**Error:** _${error.message}_`
-									};
-								}
-								return m;
-							})
-						};
-					}
-					return c;
-				});
-				isGenerating = false;
-				abortController = null;
-			},
-			abortController.signal
+		await executeModelChain(
+			activeConvId,
+			assistantMsgId,
+			conv?.messages.slice(0, -1) || [],
+			systemPrompt
 		);
 	}
 
@@ -773,6 +1074,7 @@
 			document.body.style.userSelect = '';
 			window.removeEventListener('mousemove', handleMouseMove);
 			window.removeEventListener('mouseup', handleMouseUp);
+			localStorage.setItem('ollama_sidebar_width', String(sidebarWidth));
 		};
 		
 		window.addEventListener('mousemove', handleMouseMove);
@@ -798,6 +1100,7 @@
 			document.body.style.userSelect = '';
 			window.removeEventListener('mousemove', handleMouseMove);
 			window.removeEventListener('mouseup', handleMouseUp);
+			localStorage.setItem('ollama_context_panel_width', String(contextPanelWidth));
 		};
 		
 		window.addEventListener('mousemove', handleMouseMove);
@@ -831,6 +1134,13 @@
 		bind:ollamaUrl
 		{isConnected}
 		{models}
+		bind:activeModels
+		bind:modelTemperatures
+		bind:topP
+		bind:topK
+		bind:numCtx
+		bind:numPredict
+		bind:repeatPenalty
 		onSelectConversation={handleSelectConversation}
 		onNewConversation={handleNewConversation}
 		onDeleteConversation={handleDeleteConversation}
@@ -841,6 +1151,7 @@
 		onDeleteProject={handleDeleteProject}
 		onNewConversationInProject={handleNewConversationInProject}
 		bind:projectSettingsToOpenId
+		bind:isSettingsOpen
 	/>
 
 	{#if showSidebar}
@@ -879,6 +1190,11 @@
 			bind:input
 			{models}
 			bind:selectedModel
+			{activeModels}
+			onModelPillClick={() => {
+				showSidebar = true;
+				isSettingsOpen = true;
+			}}
 			bind:attachments
 			{isGenerating}
 			onSend={() => handleSendPrompt()}
