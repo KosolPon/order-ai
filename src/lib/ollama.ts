@@ -110,13 +110,19 @@ function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy:
 /**
  * Fetch available Ollama models from local service (via SvelteKit proxy or direct fetch)
  */
-export async function fetchModels(ollamaUrl: string = DEFAULT_OLLAMA_URL): Promise<OllamaModel[]> {
+export async function fetchModels(
+	ollamaUrl: string = DEFAULT_OLLAMA_URL,
+	apiKey?: string
+): Promise<OllamaModel[]> {
 	if (typeof window === 'undefined') return [];
 	try {
 		const target = getTargetUrl('api/tags', ollamaUrl);
 		const headers: Record<string, string> = {};
 		if (target.useProxy) {
 			headers['x-ollama-url'] = ollamaUrl;
+		}
+		if (apiKey) {
+			headers['Authorization'] = `Bearer ${apiKey}`;
 		}
 
 		const res = await fetch(target.url, { headers });
@@ -131,6 +137,57 @@ export async function fetchModels(ollamaUrl: string = DEFAULT_OLLAMA_URL): Promi
 	} catch (error) {
 		console.error('Error fetching models:', error);
 		throw error;
+	}
+}
+
+// Memory cache to prevent redundant api/show network requests
+const systemPromptCache: Record<string, string> = {};
+
+/**
+ * Fetch detailed model info (including system prompt) from Ollama
+ */
+export async function fetchModelSystemPrompt(
+	modelName: string,
+	ollamaUrl: string = DEFAULT_OLLAMA_URL,
+	apiKey?: string
+): Promise<string> {
+	if (typeof window === 'undefined') return '';
+	if (!modelName || modelName.startsWith('gemini-')) return '';
+
+	// Return cached result if available
+	if (systemPromptCache[modelName] !== undefined) {
+		return systemPromptCache[modelName];
+	}
+
+	try {
+		const target = getTargetUrl('api/show', ollamaUrl);
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+		if (target.useProxy) {
+			headers['x-ollama-url'] = ollamaUrl;
+		}
+		if (apiKey) {
+			headers['Authorization'] = `Bearer ${apiKey}`;
+		}
+
+		const res = await fetch(target.url, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ name: modelName })
+		});
+
+		if (!res.ok) {
+			return '';
+		}
+
+		const data = await res.json();
+		const system = data.system || '';
+		systemPromptCache[modelName] = system;
+		return system;
+	} catch (error) {
+		console.error(`Error fetching system prompt for model ${modelName}:`, error);
+		return '';
 	}
 }
 
@@ -151,6 +208,7 @@ export async function streamChat(
 		repeatPenalty?: number;
 		customizeSettings?: boolean;
 		geminiApiKey?: string;
+		ollamaApiKey?: string;
 	},
 	onChunk: (chunk: string) => void,
 	onDone: (fullResponse: string) => void,
@@ -160,6 +218,21 @@ export async function streamChat(
 	const { messages, model, systemPrompt, ollamaUrl = DEFAULT_OLLAMA_URL, temperature = 0.7, topP, topK, numCtx, numPredict, repeatPenalty, customizeSettings = false } = options;
 
 	try {
+		const isGemini = model.startsWith('gemini-');
+		let baseSystemPrompt = '';
+		if (!isGemini) {
+			baseSystemPrompt = await fetchModelSystemPrompt(model, ollamaUrl, options.ollamaApiKey);
+		}
+
+		let combinedSystemPrompt = systemPrompt || '';
+		if (baseSystemPrompt) {
+			if (combinedSystemPrompt) {
+				combinedSystemPrompt = `${baseSystemPrompt}\n\n${combinedSystemPrompt}`;
+			} else {
+				combinedSystemPrompt = baseSystemPrompt;
+			}
+		}
+
 		// Prepare chat payload
 		const chatMessages = messages.map((m) => {
 			let content = m.content;
@@ -194,7 +267,7 @@ export async function streamChat(
 
 		// Limit duplicating the system prompt into the user message only if it is short (e.g., < 1500 characters).
 		// Duplicating large reference files/contexts overflows the context window and causes reasoning loops.
-		if (systemPrompt && chatMessages.length > 0 && systemPrompt.length < 1500) {
+		if (combinedSystemPrompt && chatMessages.length > 0 && combinedSystemPrompt.length < 1500) {
 			let lastUserMsg = null;
 			for (let i = chatMessages.length - 1; i >= 0; i--) {
 				if (chatMessages[i].role === 'user') {
@@ -204,18 +277,17 @@ export async function streamChat(
 			}
 
 			if (lastUserMsg) {
-				lastUserMsg.content += `\n\n---\n[System Instructions & Reference Context]:\n${systemPrompt}`;
+				lastUserMsg.content += `\n\n---\n[System Instructions & Reference Context]:\n${combinedSystemPrompt}`;
 			}
 		}
 
-		if (systemPrompt) {
+		if (combinedSystemPrompt) {
 			chatMessages.unshift({
 				role: 'system',
-				content: systemPrompt
+				content: combinedSystemPrompt
 			});
 		}
 
-		const isGemini = model.startsWith('gemini-');
 		const target = isGemini 
 			? { url: '/api/gemini/chat', useProxy: false } 
 			: getTargetUrl('api/chat', ollamaUrl);
@@ -227,8 +299,13 @@ export async function streamChat(
 		if (isGemini) {
 			const apiKey = options.geminiApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : '') || '';
 			headers['x-gemini-key'] = apiKey;
-		} else if (target.useProxy) {
-			headers['x-ollama-url'] = ollamaUrl;
+		} else {
+			if (target.useProxy) {
+				headers['x-ollama-url'] = ollamaUrl;
+			}
+			if (options.ollamaApiKey) {
+				headers['Authorization'] = `Bearer ${options.ollamaApiKey}`;
+			}
 		}
 
 		let requestBody: any;
@@ -236,7 +313,7 @@ export async function streamChat(
 			requestBody = {
 				model,
 				messages: chatMessages,
-				systemPrompt,
+				systemPrompt: combinedSystemPrompt,
 				temperature,
 				topP,
 				topK,

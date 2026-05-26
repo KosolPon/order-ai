@@ -7,6 +7,8 @@
 		projects = [],
 		globalContext = $bindable(''),
 		ollamaUrl = $bindable(),
+		ollamaCloudUrl = $bindable('https://ollama.com'),
+		ollamaCloudApiKey = $bindable(''),
 		geminiApiKey = $bindable(''),
 		providerMode = $bindable('ollama'),
 		activeModels = $bindable(['']),
@@ -17,6 +19,7 @@
 		numPredict = $bindable(0),
 		repeatPenalty = $bindable(1.1),
 		isConnected = false,
+		isOllamaCloudConnected = false,
 		models = [],
 		generatingConversations = {},
 		onSelectConversation,
@@ -37,8 +40,10 @@
 		projects: Project[];
 		globalContext: string;
 		ollamaUrl: string;
+		ollamaCloudUrl: string;
+		ollamaCloudApiKey: string;
 		geminiApiKey: string;
-		providerMode: 'ollama' | 'gemini' | 'both';
+		providerMode: 'ollama' | 'ollama-cloud' | 'gemini' | 'all';
 		activeModels: string[];
 		modelTemperatures: number[];
 		topP: number;
@@ -47,6 +52,7 @@
 		numPredict: number;
 		repeatPenalty: number;
 		isConnected: boolean;
+		isOllamaCloudConnected: boolean;
 		models: OllamaModel[];
 		generatingConversations?: Record<string, boolean>;
 		onSelectConversation: (id: string) => void;
@@ -64,6 +70,7 @@
 	}>();
 
 	let showAdvancedSettings = $state(false);
+	let showOllamaCloudKey = $state(false);
 
 	function addModelStep() {
 		if (activeModels.length < 3) {
@@ -509,7 +516,12 @@
 	<div class="sidebar-footer">
 		<button class="footer-btn" onclick={() => isSettingsOpen = !isSettingsOpen}>
 			<div class="status-indicator-wrapper">
-				<span class="status-dot" class:connected={providerMode === 'gemini' ? !!geminiApiKey.trim() : providerMode === 'both' ? (isConnected || !!geminiApiKey.trim()) : isConnected}></span>
+				<span class="status-dot" class:connected={
+					providerMode === 'gemini' ? !!geminiApiKey.trim() : 
+					providerMode === 'ollama-cloud' ? isOllamaCloudConnected : 
+					providerMode === 'all' ? (isConnected || isOllamaCloudConnected || !!geminiApiKey.trim()) : 
+					isConnected
+				}></span>
 				<span>Settings & Connection</span>
 			</div>
 			<svg 
@@ -527,7 +539,7 @@
 			<div class="settings-drawer animate-fade-in">
 				<div class="setting-item">
 					<label>โหมดเชื่อมต่อ (Connection Mode)</label>
-					<div class="connection-mode-selector">
+					<div class="connection-mode-selector" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
 						<button 
 							type="button"
 							class="mode-selector-btn" 
@@ -535,6 +547,14 @@
 							onclick={() => providerMode = 'ollama'}
 						>
 							Ollama (Local)
+						</button>
+						<button 
+							type="button"
+							class="mode-selector-btn" 
+							class:active={providerMode === 'ollama-cloud'}
+							onclick={() => providerMode = 'ollama-cloud'}
+						>
+							Ollama (Cloud)
 						</button>
 						<button 
 							type="button"
@@ -547,15 +567,15 @@
 						<button 
 							type="button"
 							class="mode-selector-btn" 
-							class:active={providerMode === 'both'}
-							onclick={() => providerMode = 'both'}
+							class:active={providerMode === 'all'}
+							onclick={() => providerMode = 'all'}
 						>
-							ทั้งคู่ (Both)
+							ทั้งหมด (All)
 						</button>
 					</div>
 				</div>
 
-				{#if providerMode === 'ollama' || providerMode === 'both'}
+				{#if providerMode === 'ollama' || providerMode === 'all'}
 					<div class="setting-item animate-fade-in">
 						<label for="ollama-url">Ollama Server URL</label>
 						<div class="url-input-group">
@@ -574,7 +594,46 @@
 					</div>
 				{/if}
 
-				{#if providerMode === 'gemini' || providerMode === 'both'}
+				{#if providerMode === 'ollama-cloud' || providerMode === 'all'}
+					<div class="setting-item animate-fade-in">
+						<label for="ollama-cloud-url">Ollama Cloud Base URL</label>
+						<input 
+							id="ollama-cloud-url"
+							type="text" 
+							placeholder="https://ollama.com" 
+							bind:value={ollamaCloudUrl}
+						/>
+					</div>
+
+					<div class="setting-item animate-fade-in">
+						<label for="ollama-cloud-key">Ollama Cloud API Key</label>
+						<div class="url-input-group">
+							<input 
+								id="ollama-cloud-key"
+								type={showOllamaCloudKey ? 'text' : 'password'} 
+								placeholder="Ollama Cloud API Key..." 
+								bind:value={ollamaCloudApiKey}
+							/>
+							<button 
+								class="refresh-btn" 
+								onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
+								title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
+							>
+								{#if showOllamaCloudKey}
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+									</svg>
+								{:else}
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+									</svg>
+								{/if}
+							</button>
+						</div>
+					</div>
+				{/if}
+
+				{#if providerMode === 'gemini' || providerMode === 'all'}
 					<div class="setting-item animate-fade-in">
 						<label for="gemini-key">Google Gemini API Key (Cloud)</label>
 						<div class="url-input-group">
@@ -911,6 +970,12 @@
 					{:else}
 						<span class="text-error">API Key required for Gemini Cloud.</span>
 					{/if}
+				{:else if providerMode === 'ollama-cloud'}
+					{#if isOllamaCloudConnected}
+						<span class="text-success">Connected to Ollama Cloud. Found {models.length} models.</span>
+					{:else}
+						<span class="text-error">API Key required for Ollama Cloud.</span>
+					{/if}
 				{:else if providerMode === 'ollama'}
 					{#if isConnected}
 						<span class="text-success">Connected. Found {models.length} models.</span>
@@ -933,7 +998,7 @@
 						{/if}
 					{/if}
 				{:else}
-					{#if isConnected}
+					{#if isConnected || isOllamaCloudConnected}
 						<span class="text-success">Connected. Found {models.length} models (Ollama + Gemini).</span>
 					{:else}
 						<span class="text-warning">Ollama disconnected. Gemini Cloud active if Key configured.</span>

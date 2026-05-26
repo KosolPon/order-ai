@@ -16,15 +16,30 @@
 	let currentConversationId = $state<string | null>(null);
 	let ollamaUrl = $state<string>(DEFAULT_OLLAMA_URL);
 	let geminiApiKey = $state<string>('');
-	let providerMode = $state<'ollama' | 'gemini' | 'both'>('ollama');
+	let ollamaCloudApiKey = $state<string>('');
+	let ollamaCloudUrl = $state<string>('https://ollama.com');
+	let providerMode = $state<'ollama' | 'ollama-cloud' | 'gemini' | 'all'>('ollama');
 	let ollamaModels = $state<OllamaModel[]>([]);
-	let models = $derived(
-		providerMode === 'gemini'
-			? (geminiApiKey.trim() ? GEMINI_MODELS : [])
-			: providerMode === 'both'
-				? [...ollamaModels, ...(geminiApiKey.trim() ? GEMINI_MODELS : [])].sort((a, b) => a.name.localeCompare(b.name))
-				: ollamaModels
-	);
+	let ollamaCloudModels = $state<OllamaModel[]>([]);
+	let isOllamaCloudConnected = $state<boolean>(false);
+	let models = $derived.by(() => {
+		if (providerMode === 'gemini') {
+			return geminiApiKey.trim() ? GEMINI_MODELS : [];
+		} else if (providerMode === 'ollama-cloud') {
+			return ollamaCloudApiKey.trim() ? ollamaCloudModels : [];
+		} else if (providerMode === 'all') {
+			const list = [...ollamaModels];
+			if (ollamaCloudApiKey.trim()) {
+				list.push(...ollamaCloudModels);
+			}
+			if (geminiApiKey.trim()) {
+				list.push(...GEMINI_MODELS);
+			}
+			return list.sort((a, b) => a.name.localeCompare(b.name));
+		} else {
+			return ollamaModels;
+		}
+	});
 	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
@@ -165,8 +180,21 @@
 			const storedGeminiKey = localStorage.getItem('gemini_api_key');
 			if (storedGeminiKey) geminiApiKey = storedGeminiKey;
 
+			const storedOllamaCloudKey = localStorage.getItem('ollama_cloud_api_key');
+			if (storedOllamaCloudKey) ollamaCloudApiKey = storedOllamaCloudKey;
+
+			const storedOllamaCloudUrl = localStorage.getItem('ollama_cloud_url');
+			if (storedOllamaCloudUrl) ollamaCloudUrl = storedOllamaCloudUrl;
+
 			const storedProviderMode = localStorage.getItem('ollama_provider_mode');
-			if (storedProviderMode === 'ollama' || storedProviderMode === 'gemini' || storedProviderMode === 'both') {
+			if (storedProviderMode === 'both') {
+				providerMode = 'all';
+			} else if (
+				storedProviderMode === 'ollama' || 
+				storedProviderMode === 'ollama-cloud' || 
+				storedProviderMode === 'gemini' || 
+				storedProviderMode === 'all'
+			) {
 				providerMode = storedProviderMode;
 			}
 
@@ -417,7 +445,11 @@
 	});
 
 	$effect(() => {
-		localStorage.setItem('gemini_api_key', geminiApiKey);
+		localStorage.setItem('ollama_cloud_api_key', ollamaCloudApiKey);
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_cloud_url', ollamaCloudUrl);
 	});
 
 	$effect(() => {
@@ -546,7 +578,7 @@
 		});
 	});
 
-	// Trigger model loading whenever URL changes
+	// Trigger model loading whenever URL/keys change
 	$effect(() => {
 		if (ollamaUrl) {
 			untrack(() => {
@@ -555,37 +587,62 @@
 		}
 	});
 
+	$effect(() => {
+		if (ollamaCloudUrl || ollamaCloudApiKey) {
+			untrack(() => {
+				loadCloudModels();
+			});
+		}
+	});
+
+	function autoSelectModel() {
+		const availableModels = models;
+		if (availableModels.length > 0) {
+			const modelNames = availableModels.map((m) => m.name);
+			if (!selectedModel || !modelNames.includes(selectedModel)) {
+				selectedModel = availableModels[0].name;
+			}
+		} else {
+			selectedModel = '';
+		}
+	}
+
+	// Fetch models from Ollama Cloud
+	async function loadCloudModels() {
+		if (typeof window === 'undefined') return;
+		if (!ollamaCloudApiKey.trim()) {
+			ollamaCloudModels = [];
+			isOllamaCloudConnected = false;
+			return;
+		}
+		try {
+			const fetchedModels = await fetchModels(ollamaCloudUrl, ollamaCloudApiKey);
+			fetchedModels.sort((a, b) => a.name.localeCompare(b.name));
+			ollamaCloudModels = fetchedModels;
+			isOllamaCloudConnected = true;
+			autoSelectModel();
+		} catch (error) {
+			console.error('Ollama Cloud connection failed:', error);
+			ollamaCloudModels = [];
+			isOllamaCloudConnected = false;
+			autoSelectModel();
+		}
+	}
+
 	// Fetch models from Ollama
 	async function loadModels() {
 		if (typeof window === 'undefined') return;
 		try {
 			const fetchedModels = await fetchModels(ollamaUrl);
-			// Sort models alphabetically by name
 			fetchedModels.sort((a, b) => a.name.localeCompare(b.name));
 			ollamaModels = fetchedModels;
 			isConnected = true;
-
-			// Auto select first model if none selected or the current selected one is gone
-			const geminiList = geminiApiKey.trim() ? GEMINI_MODELS : [];
-			const availableModels = 
-				providerMode === 'gemini'
-					? geminiList
-					: providerMode === 'both'
-						? [...fetchedModels, ...geminiList].sort((a, b) => a.name.localeCompare(b.name))
-						: fetchedModels;
-			if (availableModels.length > 0) {
-				const modelNames = availableModels.map((m) => m.name);
-				if (!selectedModel || !modelNames.includes(selectedModel)) {
-					selectedModel = availableModels[0].name;
-				}
-			} else {
-				selectedModel = '';
-			}
+			autoSelectModel();
 		} catch (error) {
 			console.error('Ollama connection failed:', error);
 			ollamaModels = [];
-			selectedModel = '';
 			isConnected = false;
+			autoSelectModel();
 		}
 	}
 
@@ -856,12 +913,18 @@
 				const model = activeModels[0] || selectedModel;
 				const temp = modelTemperatures[0] !== undefined ? modelTemperatures[0] : 0.7;
 				setAssistantMessageModel(model);
+
+				const isCloudModel = ollamaCloudModels.some(m => m.name === model);
+				const targetUrl = isCloudModel ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKey = isCloudModel ? ollamaCloudApiKey : undefined;
+
 				await streamChat(
 					{
 						messages: initialMessages,
 						model,
 						systemPrompt,
-						ollamaUrl,
+						ollamaUrl: targetUrl,
+						ollamaApiKey: targetApiKey,
 						temperature: temp,
 						topP,
 						topK,
@@ -886,6 +949,10 @@
 				setAssistantMessageModel(m1);
 				appendToAssistantMessage(`<think>\n[Step 1: Translating/Refining Prompt with ${m1}]\n`);
 				
+				const isCloudM1 = ollamaCloudModels.some(m => m.name === m1);
+				const targetUrlM1 = isCloudM1 ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKeyM1 = isCloudM1 ? ollamaCloudApiKey : undefined;
+
 				let m1FullResponse = '';
 				await streamChat(
 					{
@@ -904,7 +971,8 @@
 							}
 						],
 						model: m1,
-						ollamaUrl,
+						ollamaUrl: targetUrlM1,
+						ollamaApiKey: targetApiKeyM1,
 						temperature: temp1,
 						topP,
 						topK,
@@ -942,12 +1010,17 @@
 					};
 				}
 
+				const isCloudM2 = ollamaCloudModels.some(m => m.name === m2);
+				const targetUrlM2 = isCloudM2 ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKeyM2 = isCloudM2 ? ollamaCloudApiKey : undefined;
+
 				await streamChat(
 					{
 						messages: m2Messages,
 						model: m2,
 						systemPrompt,
-						ollamaUrl,
+						ollamaUrl: targetUrlM2,
+						ollamaApiKey: targetApiKeyM2,
 						temperature: temp2,
 						topP,
 						topK,
@@ -975,6 +1048,10 @@
 				setAssistantMessageModel(m1);
 				appendToAssistantMessage(`<think>\n[Step 1: Translating/Refining Prompt with ${m1}]\n`);
 				
+				const isCloudM1 = ollamaCloudModels.some(m => m.name === m1);
+				const targetUrlM1 = isCloudM1 ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKeyM1 = isCloudM1 ? ollamaCloudApiKey : undefined;
+
 				let m1FullResponse = '';
 				await streamChat(
 					{
@@ -993,7 +1070,8 @@
 							}
 						],
 						model: m1,
-						ollamaUrl,
+						ollamaUrl: targetUrlM1,
+						ollamaApiKey: targetApiKeyM1,
 						temperature: temp1,
 						topP,
 						topK,
@@ -1032,13 +1110,18 @@
 					};
 				}
 
+				const isCloudM2 = ollamaCloudModels.some(m => m.name === m2);
+				const targetUrlM2 = isCloudM2 ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKeyM2 = isCloudM2 ? ollamaCloudApiKey : undefined;
+
 				let m2FullResponse = '';
 				await streamChat(
 					{
 						messages: m2Messages,
 						model: m2,
 						systemPrompt,
-						ollamaUrl,
+						ollamaUrl: targetUrlM2,
+						ollamaApiKey: targetApiKeyM2,
 						temperature: temp2,
 						topP,
 						topK,
@@ -1068,6 +1151,10 @@
 				// Step 3: Model 3 (Final Translator)
 				setAssistantMessageModel(`${m1} ➔ ${m2} ➔ ${m3}`);
 
+				const isCloudM3 = ollamaCloudModels.some(m => m.name === m3);
+				const targetUrlM3 = isCloudM3 ? ollamaCloudUrl : ollamaUrl;
+				const targetApiKeyM3 = isCloudM3 ? ollamaCloudApiKey : undefined;
+
 				await streamChat(
 					{
 						messages: [
@@ -1085,7 +1172,8 @@
 							}
 						],
 						model: m3,
-						ollamaUrl,
+						ollamaUrl: targetUrlM3,
+						ollamaApiKey: targetApiKeyM3,
 						temperature: temp3,
 						topP,
 						topK,
@@ -1390,9 +1478,12 @@
 		{projects}
 		bind:globalContext
 		bind:ollamaUrl
+		bind:ollamaCloudUrl
+		bind:ollamaCloudApiKey
 		bind:geminiApiKey
 		bind:providerMode
 		{isConnected}
+		isOllamaCloudConnected={isOllamaCloudConnected}
 		{models}
 		bind:activeModels
 		bind:modelTemperatures
@@ -1406,7 +1497,7 @@
 		onNewConversation={handleNewConversation}
 		onDeleteConversation={handleDeleteConversation}
 		onUpdateTitle={handleUpdateTitle}
-		onRefreshModels={loadModels}
+		onRefreshModels={() => { loadModels(); loadCloudModels(); }}
 		onCreateProject={handleCreateProject}
 		onUpdateProject={handleUpdateProject}
 		onDeleteProject={handleDeleteProject}
