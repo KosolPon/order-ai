@@ -670,6 +670,9 @@
 			parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
 		}
 
+		// Enforce language alignment to match the user's language (specifically Thai if the user asks in Thai)
+		parts.push(`[LANGUAGE INSTRUCTION]: Always respond in the language used by the user. If the user prompts in Thai (ภาษาไทย), you must write all your responses, explanations, and code comments in Thai. Do not output in other languages such as Korean or English unless referencing technical keywords.`);
+
 		const combined = parts.join('\n\n');
 		console.log('[System Context Debug] Calculated System Prompt:', combined);
 		return combined;

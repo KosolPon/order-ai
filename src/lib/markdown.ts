@@ -366,12 +366,18 @@ function preprocessCanvasTags(text: string): string {
 				lang = 'javascript';
 			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
 				lang = 'typescript';
+			} else if (lowerName.endsWith('.svelte')) {
+				lang = 'svelte';
 			} else if (lowerName.endsWith('.py')) {
 				lang = 'python';
 			} else if (lowerName.endsWith('.css')) {
 				lang = 'css';
 			} else if (lowerName.endsWith('.json')) {
 				lang = 'json';
+			} else if (lowerName.endsWith('.sh') || lowerName.endsWith('.bash')) {
+				lang = 'bash';
+			} else if (lowerName.endsWith('.sql')) {
+				lang = 'sql';
 			} else {
 				lang = 'code';
 			}
@@ -416,12 +422,18 @@ function preprocessCanvasTags(text: string): string {
 				lang = 'javascript';
 			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
 				lang = 'typescript';
+			} else if (lowerName.endsWith('.svelte')) {
+				lang = 'svelte';
 			} else if (lowerName.endsWith('.py')) {
 				lang = 'python';
 			} else if (lowerName.endsWith('.css')) {
 				lang = 'css';
 			} else if (lowerName.endsWith('.json')) {
 				lang = 'json';
+			} else if (lowerName.endsWith('.sh') || lowerName.endsWith('.bash')) {
+				lang = 'bash';
+			} else if (lowerName.endsWith('.sql')) {
+				lang = 'sql';
 			} else {
 				lang = 'code';
 			}
