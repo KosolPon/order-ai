@@ -32,6 +32,7 @@
 	let attachments = $state<Attachment[]>([]);
 	let isInitialized = $state(false);
 	let theme = $state<string>('dark-blue');
+	let fontFamily = $state<string>('inter');
 
 	// Toggle between light and dark of the current color
 	function handleToggleTheme() {
@@ -44,6 +45,23 @@
 	function handleSelectColor(color: string) {
 		const isDark = theme.startsWith('dark');
 		theme = isDark ? `dark-${color}` : `light-${color}`;
+	}
+
+	function getFontFamilyCss(fontId: string): string {
+		switch (fontId) {
+			case 'inter':
+				return "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+			case 'outfit':
+				return "'Outfit', 'Inter', system-ui, -apple-system, sans-serif";
+			case 'lora':
+				return "'Lora', Georgia, 'Times New Roman', serif";
+			case 'fira-code':
+				return "'Fira Code', 'Courier New', Courier, monospace";
+			case 'system':
+				return "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+			default:
+				return "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+		}
 	}
 
 	// Context and Project States
@@ -262,6 +280,12 @@
 				if (!isNaN(parsed) && parsed >= 10 && parsed <= 30) {
 					fontSize = parsed;
 				}
+			}
+
+			const storedFontFamily = localStorage.getItem('chat_font_family');
+			const validFonts = ['inter', 'outfit', 'lora', 'fira-code', 'system'];
+			if (storedFontFamily && validFonts.includes(storedFontFamily)) {
+				fontFamily = storedFontFamily;
 			}
 
 			// Load theme preference
@@ -1279,6 +1303,7 @@
 		--sidebar-transform: {showSidebar ? '0' : '-100%'};
 		--context-panel-width: {showContextPanel ? contextPanelWidth : 0}px;
 		--chat-font-size: {fontSize}px;
+		--chat-font-family: {getFontFamilyCss(fontFamily)};
 	"
 >
 	{#if showSidebar}
@@ -1329,6 +1354,7 @@
 	<main class="main-content">
 		<ChatArea 
 			bind:fontSize={fontSize}
+			bind:fontFamily={fontFamily}
 			conversation={currentConversation}
 			{isGenerating}
 			{isInitialized}
@@ -1414,6 +1440,8 @@
 		background-color: var(--bg-primary);
 		overflow: hidden;
 		position: relative;
+		--font-main: var(--chat-font-family, 'Inter', system-ui, -apple-system, sans-serif);
+		--font-title: var(--chat-font-family, 'Outfit', var(--font-main));
 	}
 
 	.main-content {

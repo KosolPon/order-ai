@@ -393,28 +393,42 @@
 					/>
 
 					{#if !isGenerating}
-						<!-- Plus Attach File Button -->
-						<button 
-							class="control-btn attach-btn" 
-							onclick={triggerFileInput}
-							title="Attach file or image"
-						>
-							<svg viewBox="0 0 24 24" width="18" height="18">
-								<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-							</svg>
-						</button>
-
-						<!-- Globe URL Link Button -->
-						<div class="link-btn-wrapper">
+						<!-- Attachment Selector (Hover for options, collapses plus and link) -->
+						<div class="attachment-selector-container" class:has-link-open={showLinkInput}>
 							<button 
-								class="control-btn link-btn" 
-								onclick={() => showLinkInput = !showLinkInput}
-								title="Attach URL link"
+								class="control-btn attach-menu-btn" 
+								title="Add attachment (File or URL link)"
+								aria-label="Add attachment"
 							>
 								<svg viewBox="0 0 24 24" width="18" height="18">
-									<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+									<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
 								</svg>
 							</button>
+
+							<div class="attachment-options-popup">
+								<button 
+									class="popup-menu-item" 
+									onclick={triggerFileInput}
+									type="button"
+									title="Upload a file or image"
+								>
+									<svg viewBox="0 0 24 24" width="16" height="16">
+										<path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+									</svg>
+									<span>อัปโหลดไฟล์/รูปภาพ</span>
+								</button>
+								<button 
+									class="popup-menu-item" 
+									onclick={() => showLinkInput = true}
+									type="button"
+									title="Add context from a website URL"
+								>
+									<svg viewBox="0 0 24 24" width="16" height="16">
+										<path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5-2.24-5-5-5z"/>
+									</svg>
+									<span>ดึงข้อมูลจากลิงก์เว็บ</span>
+								</button>
+							</div>
 
 							{#if showLinkInput}
 								<div class="link-input-popover">
@@ -772,10 +786,77 @@
 		}
 	}
 
-	/* Link Button & Popover */
-	.link-btn-wrapper {
+	/* Attachment Selector & Popover */
+	.attachment-selector-container {
 		position: relative;
 		display: inline-block;
+	}
+
+	.attachment-options-popup {
+		position: absolute;
+		bottom: 44px;
+		right: 0;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		padding: 6px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		box-shadow: var(--shadow-lg);
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+		transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+		transform: translateY(8px);
+		z-index: 90;
+		width: 190px;
+	}
+
+	/* Bridge to keep hover active */
+	.attachment-options-popup::before {
+		content: '';
+		position: absolute;
+		bottom: -10px;
+		left: 0;
+		right: 0;
+		height: 10px;
+		background: transparent;
+	}
+
+	.attachment-selector-container:hover:not(.has-link-open) .attachment-options-popup {
+		opacity: 1;
+		visibility: visible;
+		pointer-events: auto;
+		transform: translateY(0);
+	}
+
+	.popup-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 12px;
+		border-radius: 8px;
+		border: none;
+		background: transparent;
+		color: var(--text-secondary);
+		font-size: 0.85rem;
+		font-weight: 500;
+		cursor: pointer;
+		text-align: left;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.popup-menu-item:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.popup-menu-item svg {
+		color: var(--accent-blue);
+		flex-shrink: 0;
 	}
 
 	.link-input-popover {

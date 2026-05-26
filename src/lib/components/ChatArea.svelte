@@ -15,6 +15,7 @@
 		projects = [],
 		conversations = [],
 		fontSize = $bindable(15),
+		fontFamily = $bindable('inter'),
 		onSendPrompt,
 		onEditPrompt,
 		onStopGeneration,
@@ -36,6 +37,7 @@
 		projects?: Project[];
 		conversations?: Conversation[];
 		fontSize?: number;
+		fontFamily?: string;
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
@@ -594,6 +596,26 @@
 		}
 	}
 
+	const fontFamilies = ['inter', 'outfit', 'lora', 'fira-code', 'system'];
+
+	function toggleFontFamily() {
+		const currentIndex = fontFamilies.indexOf(fontFamily);
+		const nextIndex = (currentIndex + 1) % fontFamilies.length;
+		fontFamily = fontFamilies[nextIndex];
+		localStorage.setItem('chat_font_family', fontFamily);
+	}
+
+	function getFontName(fontId: string) {
+		switch (fontId) {
+			case 'inter': return 'Inter (Sans)';
+			case 'outfit': return 'Outfit (Rounded)';
+			case 'lora': return 'Lora (Serif)';
+			case 'fira-code': return 'Fira Code (Mono)';
+			case 'system': return 'System UI';
+			default: return 'Inter';
+		}
+	}
+
 	// Determine if the current new chat belongs to a project
 	const currentProject = $derived(
 		conversation && conversation.projectId
@@ -861,6 +883,46 @@
 				</div>
 			</div>
 
+			<!-- Font Selector (Hover for Zoom, Click to cycle Fonts) -->
+			<div class="font-selector-container">
+				<button 
+					class="font-toggle-btn"
+					onclick={toggleFontFamily}
+					title="Active: {getFontName(fontFamily)} (Click to switch font family, Hover for zoom)"
+					aria-label="Change font family"
+				>
+					<span class="font-preview-text">Aa</span>
+				</button>
+				<div class="font-picker-popup">
+					<button 
+						class="font-popup-btn" 
+						onclick={decreaseFont} 
+						disabled={fontSize <= 10}
+						title="Decrease font size"
+					>
+						A-
+					</button>
+					<button 
+						class="font-popup-indicator-btn" 
+						onclick={() => {
+							fontSize = 15;
+							localStorage.setItem('chat_font_size', '15');
+						}}
+						title="Reset to 100%"
+					>
+						{Math.round((fontSize / 15) * 100)}%
+					</button>
+					<button 
+						class="font-popup-btn" 
+						onclick={increaseFont} 
+						disabled={fontSize >= 30}
+						title="Increase font size"
+					>
+						A+
+					</button>
+				</div>
+			</div>
+
 			<!-- Export Button -->
 			{#if conversation && conversation.messages.length > 0}
 				<div class="export-controls">
@@ -893,35 +955,6 @@
 					{/if}
 				</div>
 			{/if}
-
-			<div class="font-controls">
-				<button 
-					class="font-btn" 
-					onclick={decreaseFont} 
-					disabled={fontSize <= 10}
-					title="Decrease font size"
-				>
-					A-
-				</button>
-				<button 
-					class="font-indicator-btn" 
-					onclick={() => {
-						fontSize = 15;
-						localStorage.setItem('chat_font_size', '15');
-					}}
-					title="Reset to 100%"
-				>
-					{Math.round((fontSize / 15) * 100)}%
-				</button>
-				<button 
-					class="font-btn" 
-					onclick={increaseFont} 
-					disabled={fontSize >= 30}
-					title="Increase font size"
-				>
-					A+
-				</button>
-			</div>
 
 			<!-- Toggle Context / Canvas panel -->
 			{#if conversation}
@@ -1434,54 +1467,132 @@
 		flex-shrink: 0;
 	}
 
-	.font-controls {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: 20px;
-		padding: 3px 6px;
+	.font-selector-container {
+		position: relative;
+		display: inline-block;
 	}
 
-	.font-btn {
-		width: 28px;
-		height: 28px;
+	.font-toggle-btn {
+		width: 34px;
+		height: 34px;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: var(--text-secondary);
-		font-size: 0.82rem;
-		font-weight: 600;
-		transition: background-color var(--transition-fast), color var(--transition-fast);
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		flex-shrink: 0;
+		cursor: pointer;
+		padding: 0;
+		outline: none;
 	}
 
-	.font-btn:hover:not(:disabled) {
+	.font-toggle-btn:hover {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
+		border-color: var(--border-light);
+		transform: scale(1.05);
 	}
 
-	.font-btn:disabled {
-		opacity: 0.4;
+	.font-toggle-btn:active {
+		transform: scale(0.95);
+	}
+
+	.font-preview-text {
+		font-family: var(--font-main);
+		font-size: 14px;
+		font-weight: 600;
+		user-select: none;
+	}
+
+	.font-picker-popup {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%) translateY(8px);
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 20px;
+		padding: 6px 8px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15));
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+		transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+		z-index: 50;
+	}
+
+	/* Bridge to keep hover active */
+	.font-picker-popup::before {
+		content: '';
+		position: absolute;
+		top: -8px;
+		left: 0;
+		right: 0;
+		height: 8px;
+		background: transparent;
+	}
+
+	.font-selector-container:hover .font-picker-popup {
+		opacity: 1;
+		visibility: visible;
+		pointer-events: auto;
+		transform: translateX(-50%) translateY(0);
+	}
+
+	.font-popup-btn {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		border: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		color: var(--text-secondary);
+		font-size: 11px;
+		font-weight: 500;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+		padding: 0;
+	}
+
+	.font-popup-btn:hover:not(:disabled) {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+		transform: scale(1.1);
+	}
+
+	.font-popup-btn:disabled {
+		opacity: 0.5;
 		cursor: not-allowed;
 	}
 
-	.font-indicator-btn {
-		font-size: 0.78rem;
+	.font-popup-indicator-btn {
+		padding: 0 8px;
+		height: 28px;
+		border-radius: 14px;
+		border: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		color: var(--text-primary);
+		font-size: 11px;
 		font-weight: 600;
-		color: var(--text-secondary);
-		padding: 2px 6px;
-		min-width: 44px;
-		text-align: center;
-		user-select: none;
-		border-radius: 4px;
-		transition: background-color var(--transition-fast), color var(--transition-fast);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), transform var(--transition-fast);
 	}
 
-	.font-indicator-btn:hover {
+	.font-popup-indicator-btn:hover {
 		background-color: var(--bg-hover);
-		color: var(--text-primary);
+		transform: scale(1.05);
 	}
 
 	.chat-viewport {
