@@ -100,18 +100,35 @@
 	}
 
 	function autoScroll(node: HTMLElement, params: { active: boolean; text: string }) {
+		let lastScrollHeight = node.scrollHeight;
+
 		const scroll = () => {
 			if (params.active && node.scrollHeight > 0) {
 				node.scrollTop = node.scrollHeight;
+				lastScrollHeight = node.scrollHeight;
 			}
 		};
+
 		// Scroll initially
 		setTimeout(scroll, 50);
 
 		return {
 			update(newParams: { active: boolean; text: string }) {
 				params = newParams;
-				setTimeout(scroll, 0);
+				
+				// Check if the user was at the bottom of the container BEFORE Svelte updates the layout
+				const wasAtBottom = lastScrollHeight - node.scrollTop - node.clientHeight < 40;
+				
+				if (params.active && wasAtBottom) {
+					setTimeout(() => {
+						node.scrollTop = node.scrollHeight;
+						lastScrollHeight = node.scrollHeight;
+					}, 0);
+				} else {
+					setTimeout(() => {
+						lastScrollHeight = node.scrollHeight;
+					}, 0);
+				}
 			}
 		};
 	}

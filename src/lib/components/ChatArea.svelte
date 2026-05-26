@@ -49,8 +49,9 @@
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
-	let userScrolledUp = $state(false);
 	let lastConversationId = $state<string | null>(null);
+	let wasAtBottomBeforeUpdate = true;
+	let lastScrollHeight = 0;
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageContent = $state('');
 
@@ -678,7 +679,20 @@
 
 
 
-	// Smart scroll controller
+	// Smart scroll controller: pre-DOM-update measurement
+	$effect.pre(() => {
+		if (!conversation || !conversation.messages) return;
+		const msgLength = conversation.messages.length;
+		const lastMsg = conversation.messages[msgLength - 1];
+		const lastMsgContent = lastMsg?.content || '';
+
+		if (chatContainer) {
+			const { scrollTop, clientHeight } = chatContainer;
+			wasAtBottomBeforeUpdate = lastScrollHeight === 0 || (lastScrollHeight - scrollTop - clientHeight < 80);
+		}
+	});
+
+	// Smart scroll controller: post-DOM-update action
 	$effect(() => {
 		if (!conversation || !conversation.messages) return;
 		
@@ -691,7 +705,7 @@
 			// 1. Conversation switch
 			if (currentId !== lastConversationId) {
 				lastConversationId = currentId;
-				userScrolledUp = false;
+				wasAtBottomBeforeUpdate = true;
 				openedThoughts = {}; // reset open thoughts record
 				scrollToBottom('auto');
 				return;
@@ -701,15 +715,17 @@
 
 			// 2. Active AI generation (streaming response)
 			if (isGenerating && lastMsg && lastMsg.role === 'assistant') {
-				if (!userScrolledUp) {
+				if (wasAtBottomBeforeUpdate) {
 					scrollToBottom('auto');
+				} else if (chatContainer) {
+					lastScrollHeight = chatContainer.scrollHeight;
 				}
 				return;
 			}
 
 			// 3. User message sent
 			if (lastMsg && lastMsg.role === 'user') {
-				userScrolledUp = false;
+				wasAtBottomBeforeUpdate = true;
 				scrollToBottom('smooth');
 			}
 		});
@@ -719,15 +735,8 @@
 		if (!chatContainer) return;
 		
 		const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-		// If the user scrolls to the bottom (within 80px), reset userScrolledUp
-		const isAtBottom = scrollHeight - scrollTop - clientHeight < 80;
-		
-		if (isAtBottom) {
-			userScrolledUp = false;
-		} else {
-			// If user scrolled up and is not near the bottom, mark userScrolledUp as true
-			userScrolledUp = true;
-		}
+		lastScrollHeight = scrollHeight;
+		wasAtBottomBeforeUpdate = scrollHeight - scrollTop - clientHeight < 80;
 	}
 
 	async function scrollToBottom(behavior: 'auto' | 'smooth' = 'smooth') {
@@ -737,22 +746,40 @@
 				top: chatContainer.scrollHeight,
 				behavior
 			});
+			lastScrollHeight = chatContainer.scrollHeight;
 		}
 	}
 
 	function autoScroll(node: HTMLElement, params: { active: boolean; text: string }) {
+		let lastScrollHeight = node.scrollHeight;
+
 		const scroll = () => {
 			if (params.active && node.scrollHeight > 0) {
 				node.scrollTop = node.scrollHeight;
+				lastScrollHeight = node.scrollHeight;
 			}
 		};
+
 		// Scroll initially
 		setTimeout(scroll, 50);
 
 		return {
 			update(newParams: { active: boolean; text: string }) {
 				params = newParams;
-				setTimeout(scroll, 0);
+				
+				// Check if the user was at the bottom of the container BEFORE Svelte updates the layout
+				const wasAtBottom = lastScrollHeight - node.scrollTop - node.clientHeight < 40;
+				
+				if (params.active && wasAtBottom) {
+					setTimeout(() => {
+						node.scrollTop = node.scrollHeight;
+						lastScrollHeight = node.scrollHeight;
+					}, 0);
+				} else {
+					setTimeout(() => {
+						lastScrollHeight = node.scrollHeight;
+					}, 0);
+				}
 			}
 		};
 	}
