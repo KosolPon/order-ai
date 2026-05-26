@@ -6,7 +6,7 @@
 	import { untrack } from 'svelte';
 	
 	import type { Conversation, Message, OllamaModel, Attachment, Project, ProjectFile } from '$lib/types';
-	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL } from '$lib/ollama';
+	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL, GEMINI_MODELS } from '$lib/ollama';
 	import { parseThinking } from '$lib/markdown';
 	import { db } from '$lib/db';
 	import { parseCanvasTags } from '$lib/canvasParser';
@@ -15,7 +15,9 @@
 	let conversations = $state<Conversation[]>([]);
 	let currentConversationId = $state<string | null>(null);
 	let ollamaUrl = $state<string>(DEFAULT_OLLAMA_URL);
-	let models = $state<OllamaModel[]>([]);
+	let geminiApiKey = $state<string>('');
+	let ollamaModels = $state<OllamaModel[]>([]);
+	let models = $derived(geminiApiKey && geminiApiKey.trim() ? [...ollamaModels, ...GEMINI_MODELS].sort((a, b) => a.name.localeCompare(b.name)) : ollamaModels);
 	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
@@ -152,6 +154,9 @@
 		untrack(() => {
 			const storedUrl = localStorage.getItem('ollama_url');
 			if (storedUrl) ollamaUrl = storedUrl;
+
+			const storedGeminiKey = localStorage.getItem('gemini_api_key');
+			if (storedGeminiKey) geminiApiKey = storedGeminiKey;
 
 			const storedChats = localStorage.getItem('ollama_conversations');
 			if (storedChats) {
@@ -376,6 +381,10 @@
 	});
 
 	$effect(() => {
+		localStorage.setItem('gemini_api_key', geminiApiKey);
+	});
+
+	$effect(() => {
 		if (!isGenerating) {
 			localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
 		}
@@ -517,21 +526,22 @@
 			const fetchedModels = await fetchModels(ollamaUrl);
 			// Sort models alphabetically by name
 			fetchedModels.sort((a, b) => a.name.localeCompare(b.name));
-			models = fetchedModels;
+			ollamaModels = fetchedModels;
 			isConnected = true;
 
 			// Auto select first model if none selected or the current selected one is gone
-			if (fetchedModels.length > 0) {
-				const modelNames = fetchedModels.map((m) => m.name);
+			const availableModels = geminiApiKey && geminiApiKey.trim() ? [...fetchedModels, ...GEMINI_MODELS].sort((a, b) => a.name.localeCompare(b.name)) : fetchedModels;
+			if (availableModels.length > 0) {
+				const modelNames = availableModels.map((m) => m.name);
 				if (!selectedModel || !modelNames.includes(selectedModel)) {
-					selectedModel = fetchedModels[0].name;
+					selectedModel = availableModels[0].name;
 				}
 			} else {
 				selectedModel = '';
 			}
 		} catch (error) {
 			console.error('Ollama connection failed:', error);
-			models = [];
+			ollamaModels = [];
 			selectedModel = '';
 			isConnected = false;
 		}
@@ -1338,6 +1348,7 @@
 		{projects}
 		bind:globalContext
 		bind:ollamaUrl
+		bind:geminiApiKey
 		{isConnected}
 		{models}
 		bind:activeModels

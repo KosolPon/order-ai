@@ -3,6 +3,79 @@ import type { OllamaModel, Message } from './types';
 // Default Ollama API URL
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
+export const GEMINI_MODELS: OllamaModel[] = [
+	{
+		name: 'gemini-2.5-flash',
+		modified_at: new Date().toISOString(),
+		size: 0,
+		digest: 'gemini-2.5-flash',
+		details: {
+			parent_model: '',
+			format: 'cloud',
+			family: 'gemini',
+			families: ['gemini'],
+			parameter_size: 'unknown',
+			quantization_level: 'cloud'
+		}
+	},
+	{
+		name: 'gemini-2.0-flash',
+		modified_at: new Date().toISOString(),
+		size: 0,
+		digest: 'gemini-2.0-flash',
+		details: {
+			parent_model: '',
+			format: 'cloud',
+			family: 'gemini',
+			families: ['gemini'],
+			parameter_size: 'unknown',
+			quantization_level: 'cloud'
+		}
+	},
+	{
+		name: 'gemini-1.5-flash',
+		modified_at: new Date().toISOString(),
+		size: 0,
+		digest: 'gemini-1.5-flash',
+		details: {
+			parent_model: '',
+			format: 'cloud',
+			family: 'gemini',
+			families: ['gemini'],
+			parameter_size: 'unknown',
+			quantization_level: 'cloud'
+		}
+	},
+	{
+		name: 'gemini-1.5-pro',
+		modified_at: new Date().toISOString(),
+		size: 0,
+		digest: 'gemini-1.5-pro',
+		details: {
+			parent_model: '',
+			format: 'cloud',
+			family: 'gemini',
+			families: ['gemini'],
+			parameter_size: 'unknown',
+			quantization_level: 'cloud'
+		}
+	},
+	{
+		name: 'gemini-2.0-pro-exp-02-05',
+		modified_at: new Date().toISOString(),
+		size: 0,
+		digest: 'gemini-2.0-pro-exp-02-05',
+		details: {
+			parent_model: '',
+			format: 'cloud',
+			family: 'gemini',
+			families: ['gemini'],
+			parameter_size: 'unknown',
+			quantization_level: 'cloud'
+		}
+	}
+];
+
 /**
  * Helper to determine the correct Ollama endpoint URL.
  * If the site is deployed publicly and the user targets localhost, we fetch directly.
@@ -77,6 +150,7 @@ export async function streamChat(
 		numPredict?: number;
 		repeatPenalty?: number;
 		customizeSettings?: boolean;
+		geminiApiKey?: string;
 	},
 	onChunk: (chunk: string) => void,
 	onDone: (fullResponse: string) => void,
@@ -141,29 +215,50 @@ export async function streamChat(
 			});
 		}
 
-		const target = getTargetUrl('api/chat', ollamaUrl);
+		const isGemini = model.startsWith('gemini-');
+		const target = isGemini 
+			? { url: '/api/gemini/chat', useProxy: false } 
+			: getTargetUrl('api/chat', ollamaUrl);
+
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json'
 		};
-		if (target.useProxy) {
+
+		if (isGemini) {
+			const apiKey = options.geminiApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : '') || '';
+			headers['x-gemini-key'] = apiKey;
+		} else if (target.useProxy) {
 			headers['x-ollama-url'] = ollamaUrl;
 		}
 
-		const requestBody: any = {
-			model,
-			messages: chatMessages,
-			stream: true
-		};
-
-		if (customizeSettings) {
-			requestBody.options = {
+		let requestBody: any;
+		if (isGemini) {
+			requestBody = {
+				model,
+				messages: chatMessages,
+				systemPrompt,
 				temperature,
-				top_p: topP,
-				top_k: topK,
-				num_ctx: numCtx,
-				num_predict: numPredict === 0 ? -1 : numPredict,
-				repeat_penalty: repeatPenalty
+				topP,
+				topK,
+				numPredict
 			};
+		} else {
+			requestBody = {
+				model,
+				messages: chatMessages,
+				stream: true
+			};
+
+			if (customizeSettings) {
+				requestBody.options = {
+					temperature,
+					top_p: topP,
+					top_k: topK,
+					num_ctx: numCtx,
+					num_predict: numPredict === 0 ? -1 : numPredict,
+					repeat_penalty: repeatPenalty
+				};
+			}
 		}
 
 		const response = await fetch(target.url, {
