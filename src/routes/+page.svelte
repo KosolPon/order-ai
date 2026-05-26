@@ -64,6 +64,7 @@
 	let lastOpenedThinkingMsgId = $state<string | null>(null);
 	let selectedThinkingMsgId = $state<string | null>(null);
 	let activeCanvasFileName = $state<string | null>(null);
+	let useCanvas = $state<boolean>(false);
 
 	// Abort controller to cancel streaming
 	let abortController: AbortController | null = null;
@@ -213,6 +214,13 @@
 			const storedGlobalContext = localStorage.getItem('ollama_global_context');
 			if (storedGlobalContext) {
 				globalContext = storedGlobalContext;
+			}
+			// Load canvas toggle preference (default: false)
+			const storedUseCanvas = localStorage.getItem('use_canvas_directive');
+			if (storedUseCanvas !== null) {
+				useCanvas = storedUseCanvas === 'true';
+			} else {
+				useCanvas = false;
 			}
 			
 			// Load initial draft for current conversation
@@ -649,7 +657,11 @@
 		}
 
 		// Append critical canvas syntax instructions for the AI
-		parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
+		if (useCanvas) {
+			parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
+		} else {
+			parts.push(`[CRITICAL DIRECTIVE]: DO NOT use <canvas> tags. If you need to write any source code, HTML, or markdown, please write it inside standard markdown code blocks (fenced with \`\`\`).`);
+		}
 
 		const combined = parts.join('\n\n');
 		console.log('[System Context Debug] Calculated System Prompt:', combined);
@@ -1326,6 +1338,7 @@
 			}}
 			bind:attachments
 			{isGenerating}
+			bind:useCanvas
 			onSend={() => handleSendPrompt()}
 			onStop={handleStopGeneration}
 		/>

@@ -11,6 +11,7 @@
 		attachments = $bindable([]),
 		isGenerating = false,
 		isBusy = false,
+		useCanvas = $bindable(false),
 		onSend,
 		onStop
 	} = $props<{
@@ -22,6 +23,7 @@
 		attachments: Attachment[];
 		isGenerating: boolean;
 		isBusy?: boolean;
+		useCanvas: boolean;
 		onSend: () => void;
 		onStop: () => void;
 	}>();
@@ -439,6 +441,23 @@
 						</div>
 					{/if}
 
+					<!-- Canvas Mode Toggle Button -->
+					<button 
+						class="control-btn canvas-toggle-btn" 
+						class:active={useCanvas}
+						onclick={() => {
+							useCanvas = !useCanvas;
+							localStorage.setItem('use_canvas_directive', String(useCanvas));
+						}}
+						disabled={isGenerating}
+						title={useCanvas ? "ปิดโหมด Canvas (ส่งเป็น Markdown ปกติ)" : "เปิดโหมด Canvas (ส่งออกเอกสาร/โค้ดในหน้าต่างขวา)"}
+						aria-label={useCanvas ? "Disable Canvas (Artifacts) Mode" : "Enable Canvas (Artifacts) Mode"}
+					>
+						<svg viewBox="0 0 24 24" width="18" height="18">
+							<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+						</svg>
+					</button>
+
 					{#if isGenerating}
 						<button 
 							class="control-btn stop-btn" 
@@ -684,6 +703,13 @@
 	.control-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.canvas-toggle-btn.active {
+		background-color: color-mix(in srgb, var(--accent-blue) 15%, transparent);
+		color: var(--accent-blue);
+		border-color: var(--accent-blue);
+		box-shadow: 0 0 8px color-mix(in srgb, var(--accent-blue) 10%, transparent);
 	}
 
 	.send-btn {
