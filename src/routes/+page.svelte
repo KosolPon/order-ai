@@ -3,6 +3,7 @@
 	import ChatArea from '$lib/components/ChatArea.svelte';
 	import InputArea from '$lib/components/InputArea.svelte';
 	import ContextPanel from '$lib/components/ContextPanel.svelte';
+	import SettingsModal from '$lib/components/SettingsModal.svelte';
 	import { untrack } from 'svelte';
 	
 	import type { Conversation, Message, OllamaModel, Attachment, Project, ProjectFile } from '$lib/types';
@@ -1476,28 +1477,14 @@
 		{conversations}
 		{currentConversationId}
 		{projects}
-		bind:globalContext
-		bind:ollamaUrl
-		bind:ollamaCloudUrl
-		bind:ollamaCloudApiKey
-		bind:geminiApiKey
-		bind:providerMode
+		{geminiApiKey}
+		{providerMode}
 		{isConnected}
-		isOllamaCloudConnected={isOllamaCloudConnected}
-		{models}
-		bind:activeModels
-		bind:modelTemperatures
-		bind:topP
-		bind:topK
-		bind:numCtx
-		bind:numPredict
-		bind:repeatPenalty
-		bind:customizeSettings
+		{isOllamaCloudConnected}
 		onSelectConversation={handleSelectConversation}
 		onNewConversation={handleNewConversation}
 		onDeleteConversation={handleDeleteConversation}
 		onUpdateTitle={handleUpdateTitle}
-		onRefreshModels={() => { loadModels(); loadCloudModels(); }}
 		onCreateProject={handleCreateProject}
 		onUpdateProject={handleUpdateProject}
 		onDeleteProject={handleDeleteProject}
@@ -1596,6 +1583,28 @@
 			onClose={() => showContextPanel = false}
 		/>
 	{/if}
+
+	<SettingsModal
+		bind:isSettingsOpen
+		bind:ollamaUrl
+		bind:ollamaCloudUrl
+		bind:ollamaCloudApiKey
+		bind:geminiApiKey
+		bind:providerMode
+		bind:activeModels
+		bind:modelTemperatures
+		bind:topP
+		bind:topK
+		bind:numCtx
+		bind:numPredict
+		bind:repeatPenalty
+		bind:customizeSettings
+		bind:globalContext
+		{isConnected}
+		{isOllamaCloudConnected}
+		{models}
+		onRefreshModels={() => { loadModels(); loadCloudModels(); }}
+	/>
 </div>
 
 <style>

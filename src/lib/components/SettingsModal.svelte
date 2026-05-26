@@ -1,0 +1,1382 @@
+<script lang="ts">
+	import type { OllamaModel } from '$lib/types';
+	import { fade, scale } from 'svelte/transition';
+
+	let {
+		isSettingsOpen = $bindable(false),
+		ollamaUrl = $bindable(),
+		ollamaCloudUrl = $bindable(),
+		ollamaCloudApiKey = $bindable(),
+		geminiApiKey = $bindable(),
+		providerMode = $bindable(),
+		activeModels = $bindable(),
+		modelTemperatures = $bindable(),
+		topP = $bindable(),
+		topK = $bindable(),
+		numCtx = $bindable(),
+		numPredict = $bindable(),
+		repeatPenalty = $bindable(),
+		customizeSettings = $bindable(),
+		globalContext = $bindable(),
+		isConnected = false,
+		isOllamaCloudConnected = false,
+		models = [],
+		onRefreshModels
+	} = $props<{
+		isSettingsOpen: boolean;
+		ollamaUrl: string;
+		ollamaCloudUrl: string;
+		ollamaCloudApiKey: string;
+		geminiApiKey: string;
+		providerMode: 'ollama' | 'ollama-cloud' | 'gemini' | 'all';
+		activeModels: string[];
+		modelTemperatures: number[];
+		topP: number;
+		topK: number;
+		numCtx: number;
+		numPredict: number;
+		repeatPenalty: number;
+		customizeSettings: boolean;
+		globalContext: string;
+		isConnected: boolean;
+		isOllamaCloudConnected: boolean;
+		models: OllamaModel[];
+		onRefreshModels: () => void;
+	}>();
+
+	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context'>('connections');
+	let showOllamaCloudKey = $state(false);
+	let showGeminiKey = $state(false);
+
+	function closeSettings() {
+		isSettingsOpen = false;
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			closeSettings();
+		}
+	}
+
+	function addModelStep() {
+		if (activeModels.length < 3) {
+			const nextModelName = models[0]?.name || '';
+			activeModels = [...activeModels, nextModelName];
+			const defaultTemp = activeModels.length === 2 ? 0.2 : 0.7;
+			modelTemperatures = [...modelTemperatures, defaultTemp];
+		}
+	}
+
+	function removeModelStep(index: number) {
+		if (index > 0) {
+			activeModels = activeModels.filter((_: string, i: number) => i !== index);
+			modelTemperatures = modelTemperatures.filter((_: number, i: number) => i !== index);
+		}
+	}
+
+	function updateModelStep(index: number, val: string) {
+		activeModels = activeModels.map((m: string, i: number) => i === index ? val : m);
+	}
+
+	function updateModelTemp(index: number, val: number) {
+		modelTemperatures = modelTemperatures.map((t: number, i: number) => i === index ? val : t);
+	}
+</script>
+
+{#if isSettingsOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div 
+		class="modal-backdrop" 
+		onclick={closeSettings} 
+		transition:fade={{ duration: 150 }}
+		role="button" 
+		tabindex="-1"
+	>
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="settings-modal-content" 
+			onclick={(e) => e.stopPropagation()} 
+			transition:scale={{ start: 0.95, duration: 150 }}
+			role="dialog" 
+			aria-modal="true" 
+			tabindex="-1"
+			onkeydown={handleKeydown}
+		>
+			<!-- Sidebar -->
+			<div class="settings-sidebar">
+				<div class="settings-brand">
+					<svg class="glow-icon" viewBox="0 0 24 24" width="20" height="20">
+						<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+					</svg>
+					<span>Settings</span>
+				</div>
+				
+				<nav class="settings-nav">
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'connections'} 
+						onclick={() => activeTab = 'connections'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H5v-2h6V7h2v4h4v2z"/>
+						</svg>
+						<span>Connections & APIs</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'chain'} 
+						onclick={() => activeTab = 'chain'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M17 16h-4v-2h4c1.1 0 2-.9 2-2s-.9-2-2-2h-4V8h4c2.2 0 4 1.8 4 4s-1.8 4-4 4zm-6-2H7c-1.1 0-2-.9-2-2s.9-2 2-2h4V8H7c-2.2 0-4 1.8-4 4s1.8 4 4 4h4v-2zm-3-3h8v2H8v-2z"/>
+						</svg>
+						<span>Model Chain Configuration</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'advanced'} 
+						onclick={() => activeTab = 'advanced'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12.91 4.29l7.8 7.8c.39.39.39 1.02 0 1.41l-7.8 7.8c-.39.39-1.02.39-1.41 0l-7.8-7.8c-.39-.39-.39-1.02 0-1.41l7.8-7.8c.39-.39 1.03-.39 1.41 0zM12 7a5 5 0 100 10 5 5 0 000-10zm0 8a3 3 0 110-6 3 3 0 010 6z"/>
+						</svg>
+						<span>Advanced Parameters</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'context'} 
+						onclick={() => activeTab = 'context'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+						</svg>
+						<span>Global Context</span>
+					</button>
+				</nav>
+			</div>
+
+			<!-- Main Content -->
+			<div class="settings-content-wrapper">
+				<div class="settings-header">
+					<h2>
+						{#if activeTab === 'connections'}
+							Connections & APIs
+						{:else if activeTab === 'chain'}
+							Model Chain Configuration
+						{:else if activeTab === 'advanced'}
+							Advanced Parameters
+						{:else if activeTab === 'context'}
+							Global System Context
+						{/if}
+					</h2>
+					<button class="settings-close-btn" onclick={closeSettings} aria-label="Close settings">
+						<svg viewBox="0 0 24 24" width="20" height="20">
+							<path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+						</svg>
+					</button>
+				</div>
+
+				<div class="settings-body scrollbar-custom">
+					{#if activeTab === 'connections'}
+						<div class="settings-section">
+							<div class="setting-item-large">
+								<span class="setting-title-label">Connection Mode (โหมดเชื่อมต่อ)</span>
+								<div class="connection-tabs-header">
+									<button 
+										type="button"
+										class="connection-tab-item" 
+										class:active={providerMode === 'ollama'}
+										onclick={() => providerMode = 'ollama'}
+									>
+										Ollama (Local)
+									</button>
+									<button 
+										type="button"
+										class="connection-tab-item" 
+										class:active={providerMode === 'ollama-cloud'}
+										onclick={() => providerMode = 'ollama-cloud'}
+									>
+										Ollama (Cloud)
+									</button>
+									<button 
+										type="button"
+										class="connection-tab-item" 
+										class:active={providerMode === 'gemini'}
+										onclick={() => providerMode = 'gemini'}
+									>
+										Gemini (Cloud)
+									</button>
+									<button 
+										type="button"
+										class="connection-tab-item" 
+										class:active={providerMode === 'all'}
+										onclick={() => providerMode = 'all'}
+									>
+										All Combined
+									</button>
+								</div>
+							</div>
+
+							{#if providerMode === 'ollama' || providerMode === 'all'}
+								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
+									<label for="modal-ollama-url">Ollama Server URL</label>
+									<div class="modal-input-group">
+										<input 
+											id="modal-ollama-url"
+											type="text" 
+											placeholder="http://localhost:11434" 
+											bind:value={ollamaUrl}
+										/>
+										<button class="modal-refresh-btn" onclick={onRefreshModels} title="Refresh connection">
+											<svg viewBox="0 0 24 24" width="16" height="16">
+												<path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+											</svg>
+											<span>Test & Sync</span>
+										</button>
+									</div>
+									{#if providerMode === 'ollama'}
+										<div class="status-alert" class:success={isConnected} class:error={!isConnected}>
+											<span class="status-alert-dot"></span>
+											<span>{isConnected ? `Connected. Loaded ${models.length} local models.` : 'Disconnected. Verify local Ollama server is running.'}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							{#if providerMode === 'ollama-cloud' || providerMode === 'all'}
+								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
+									<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
+									<input 
+										id="modal-ollama-cloud-url"
+										type="text" 
+										class="modal-text-input"
+										placeholder="https://ollama.com" 
+										bind:value={ollamaCloudUrl}
+									/>
+								</div>
+
+								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
+									<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
+									<div class="modal-input-group">
+										<input 
+											id="modal-ollama-cloud-key"
+											type={showOllamaCloudKey ? 'text' : 'password'} 
+											placeholder="Ollama Cloud API Key..." 
+											bind:value={ollamaCloudApiKey}
+										/>
+										<button 
+											class="modal-eye-btn" 
+											onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
+											title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
+										>
+											{#if showOllamaCloudKey}
+												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+											{:else}
+												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+											{/if}
+										</button>
+									</div>
+									{#if providerMode === 'ollama-cloud'}
+										<div class="status-alert" class:success={isOllamaCloudConnected} class:error={!isOllamaCloudConnected}>
+											<span class="status-alert-dot"></span>
+											<span>{isOllamaCloudConnected ? `Connected. Loaded ${models.length} cloud models.` : 'Disconnected. API Key is required for Ollama Cloud connection.'}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							{#if providerMode === 'gemini' || providerMode === 'all'}
+								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
+									<label for="modal-gemini-key">Google Gemini API Key (Cloud)</label>
+									<div class="modal-input-group">
+										<input 
+											id="modal-gemini-key"
+											type={showGeminiKey ? 'text' : 'password'} 
+											placeholder="AI Studio Gemini API Key..." 
+											bind:value={geminiApiKey}
+										/>
+										<button 
+											class="modal-eye-btn" 
+											onclick={() => showGeminiKey = !showGeminiKey} 
+											title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
+										>
+											{#if showGeminiKey}
+												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+											{:else}
+												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+											{/if}
+										</button>
+									</div>
+									{#if providerMode === 'gemini'}
+										<div class="status-alert" class:success={!!geminiApiKey.trim()} class:error={!geminiApiKey.trim()}>
+											<span class="status-alert-dot"></span>
+											<span>{geminiApiKey.trim() ? 'Google Gemini Cloud service API Key loaded.' : 'Google Gemini connection requires a valid API Studio Key.'}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							{#if providerMode === 'ollama' && !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
+								<div class="cors-help-card animate-fade-in">
+									<h4>CORS Configuration Guide</h4>
+									<p>To connect a local Ollama instance from a remote/deployed page, you need to enable CORS origins:</p>
+									<ol>
+										<li>Shut down the Ollama desktop client completely.</li>
+										<li>Open terminal and define environment variable:
+											<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
+										</li>
+										<li>Restart the Ollama application.</li>
+									</ol>
+									<p class="cors-tip-note">Tip: Or use ngrok to tunnel to port 11434 with HTTPS support.</p>
+								</div>
+							{/if}
+						</div>
+					{:else if activeTab === 'chain'}
+						<div class="settings-section">
+							<div class="setting-item-block">
+								<div class="model-chain-intro">
+									<h3>Multi-Model Execution Chain (โครงสร้างการต่อสายโมเดล)</h3>
+									<p>Assign up to 3 models to execute different pipeline steps recursively (e.g. Chat Refiner → Command Executor → Translator).</p>
+								</div>
+							</div>
+
+							<div class="model-chain-cards">
+								{#each activeModels as model, idx (idx)}
+									<div class="chain-step-card animate-zoom-in">
+										<div class="chain-card-header">
+											<span class="chain-step-index">Step {idx + 1}</span>
+											<span class="chain-step-role">
+												{#if idx === 0}
+													(Primary Chat / Prompt Refiner)
+												{:else if idx === 1 && activeModels.length === 2}
+													(Executor)
+												{:else if idx === 1}
+													(Executor Step 2)
+												{:else}
+													(Translator Step 3)
+												{/if}
+											</span>
+											{#if idx > 0}
+												<button 
+													class="chain-remove-btn" 
+													onclick={() => removeModelStep(idx)}
+													title="Remove step from chain"
+												>
+													✕
+												</button>
+											{/if}
+										</div>
+
+										<div class="chain-card-body">
+											<div class="modal-form-item">
+												<label for="select-model-{idx}">Selected Model</label>
+												<select 
+													id="select-model-{idx}"
+													class="modal-select" 
+													value={model}
+													onchange={(e) => updateModelStep(idx, e.currentTarget.value)}
+												>
+													{#if models.length === 0}
+														<option value="">No models found</option>
+													{:else}
+														{#if !model}
+															<option value="">Select a model...</option>
+														{/if}
+														{#each models as m}
+															<option value={m.name}>{m.name}</option>
+														{/each}
+													{/if}
+												</select>
+											</div>
+
+											{#if customizeSettings}
+												<div class="modal-form-item temp-slider-group animate-fade-in">
+													<div class="setting-label-row">
+														<label for="temp-slider-{idx}">Creativity / Temperature (จินตนาการ)</label>
+														<div class="val-display-group">
+															<button 
+																class="individual-reset-btn" 
+																onclick={() => modelTemperatures[idx] = (idx === 1 ? 0.2 : 0.7)} 
+																title="Reset to default temperature"
+															>
+																<svg viewBox="0 0 24 24" width="12" height="12">
+																	<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+																</svg>
+															</button>
+															<span class="setting-val-tag">
+																{(modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7).toFixed(2)}
+															</span>
+														</div>
+													</div>
+													<div class="slider-wrapper">
+														<input 
+															id="temp-slider-{idx}"
+															type="range" 
+															min="0" 
+															max="1.5" 
+															step="0.05" 
+															value={modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7}
+															oninput={(e) => updateModelTemp(idx, parseFloat(e.currentTarget.value))}
+															class="modal-slider"
+														/>
+													</div>
+												</div>
+											{/if}
+										</div>
+									</div>
+								{/each}
+
+								{#if activeModels.length < 3}
+									<button 
+										class="chain-add-btn" 
+										onclick={addModelStep}
+										disabled={models.length === 0}
+									>
+										<svg viewBox="0 0 24 24" width="18" height="18">
+											<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+										</svg>
+										<span>Add Next Execution Model (Maximum 3)</span>
+									</button>
+								{/if}
+							</div>
+						</div>
+					{:else if activeTab === 'advanced'}
+						<div class="settings-section">
+							<div class="setting-item-block" style="margin-bottom: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 16px;">
+								<label class="modal-checkbox-label" for="modal-customize-settings">
+									<input 
+										type="checkbox" 
+										id="modal-customize-settings" 
+										bind:checked={customizeSettings} 
+									/>
+									<span>Enable Manual Parameter Tuning (ปรับแต่งพารามิเตอร์โมเดลด้วยตัวเอง)</span>
+								</label>
+							</div>
+
+							<div class="advanced-sliders-container" class:disabled-settings={!customizeSettings}>
+								<!-- Top P -->
+								<div class="advanced-tuning-card">
+									<div class="setting-label-row">
+										<label for="modal-topp-slider">Top P (สัดส่วนความน่าจะเป็นสะสม)</label>
+										<div class="val-display-group">
+											<button 
+												class="individual-reset-btn" 
+												onclick={() => topP = 0.9} 
+												disabled={!customizeSettings}
+												title="Reset to 0.90"
+											>
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-val-tag">{topP.toFixed(2)}</span>
+										</div>
+									</div>
+									<div class="slider-wrapper">
+										<input 
+											id="modal-topp-slider"
+											type="range" 
+											min="0" 
+											max="1" 
+											step="0.01" 
+											bind:value={topP}
+											disabled={!customizeSettings}
+											class="modal-slider"
+										/>
+									</div>
+								</div>
+
+								<!-- Top K -->
+								<div class="advanced-tuning-card">
+									<div class="setting-label-row">
+										<label for="modal-topk-slider">Top K (กลุ่มคำที่มีโอกาสสูงสุด)</label>
+										<div class="val-display-group">
+											<button 
+												class="individual-reset-btn" 
+												onclick={() => topK = 40} 
+												disabled={!customizeSettings}
+												title="Reset to 40"
+											>
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-val-tag">{topK}</span>
+										</div>
+									</div>
+									<div class="slider-wrapper">
+										<input 
+											id="modal-topk-slider"
+											type="range" 
+											min="1" 
+											max="100" 
+											step="1" 
+											bind:value={topK}
+											disabled={!customizeSettings}
+											class="modal-slider"
+										/>
+									</div>
+								</div>
+
+								<!-- Context Limit -->
+								<div class="advanced-tuning-card">
+									<div class="setting-label-row">
+										<label for="modal-numctx-slider">Context Limit (หน่วยความจำแชต)</label>
+										<div class="val-display-group">
+											<button 
+												class="individual-reset-btn" 
+												onclick={() => numCtx = 4096} 
+												disabled={!customizeSettings}
+												title="Reset to 4096"
+											>
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-val-tag">{numCtx} tokens</span>
+										</div>
+									</div>
+									<div class="slider-wrapper">
+										<input 
+											id="modal-numctx-slider"
+											type="range" 
+											min="1024" 
+											max="32768" 
+											step="1024" 
+											bind:value={numCtx}
+											disabled={!customizeSettings}
+											class="modal-slider"
+										/>
+									</div>
+								</div>
+
+								<!-- Max Tokens -->
+								<div class="advanced-tuning-card">
+									<div class="setting-label-row">
+										<label for="modal-numpredict-slider">Max Tokens (จำกัดคำตอบสูงสุด)</label>
+										<div class="val-display-group">
+											<button 
+												class="individual-reset-btn" 
+												onclick={() => numPredict = 0} 
+												disabled={!customizeSettings}
+												title="Reset to Unlimited"
+											>
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-val-tag">{numPredict === 0 ? 'Unlimited (ไม่จำกัด)' : `${numPredict} tokens`}</span>
+										</div>
+									</div>
+									<div class="slider-wrapper">
+										<input 
+											id="modal-numpredict-slider"
+											type="range" 
+											min="0" 
+											max="8192" 
+											step="128" 
+											bind:value={numPredict}
+											disabled={!customizeSettings}
+											class="modal-slider"
+										/>
+									</div>
+								</div>
+
+								<!-- Repeat Penalty -->
+								<div class="advanced-tuning-card">
+									<div class="setting-label-row">
+										<label for="modal-repeatpenalty-slider">Repeat Penalty (อัตราลดการพูดซ้ำ)</label>
+										<div class="val-display-group">
+											<button 
+												class="individual-reset-btn" 
+												onclick={() => repeatPenalty = 1.1} 
+												disabled={!customizeSettings}
+												title="Reset to 1.10"
+											>
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+												</svg>
+											</button>
+											<span class="setting-val-tag">{repeatPenalty.toFixed(2)}</span>
+										</div>
+									</div>
+									<div class="slider-wrapper">
+										<input 
+											id="modal-repeatpenalty-slider"
+											type="range" 
+											min="0.5" 
+											max="2.0" 
+											step="0.05" 
+											bind:value={repeatPenalty}
+											disabled={!customizeSettings}
+											class="modal-slider"
+										/>
+									</div>
+								</div>
+							</div>
+						</div>
+					{:else if activeTab === 'context'}
+						<div class="settings-section">
+							<div class="setting-item-block">
+								<label for="modal-global-context">Global Context (All Chats)</label>
+								<p class="modal-help-subtext">
+									Inject global instructions or persona rules. This text will be appended as system prompt prefix for ALL active chats.
+								</p>
+								<textarea 
+									id="modal-global-context"
+									placeholder="e.g. You are an expert Svelte 5 developer. Keep your responses short and use professional tone..." 
+									bind:value={globalContext}
+									rows="10"
+									class="modal-textarea scrollbar-custom"
+								></textarea>
+							</div>
+						</div>
+					{/if}
+				</div>
+
+				<div class="settings-footer">
+					<button class="settings-save-btn" onclick={closeSettings}>Close & Apply</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	/* Settings Modal Structure */
+	.modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background-color: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(8px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 10000; /* Ensure it stays above everything */
+	}
+
+	.settings-modal-content {
+		width: 820px;
+		max-width: 95vw;
+		height: 600px;
+		max-height: 85vh;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		box-shadow: var(--shadow-lg);
+		display: flex;
+		overflow: hidden;
+		text-align: left;
+	}
+
+	/* Sidebar Styles */
+	.settings-sidebar {
+		width: 250px;
+		background-color: var(--bg-primary);
+		border-right: 1px solid var(--border-light);
+		display: flex;
+		flex-direction: column;
+		flex-shrink: 0;
+	}
+
+	.settings-brand {
+		padding: 24px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-family: var(--font-title);
+		font-size: 1.15rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		border-bottom: 1px solid var(--border-light);
+	}
+
+	.settings-brand svg {
+		color: var(--accent-blue);
+		filter: drop-shadow(0 0 4px rgba(168, 199, 250, 0.4));
+	}
+
+	.settings-nav {
+		padding: 16px 8px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		flex: 1;
+		overflow-y: auto;
+	}
+
+	.nav-tab-btn {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 16px;
+		background: none;
+		border: none;
+		border-radius: 8px;
+		color: var(--text-secondary);
+		font-size: 0.85rem;
+		font-weight: 500;
+		text-align: left;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.nav-tab-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.nav-tab-btn.active {
+		background-color: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-primary));
+		border-left: 3px solid var(--accent-blue);
+		border-radius: 0 8px 8px 0;
+		color: var(--accent-blue);
+		font-weight: 600;
+	}
+
+	.nav-tab-btn svg {
+		flex-shrink: 0;
+	}
+
+	/* Content Area Styles */
+	.settings-content-wrapper {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-width: 0; /* Allow shrinking */
+	}
+
+	.settings-header {
+		padding: 20px 24px;
+		border-bottom: 1px solid var(--border-light);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.settings-header h2 {
+		margin: 0;
+		font-family: var(--font-title);
+		font-size: 1.15rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.settings-close-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 6px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.settings-close-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.settings-body {
+		flex: 1;
+		padding: 24px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+	}
+
+	.settings-section {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	/* Setting Items and Blocks */
+	.setting-item-large {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.setting-title-label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.connection-tabs-header {
+		display: flex;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 4px;
+		gap: 4px;
+	}
+
+	.connection-tab-item {
+		flex: 1;
+		padding: 8px 12px;
+		background: none;
+		border: none;
+		border-radius: 6px;
+		color: var(--text-secondary);
+		font-size: 0.82rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+		text-align: center;
+	}
+
+	.connection-tab-item:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.connection-tab-item.active {
+		background-color: var(--accent-blue);
+		color: var(--bg-primary);
+		font-weight: 600;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.setting-item-block {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.setting-item-block label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+	}
+
+	/* Inputs & Buttons */
+	.modal-input-group {
+		display: flex;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		overflow: hidden;
+		transition: border-color var(--transition-fast);
+	}
+
+	.modal-input-group:focus-within {
+		border-color: var(--accent-blue);
+	}
+
+	.modal-input-group input {
+		flex: 1;
+		background: none;
+		border: none;
+		outline: none;
+		padding: 10px 14px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		min-width: 0;
+	}
+
+	.modal-text-input {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		outline: none;
+		padding: 10px 14px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		transition: border-color var(--transition-fast);
+	}
+
+	.modal-text-input:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.modal-refresh-btn {
+		background-color: var(--bg-tertiary);
+		border: none;
+		border-left: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 16px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.modal-refresh-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.modal-eye-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 0 14px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color var(--transition-fast);
+	}
+
+	.modal-eye-btn:hover {
+		color: var(--text-primary);
+	}
+
+	/* Status Alerts */
+	.status-alert {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 0.76rem;
+		padding: 8px 12px;
+		border-radius: 6px;
+		margin-top: 4px;
+	}
+
+	.status-alert.success {
+		background-color: rgba(81, 207, 102, 0.1);
+		color: #51cf66;
+	}
+
+	.status-alert.error {
+		background-color: rgba(255, 107, 107, 0.1);
+		color: #ff6b6b;
+	}
+
+	.status-alert-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background-color: currentColor;
+	}
+
+	.cors-help-card {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 14px;
+		font-size: 0.8rem;
+		line-height: 1.45;
+		color: var(--text-secondary);
+	}
+
+	.cors-help-card h4 {
+		margin: 0 0 8px 0;
+		color: var(--text-primary);
+		font-weight: 600;
+	}
+
+	.cors-help-card ol {
+		margin: 0;
+		padding-left: 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.cors-help-card pre {
+		background-color: var(--bg-tertiary);
+		padding: 4px 8px;
+		border-radius: 4px;
+		border: 1px solid var(--border-light);
+		margin: 4px 0;
+		overflow-x: auto;
+	}
+
+	.cors-help-card code {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--accent-blue);
+	}
+
+	/* Model Chain Configuration */
+	.model-chain-intro h3 {
+		margin: 0 0 4px 0;
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.model-chain-intro p {
+		margin: 0;
+		font-size: 0.78rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+	}
+
+	.model-chain-cards {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.chain-step-card {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		overflow: hidden;
+	}
+
+	.chain-card-header {
+		background-color: var(--bg-tertiary);
+		padding: 8px 14px;
+		border-bottom: 1px solid var(--border-light);
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.chain-step-index {
+		font-size: 0.74rem;
+		font-weight: 700;
+		background-color: var(--accent-blue);
+		color: var(--bg-primary);
+		padding: 2px 6px;
+		border-radius: 4px;
+		text-transform: uppercase;
+	}
+
+	.chain-step-role {
+		font-size: 0.74rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+
+	.chain-remove-btn {
+		margin-left: auto;
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		font-size: 0.8rem;
+		padding: 2px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.chain-remove-btn:hover {
+		background-color: rgba(255, 107, 107, 0.1);
+		color: #ff6b6b;
+	}
+
+	.chain-card-body {
+		padding: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.modal-select {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 8px 12px;
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		outline: none;
+		transition: border-color var(--transition-fast);
+		cursor: pointer;
+	}
+
+	.modal-select:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.chain-add-btn {
+		background-color: var(--bg-primary);
+		border: 1px dashed var(--border-color);
+		border-radius: 10px;
+		padding: 12px;
+		color: var(--accent-blue);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), border-style var(--transition-fast);
+	}
+
+	.chain-add-btn:hover {
+		background-color: var(--bg-hover);
+		border-style: solid;
+	}
+
+	.chain-add-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.inline-checkbox-wrapper {
+		margin-top: 14px;
+		padding-top: 14px;
+		border-top: 1px solid var(--border-light);
+	}
+
+	.modal-checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-size: 0.84rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.modal-checkbox-label input {
+		width: 15px;
+		height: 15px;
+		cursor: pointer;
+	}
+
+	.modal-help-subtext {
+		margin: 4px 0 0 25px;
+		font-size: 0.74rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+	}
+
+	/* Sliders */
+	.temp-slider-group {
+		margin-top: 6px;
+	}
+
+	.setting-label-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.val-display-group {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.individual-reset-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.individual-reset-btn:hover:not(:disabled) {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.setting-val-tag {
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: var(--accent-blue);
+		background-color: rgba(168, 199, 250, 0.08);
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-family: var(--font-mono);
+	}
+
+	.slider-wrapper {
+		display: flex;
+		align-items: center;
+		padding: 4px 0;
+	}
+
+	.modal-slider {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+		outline: none;
+		cursor: pointer;
+	}
+
+	.modal-slider::-webkit-slider-runnable-track {
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+	}
+
+	.modal-slider::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--accent-blue);
+		cursor: pointer;
+		margin-top: -4px;
+		box-shadow: 0 0 6px rgba(168, 199, 250, 0.4);
+		transition: transform var(--transition-fast), background-color var(--transition-fast);
+	}
+
+	.modal-slider::-webkit-slider-thumb:hover {
+		background: var(--accent-blue-hover);
+		transform: scale(1.2);
+	}
+
+	.modal-slider::-moz-range-track {
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--bg-tertiary);
+	}
+
+	.modal-slider::-moz-range-thumb {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--accent-blue);
+		cursor: pointer;
+		border: none;
+		box-shadow: 0 0 6px rgba(168, 199, 250, 0.4);
+		transition: transform var(--transition-fast), background-color var(--transition-fast);
+	}
+
+	.modal-slider::-moz-range-thumb:hover {
+		background: var(--accent-blue-hover);
+		transform: scale(1.2);
+	}
+
+	/* Advanced Sliders */
+	.fallback-warning-card {
+		background-color: rgba(255, 193, 7, 0.08);
+		border: 1px solid rgba(255, 193, 7, 0.2);
+		border-radius: 8px;
+		padding: 12px 16px;
+		display: flex;
+		gap: 12px;
+		align-items: flex-start;
+		color: #e2b200;
+	}
+
+	.fallback-warning-text h4 {
+		margin: 0 0 2px 0;
+		font-size: 0.84rem;
+		font-weight: 600;
+	}
+
+	.fallback-warning-text p {
+		margin: 0;
+		font-size: 0.76rem;
+		color: var(--text-secondary);
+		line-height: 1.4;
+	}
+
+	.advanced-sliders-container {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		transition: opacity 0.2s ease, pointer-events 0.2s ease;
+	}
+
+	.advanced-sliders-container.disabled-settings {
+		opacity: 0.4;
+		pointer-events: none;
+		user-select: none;
+	}
+
+	.advanced-tuning-card {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 12px 14px;
+	}
+
+	.advanced-tuning-card label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+	}
+
+	/* Textareas */
+	.modal-textarea {
+		width: 100%;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		outline: none;
+		padding: 12px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		line-height: 1.45;
+		resize: none;
+		font-family: inherit;
+		box-sizing: border-box;
+		transition: border-color var(--transition-fast);
+	}
+
+	.modal-textarea:focus {
+		border-color: var(--accent-blue);
+	}
+
+	/* Footer Styles */
+	.settings-footer {
+		padding: 16px 24px;
+		border-top: 1px solid var(--border-light);
+		background-color: var(--bg-tertiary);
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	.settings-save-btn {
+		background-color: var(--accent-blue);
+		color: var(--bg-primary);
+		border: none;
+		border-radius: 8px;
+		padding: 10px 20px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
+	}
+
+	.settings-save-btn:hover {
+		background-color: var(--accent-blue-hover);
+	}
+
+	.scrollbar-custom::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	.scrollbar-custom::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.scrollbar-custom::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 3px;
+	}
+
+	.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+		background: var(--text-muted);
+	}
+</style>
