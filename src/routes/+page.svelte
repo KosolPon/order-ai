@@ -16,8 +16,15 @@
 	let currentConversationId = $state<string | null>(null);
 	let ollamaUrl = $state<string>(DEFAULT_OLLAMA_URL);
 	let geminiApiKey = $state<string>('');
+	let providerMode = $state<'ollama' | 'gemini' | 'both'>('ollama');
 	let ollamaModels = $state<OllamaModel[]>([]);
-	let models = $derived(geminiApiKey && geminiApiKey.trim() ? [...ollamaModels, ...GEMINI_MODELS].sort((a, b) => a.name.localeCompare(b.name)) : ollamaModels);
+	let models = $derived(
+		providerMode === 'gemini'
+			? (geminiApiKey.trim() ? GEMINI_MODELS : [])
+			: providerMode === 'both'
+				? [...ollamaModels, ...(geminiApiKey.trim() ? GEMINI_MODELS : [])].sort((a, b) => a.name.localeCompare(b.name))
+				: ollamaModels
+	);
 	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
@@ -157,6 +164,11 @@
 
 			const storedGeminiKey = localStorage.getItem('gemini_api_key');
 			if (storedGeminiKey) geminiApiKey = storedGeminiKey;
+
+			const storedProviderMode = localStorage.getItem('ollama_provider_mode');
+			if (storedProviderMode === 'ollama' || storedProviderMode === 'gemini' || storedProviderMode === 'both') {
+				providerMode = storedProviderMode;
+			}
 
 			const storedChats = localStorage.getItem('ollama_conversations');
 			if (storedChats) {
@@ -385,6 +397,30 @@
 	});
 
 	$effect(() => {
+		localStorage.setItem('ollama_provider_mode', providerMode);
+	});
+
+	$effect(() => {
+		if (providerMode) {
+			untrack(() => {
+				const availableModels = models;
+				if (availableModels.length > 0) {
+					const modelNames = availableModels.map((m) => m.name);
+					if (!selectedModel || !modelNames.includes(selectedModel)) {
+						selectedModel = availableModels[0].name;
+					}
+				} else {
+					selectedModel = '';
+				}
+			});
+		}
+	});
+
+	$effect(() => {
+		localStorage.setItem('gemini_api_key', geminiApiKey);
+	});
+
+	$effect(() => {
 		if (!isGenerating) {
 			localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
 		}
@@ -530,7 +566,13 @@
 			isConnected = true;
 
 			// Auto select first model if none selected or the current selected one is gone
-			const availableModels = geminiApiKey && geminiApiKey.trim() ? [...fetchedModels, ...GEMINI_MODELS].sort((a, b) => a.name.localeCompare(b.name)) : fetchedModels;
+			const geminiList = geminiApiKey.trim() ? GEMINI_MODELS : [];
+			const availableModels = 
+				providerMode === 'gemini'
+					? geminiList
+					: providerMode === 'both'
+						? [...fetchedModels, ...geminiList].sort((a, b) => a.name.localeCompare(b.name))
+						: fetchedModels;
 			if (availableModels.length > 0) {
 				const modelNames = availableModels.map((m) => m.name);
 				if (!selectedModel || !modelNames.includes(selectedModel)) {
@@ -1349,6 +1391,7 @@
 		bind:globalContext
 		bind:ollamaUrl
 		bind:geminiApiKey
+		bind:providerMode
 		{isConnected}
 		{models}
 		bind:activeModels
