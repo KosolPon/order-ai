@@ -602,10 +602,15 @@
 
 	const themeColors = [
 		{ name: 'blue', label: 'Blue (ฟ้า)', color: '#3b82f6' },
-		{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
-		{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
+		{ name: 'indigo', label: 'Indigo (น้ำเงินคราม)', color: '#6366f1' },
 		{ name: 'purple', label: 'Purple (ม่วง)', color: '#a855f7' },
+		{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
+		{ name: 'red', label: 'Red (แดง)', color: '#ef4444' },
+		{ name: 'orange', label: 'Orange (ส้ม)', color: '#f97316' },
+		{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
 		{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' },
+		{ name: 'teal', label: 'Teal (เทอร์ควอยซ์)', color: '#14b8a6' },
+		{ name: 'cyan', label: 'Cyan (ฟ้าคราม)', color: '#06b6d4' },
 		{ name: 'gray', label: 'Gray (เทา)', color: '#6b7280' }
 	];
 
@@ -794,14 +799,26 @@
 		</div>
 
 		<div class="header-actions">
-			<!-- Theme Color Picker -->
+			<!-- Theme Selector & Toggle Container -->
 			<div class="theme-selector-container">
 				<button 
-					class="theme-picker-trigger"
-					title="Change theme color"
-					aria-label="Change theme color"
+					class="theme-toggle-btn"
+					onclick={onToggleTheme}
+					title={theme.startsWith('dark') ? 'Switch to Light Theme (Hover for colors)' : 'Switch to Dark Theme (Hover for colors)'}
+					aria-label={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+					style="--active-theme-color: {activeColor.color}"
 				>
-					<span class="active-color-dot" style="background-color: {activeColor.color}"></span>
+					{#if theme.startsWith('dark')}
+						<!-- Sun Icon -->
+						<svg viewBox="0 0 24 24" width="18" height="18">
+							<path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41zm-12.37 12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41z"/>
+						</svg>
+					{:else}
+						<!-- Moon Icon -->
+						<svg viewBox="0 0 24 24" width="18" height="18">
+							<path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+						</svg>
+					{/if}
 				</button>
 				<div class="theme-picker-popup">
 					{#each themeColors as col}
@@ -816,26 +833,6 @@
 					{/each}
 				</div>
 			</div>
-
-			<!-- Theme Toggle Button -->
-			<button 
-				class="theme-toggle-btn"
-				onclick={onToggleTheme}
-				title={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-				aria-label={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-			>
-				{#if theme.startsWith('dark')}
-					<!-- Sun Icon -->
-					<svg viewBox="0 0 24 24" width="18" height="18">
-						<path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41zm-12.37 12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41z"/>
-					</svg>
-				{:else}
-					<!-- Moon Icon -->
-					<svg viewBox="0 0 24 24" width="18" height="18">
-						<path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
-					</svg>
-				{/if}
-			</button>
 
 			<!-- Export Button -->
 			{#if conversation && conversation.messages.length > 0}
@@ -2313,9 +2310,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--text-secondary);
+		color: var(--active-theme-color, var(--text-secondary));
 		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
+		border: 1px solid var(--active-theme-color, var(--border-color));
 		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 		flex-shrink: 0;
 	}
@@ -2342,41 +2339,7 @@
 		display: inline-block;
 	}
 
-	.theme-picker-trigger {
-		width: 34px;
-		height: 34px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text-secondary);
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-		cursor: pointer;
-		flex-shrink: 0;
-		padding: 0;
-		outline: none;
-	}
 
-	.theme-picker-trigger:hover {
-		background-color: var(--bg-hover);
-		border-color: var(--border-light);
-		transform: scale(1.05);
-	}
-
-	.theme-picker-trigger:active {
-		transform: scale(0.95);
-	}
-
-	.active-color-dot {
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		border: 1px solid rgba(0, 0, 0, 0.15);
-		transition: transform var(--transition-fast);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-	}
 
 	.theme-picker-popup {
 		position: absolute;

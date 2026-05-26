@@ -268,10 +268,15 @@
 			const storedTheme = localStorage.getItem('theme');
 			const validThemes = [
 				'dark-blue', 'light-blue',
-				'dark-yellow', 'light-yellow',
-				'dark-pink', 'light-pink',
+				'dark-indigo', 'light-indigo',
 				'dark-purple', 'light-purple',
+				'dark-pink', 'light-pink',
+				'dark-red', 'light-red',
+				'dark-orange', 'light-orange',
+				'dark-yellow', 'light-yellow',
 				'dark-green', 'light-green',
+				'dark-teal', 'light-teal',
+				'dark-cyan', 'light-cyan',
 				'dark-gray', 'light-gray'
 			];
 			if (storedTheme && validThemes.includes(storedTheme)) {
@@ -304,10 +309,15 @@
 		// Update meta color based on active theme
 		let metaColor = '#131314'; // Default dark
 		if (theme.startsWith('dark')) {
-			if (theme.endsWith('yellow')) metaColor = '#12110f';
-			else if (theme.endsWith('pink')) metaColor = '#131112';
-			else if (theme.endsWith('purple')) metaColor = '#111013';
-			else if (theme.endsWith('green')) metaColor = '#0f1210';
+			if (theme.endsWith('yellow')) metaColor = '#121110';
+			else if (theme.endsWith('pink')) metaColor = '#131212';
+			else if (theme.endsWith('purple')) metaColor = '#121113';
+			else if (theme.endsWith('green')) metaColor = '#111211';
+			else if (theme.endsWith('orange')) metaColor = '#131110';
+			else if (theme.endsWith('teal')) metaColor = '#101312';
+			else if (theme.endsWith('red')) metaColor = '#131010';
+			else if (theme.endsWith('indigo')) metaColor = '#101115';
+			else if (theme.endsWith('cyan')) metaColor = '#101314';
 			else if (theme.endsWith('gray')) metaColor = '#161616';
 		} else {
 			metaColor = '#f0f4f9'; // Default light-blue
@@ -315,6 +325,11 @@
 			else if (theme.endsWith('pink')) metaColor = '#fdfafb';
 			else if (theme.endsWith('purple')) metaColor = '#faf8fc';
 			else if (theme.endsWith('green')) metaColor = '#f6faf7';
+			else if (theme.endsWith('orange')) metaColor = '#fdfbfa';
+			else if (theme.endsWith('teal')) metaColor = '#f5fafb';
+			else if (theme.endsWith('red')) metaColor = '#fdfafb';
+			else if (theme.endsWith('indigo')) metaColor = '#fafbfe';
+			else if (theme.endsWith('cyan')) metaColor = '#f5fbfc';
 			else if (theme.endsWith('gray')) metaColor = '#f5f5f5';
 		}
 		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', metaColor);
