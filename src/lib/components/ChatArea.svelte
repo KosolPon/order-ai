@@ -1595,7 +1595,7 @@
 		border: 1px solid var(--border-color);
 		border-radius: 16px;
 		padding: 12px 14px;
-		width: 250px;
+		width: 220px;
 		box-shadow: var(--shadow-lg);
 		z-index: 100;
 		display: flex;
