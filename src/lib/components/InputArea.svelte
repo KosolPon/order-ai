@@ -520,7 +520,7 @@
 		width: 100%;
 		max-width: 1000px;
 		margin: 0 auto;
-		padding: 4px 16px 24px 16px;
+		padding: 4px 16px calc(24px + env(safe-area-inset-bottom, 0px)) 16px;
 		background-color: var(--bg-primary);
 		display: flex;
 		flex-direction: column;
@@ -1006,7 +1006,7 @@
 
 	@media (max-width: 768px) {
 		.input-container {
-			padding: 4px 12px 16px 12px;
+			padding: 4px 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px;
 		}
 	}
 

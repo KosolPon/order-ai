@@ -73,6 +73,7 @@
 	});
 
 	let isExportMenuOpen = $state(false);
+	let isAppearanceOpen = $state(false);
 
 	let lightboxImage = $state<string | null>(null);
 	let lightboxAlt = $state('');
@@ -483,6 +484,22 @@
 		}
 	});
 
+	// Close appearance dropdown when clicking outside
+	$effect(() => {
+		if (isAppearanceOpen) {
+			const handleOutsideClick = (e: MouseEvent) => {
+				const target = e.target as HTMLElement;
+				if (!target.closest('.appearance-controls')) {
+					isAppearanceOpen = false;
+				}
+			};
+			window.addEventListener('click', handleOutsideClick);
+			return () => {
+				window.removeEventListener('click', handleOutsideClick);
+			};
+		}
+	});
+
 	function exportToMarkdown() {
 		if (!conversation) return;
 		isExportMenuOpen = false;
@@ -848,13 +865,13 @@
 		</div>
 
 		<div class="header-actions">
-			<!-- Theme Selector & Toggle Container -->
-			<div class="theme-selector-container">
+			<!-- Unified Appearance Dropdown triggered by the Theme Icon -->
+			<div class="appearance-controls">
 				<button 
 					class="theme-toggle-btn"
-					onclick={onToggleTheme}
-					title={theme.startsWith('dark') ? 'Switch to Light Theme (Hover for colors)' : 'Switch to Dark Theme (Hover for colors)'}
-					aria-label={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+					onclick={() => isAppearanceOpen = !isAppearanceOpen}
+					aria-expanded={isAppearanceOpen}
+					title="เปลี่ยนตัวอักษร ซูม และสีธีม"
 					style="--active-theme-color: {activeColor.color}"
 				>
 					{#if theme.startsWith('dark')}
@@ -869,59 +886,117 @@
 						</svg>
 					{/if}
 				</button>
-				<div class="theme-picker-popup">
-					{#each themeColors as col}
-						<button
-							class="color-dot {col.name}"
-							class:active={theme.endsWith(col.name)}
-							onclick={() => onSelectColor(col.name)}
-							title="Switch to {col.label} theme"
-							aria-label="Switch to {col.label} theme"
-							style="background-color: {col.color}"
-						></button>
-					{/each}
-				</div>
-			</div>
+ 
+ 				{#if isAppearanceOpen}
+ 					<div class="appearance-dropdown animate-zoom-in">
+						<!-- Section 1: Theme Mode (Light / Dark) -->
+						<div class="dropdown-section">
+							<div class="section-label">Theme Mode</div>
+							<div class="theme-mode-row">
+								<button 
+									class="theme-mode-btn" 
+									class:active={!theme.startsWith('dark')} 
+									onclick={() => {
+										if (theme.startsWith('dark')) {
+											onToggleTheme();
+										}
+									}}
+								>
+									<!-- Sun Icon -->
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41zm-12.37 12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41z"/>
+									</svg>
+									<span>Light</span>
+								</button>
+								<button 
+									class="theme-mode-btn" 
+									class:active={theme.startsWith('dark')} 
+									onclick={() => {
+										if (!theme.startsWith('dark')) {
+											onToggleTheme();
+										}
+									}}
+								>
+									<!-- Moon Icon -->
+									<svg viewBox="0 0 24 24" width="14" height="14">
+										<path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+									</svg>
+									<span>Dark</span>
+								</button>
+							</div>
+						</div>
 
-			<!-- Font Selector (Hover for Zoom, Click to cycle Fonts) -->
-			<div class="font-selector-container">
-				<button 
-					class="font-toggle-btn"
-					onclick={toggleFontFamily}
-					title="Active: {getFontName(fontFamily)} (Click to switch font family, Hover for zoom)"
-					aria-label="Change font family"
-				>
-					<span class="font-preview-text">Aa</span>
-				</button>
-				<div class="font-picker-popup">
-					<button 
-						class="font-popup-btn" 
-						onclick={decreaseFont} 
-						disabled={fontSize <= 10}
-						title="Decrease font size"
-					>
-						A-
-					</button>
-					<button 
-						class="font-popup-indicator-btn" 
-						onclick={() => {
-							fontSize = 15;
-							localStorage.setItem('chat_font_size', '15');
-						}}
-						title="Reset to 100%"
-					>
-						{Math.round((fontSize / 15) * 100)}%
-					</button>
-					<button 
-						class="font-popup-btn" 
-						onclick={increaseFont} 
-						disabled={fontSize >= 30}
-						title="Increase font size"
-					>
-						A+
-					</button>
-				</div>
-			</div>
+ 						<!-- Section 2: Font Family -->
+ 						<div class="dropdown-section">
+ 							<div class="section-label">Font Family</div>
+ 							<div class="font-family-select-wrapper">
+ 								<select 
+ 									class="appearance-select" 
+ 									bind:value={fontFamily}
+ 									onchange={() => localStorage.setItem('chat_font_family', fontFamily)}
+ 								>
+ 									{#each fontFamilies as font}
+ 										<option value={font}>{getFontName(font)}</option>
+ 									{/each}
+ 								</select>
+ 								<svg class="chevron-select" viewBox="0 0 24 24" width="14" height="14">
+ 									<path fill="currentColor" d="M7 10l5 5 5-5z"/>
+ 								</svg>
+ 							</div>
+ 						</div>
+ 
+ 						<!-- Section 3: Zoom / Font Size -->
+ 						<div class="dropdown-section">
+ 							<div class="section-label">Text Zoom</div>
+ 							<div class="zoom-controls-row">
+ 								<button 
+ 									class="zoom-btn" 
+ 									onclick={decreaseFont} 
+ 									disabled={fontSize <= 10}
+ 									title="Decrease font size"
+ 								>
+ 									A-
+ 								</button>
+ 								<button 
+ 									class="zoom-reset-btn" 
+ 									onclick={() => {
+ 										fontSize = 15;
+ 										localStorage.setItem('chat_font_size', '15');
+ 									}}
+ 									title="Reset to 100%"
+ 								>
+ 									{Math.round((fontSize / 15) * 100)}%
+ 								</button>
+ 								<button 
+ 									class="zoom-btn" 
+ 									onclick={increaseFont} 
+ 									disabled={fontSize >= 30}
+ 									title="Increase font size"
+ 								>
+ 									A+
+ 								</button>
+ 							</div>
+ 						</div>
+ 
+ 						<!-- Section 4: Accent Color Theme -->
+ 						<div class="dropdown-section last">
+ 							<div class="section-label">Theme Color</div>
+ 							<div class="theme-color-grid">
+ 								{#each themeColors as col}
+ 									<button
+ 										class="color-dot-item {col.name}"
+ 										class:active={theme.endsWith(col.name)}
+ 										onclick={() => onSelectColor(col.name)}
+ 										title="Switch to {col.label} theme"
+ 										aria-label="Switch to {col.label} theme"
+ 										style="background-color: {col.color}"
+ 									></button>
+ 								{/each}
+ 							</div>
+ 						</div>
+ 					</div>
+ 				{/if}
+ 			</div>
 
 			<!-- Export Button -->
 			{#if conversation && conversation.messages.length > 0}
@@ -1467,132 +1542,234 @@
 		flex-shrink: 0;
 	}
 
-	.font-selector-container {
+	.appearance-controls {
 		position: relative;
 		display: inline-block;
 	}
 
-	.font-toggle-btn {
-		width: 34px;
+	.appearance-toggle-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		height: 34px;
-		border-radius: 50%;
+		padding: 0 12px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 17px;
+		color: var(--text-secondary);
+		font-weight: 500;
+		font-size: 0.85rem;
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		cursor: pointer;
+		outline: none;
+	}
+
+	.appearance-toggle-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+		transform: scale(1.02);
+	}
+
+	.appearance-toggle-btn:active {
+		transform: scale(0.98);
+	}
+
+	.font-icon-svg {
+		color: var(--accent-blue);
+		flex-shrink: 0;
+	}
+
+	.font-name-label {
+		max-width: 120px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.appearance-dropdown {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		padding: 12px 14px;
+		width: 250px;
+		box-shadow: var(--shadow-lg);
+		z-index: 100;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.dropdown-section {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		border-bottom: 1px solid var(--border-light);
+		padding-bottom: 10px;
+	}
+
+	.dropdown-section.last {
+		border-bottom: none;
+		padding-bottom: 0;
+	}
+
+	.section-label {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.font-family-select-wrapper {
+		position: relative;
+		width: 100%;
+	}
+
+	.appearance-select {
+		width: 100%;
+		height: 32px;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 0 28px 0 10px;
+		font-size: 0.85rem;
+		color: var(--text-primary);
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+		outline: none;
+		transition: border-color var(--transition-fast);
+	}
+
+	.appearance-select:focus {
+		border-color: var(--accent-blue);
+	}
+
+	.chevron-select {
+		position: absolute;
+		right: 8px;
+		top: 50%;
+		transform: translateY(-50%);
+		pointer-events: none;
+		color: var(--text-muted);
+	}
+
+	.zoom-controls-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.zoom-btn {
+		width: 32px;
+		height: 32px;
+		border-radius: 8px;
+		border: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		color: var(--text-secondary);
+		font-size: 0.8rem;
+		font-weight: 600;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--text-secondary);
-		background-color: var(--bg-secondary);
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.zoom-btn:hover:not(:disabled) {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.zoom-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.zoom-reset-btn {
+		flex: 1;
+		height: 32px;
+		border-radius: 8px;
 		border: 1px solid var(--border-color);
-		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-		flex-shrink: 0;
+		background-color: var(--bg-primary);
+		color: var(--text-primary);
+		font-size: 0.82rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
+	}
+
+	.zoom-reset-btn:hover {
+		background-color: var(--bg-hover);
+	}
+
+	.theme-mode-row {
+		display: flex;
+		gap: 8px;
+		width: 100%;
+	}
+
+	.theme-mode-btn {
+		flex: 1;
+		height: 32px;
+		border-radius: 8px;
+		border: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		color: var(--text-secondary);
+		font-size: 0.82rem;
+		font-weight: 500;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.theme-mode-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.theme-mode-btn.active {
+		background-color: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-secondary));
+		border-color: var(--accent-blue);
+		color: var(--accent-blue);
+		font-weight: 600;
+	}
+
+	.theme-color-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding: 4px 0;
+	}
+
+	.color-dot-item {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		border: 1px solid rgba(0, 0, 0, 0.15);
+		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 		cursor: pointer;
 		padding: 0;
 		outline: none;
 	}
 
-	.font-toggle-btn:hover {
-		background-color: var(--bg-hover);
-		color: var(--text-primary);
-		border-color: var(--border-light);
-		transform: scale(1.05);
+	.color-dot-item:hover {
+		transform: scale(1.15);
 	}
 
-	.font-toggle-btn:active {
-		transform: scale(0.95);
-	}
-
-	.font-preview-text {
-		font-family: var(--font-main);
-		font-size: 14px;
-		font-weight: 600;
-		user-select: none;
-	}
-
-	.font-picker-popup {
-		position: absolute;
-		top: calc(100% + 6px);
-		left: 50%;
-		transform: translateX(-50%) translateY(8px);
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: 20px;
-		padding: 6px 8px;
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15));
-		opacity: 0;
-		visibility: hidden;
-		pointer-events: none;
-		transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
-		z-index: 50;
-	}
-
-	/* Bridge to keep hover active */
-	.font-picker-popup::before {
-		content: '';
-		position: absolute;
-		top: -8px;
-		left: 0;
-		right: 0;
-		height: 8px;
-		background: transparent;
-	}
-
-	.font-selector-container:hover .font-picker-popup {
-		opacity: 1;
-		visibility: visible;
-		pointer-events: auto;
-		transform: translateX(-50%) translateY(0);
-	}
-
-	.font-popup-btn {
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		border: 1px solid var(--border-color);
-		background-color: var(--bg-primary);
-		color: var(--text-secondary);
-		font-size: 11px;
-		font-weight: 500;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-		padding: 0;
-	}
-
-	.font-popup-btn:hover:not(:disabled) {
-		background-color: var(--bg-hover);
-		color: var(--text-primary);
-		border-color: var(--border-light);
+	.color-dot-item.active {
 		transform: scale(1.1);
-	}
-
-	.font-popup-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.font-popup-indicator-btn {
-		padding: 0 8px;
-		height: 28px;
-		border-radius: 14px;
-		border: 1px solid var(--border-color);
-		background-color: var(--bg-primary);
-		color: var(--text-primary);
-		font-size: 11px;
-		font-weight: 600;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: background-color var(--transition-fast), transform var(--transition-fast);
-	}
-
-	.font-popup-indicator-btn:hover {
-		background-color: var(--bg-hover);
-		transform: scale(1.05);
+		box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-blue);
 	}
 
 	.chat-viewport {
@@ -2472,69 +2649,5 @@
 		fill: currentColor;
 	}
 
-	.theme-selector-container {
-		position: relative;
-		display: inline-block;
-	}
 
-
-
-	.theme-picker-popup {
-		position: absolute;
-		top: calc(100% + 6px);
-		left: 50%;
-		transform: translateX(-50%) translateY(8px);
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: 20px;
-		padding: 8px 10px;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15));
-		opacity: 0;
-		visibility: hidden;
-		pointer-events: none;
-		transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
-		z-index: 50;
-	}
-
-	/* Bridge to keep hover active */
-	.theme-picker-popup::before {
-		content: '';
-		position: absolute;
-		top: -8px;
-		left: 0;
-		right: 0;
-		height: 8px;
-		background: transparent;
-	}
-
-	.theme-selector-container:hover .theme-picker-popup {
-		opacity: 1;
-		visibility: visible;
-		pointer-events: auto;
-		transform: translateX(-50%) translateY(0);
-	}
-
-	.color-dot {
-		width: 14px;
-		height: 14px;
-		border-radius: 50%;
-		border: 1px solid rgba(0, 0, 0, 0.15);
-		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-		cursor: pointer;
-		padding: 0;
-		outline: none;
-		position: relative;
-	}
-
-	.color-dot:hover {
-		transform: scale(1.2);
-	}
-
-	.color-dot.active {
-		transform: scale(1.1);
-		box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-blue);
-	}
 </style>
