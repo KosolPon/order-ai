@@ -716,7 +716,8 @@
 					{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
 					{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
 					{ name: 'purple', label: 'Purple (ม่วง)', color: '#a855f7' },
-					{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' }
+					{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' },
+					{ name: 'gray', label: 'Gray (เทา)', color: '#6b7280' }
 				] as col}
 					<button
 						class="color-dot {col.name}"

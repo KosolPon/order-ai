@@ -251,7 +251,8 @@
 				'dark-yellow', 'light-yellow',
 				'dark-pink', 'light-pink',
 				'dark-purple', 'light-purple',
-				'dark-green', 'light-green'
+				'dark-green', 'light-green',
+				'dark-gray', 'light-gray'
 			];
 			if (storedTheme && validThemes.includes(storedTheme)) {
 				theme = storedTheme;
@@ -275,16 +276,18 @@
 		// Update meta color based on active theme
 		let metaColor = '#131314'; // Default dark
 		if (theme.startsWith('dark')) {
-			if (theme.endsWith('yellow')) metaColor = '#151411';
-			else if (theme.endsWith('pink')) metaColor = '#161214';
-			else if (theme.endsWith('purple')) metaColor = '#131116';
-			else if (theme.endsWith('green')) metaColor = '#101412';
+			if (theme.endsWith('yellow')) metaColor = '#12110f';
+			else if (theme.endsWith('pink')) metaColor = '#131112';
+			else if (theme.endsWith('purple')) metaColor = '#111013';
+			else if (theme.endsWith('green')) metaColor = '#0f1210';
+			else if (theme.endsWith('gray')) metaColor = '#161616';
 		} else {
 			metaColor = '#f0f4f9'; // Default light-blue
 			if (theme.endsWith('yellow')) metaColor = '#faf8f5';
-			else if (theme.endsWith('pink')) metaColor = '#fcf7f9';
-			else if (theme.endsWith('purple')) metaColor = '#faf7fc';
+			else if (theme.endsWith('pink')) metaColor = '#fdfafb';
+			else if (theme.endsWith('purple')) metaColor = '#faf8fc';
 			else if (theme.endsWith('green')) metaColor = '#f6faf7';
+			else if (theme.endsWith('gray')) metaColor = '#f5f5f5';
 		}
 		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', metaColor);
 		localStorage.setItem('theme', theme);
@@ -431,6 +434,8 @@
 		if (typeof window === 'undefined') return;
 		try {
 			const fetchedModels = await fetchModels(ollamaUrl);
+			// Sort models alphabetically by name
+			fetchedModels.sort((a, b) => a.name.localeCompare(b.name));
 			models = fetchedModels;
 			isConnected = true;
 
