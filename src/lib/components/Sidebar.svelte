@@ -291,7 +291,7 @@
 			<svg class="glow-icon" viewBox="0 0 24 24" width="24" height="24">
 				<path fill="currentColor" d="M12 2L2 22h20L12 2zm0 3.99L18.8 19H5.2L12 5.99zM12 17c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1zm0-7.75c.41 0 .75-.34.75-.75s-.34-.75-.75-.75-.75.34-.75.75.34.75.75.75z"/>
 			</svg>
-			<span>Antigravity Ollama</span>
+			<span>Order AI</span>
 		</div>
 		<button class="new-chat-btn" onclick={onNewConversation}>
 			<svg viewBox="0 0 24 24" width="18" height="18">
