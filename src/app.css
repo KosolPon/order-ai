@@ -57,8 +57,94 @@
 	--header-bg: rgba(19, 19, 20, 0.85);
 }
 
-[data-theme="light"] {
-	/* Color Palette (Light theme - Sepia / Warm Sand) */
+[data-theme^="light"] {
+	/* Color Palette (Light theme - Cool Ice Blue) */
+	--bg-primary: #f0f4f9;     /* Soft warm ice blue for main chat viewport */
+	--bg-secondary: #e8edf4;   /* Soothing ice blue for Sidebars (LeftPane / RightPane) */
+	--bg-tertiary: #dbe3ec;    /* Deeper ice blue for inner sections and panel tabs */
+	--bg-hover: #d0dbe6;       /* Hover state */
+	--bg-active: #c2d0df;      /* Active/selected state */
+	
+	--border-color: #d2dbe5;
+	--border-light: rgba(0, 0, 0, 0.04);
+
+	--text-primary: #1f1f1f;
+	--text-secondary: #474747;
+	--text-muted: #757575;
+	--text-link: #0b57d0;
+
+	--accent-blue: #0b57d0;
+	--accent-blue-hover: #0842a0;
+	--accent-gradient: linear-gradient(74deg, #0b57d0 0, #4285f4 20%, #7baaf7 44%, #a8c7fa 56%, #ffffff 75%, #ffffff 100%);
+	--accent-glow: radial-gradient(circle at center, rgba(11, 87, 208, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--shadow-sm: 0 1px 2px rgba(0,0,0,0.02);
+	--shadow-md: 0 4px 6px -1px rgba(0,0,0,0.04), 0 2px 4px -1px rgba(0,0,0,0.02);
+	--shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -2px rgba(0,0,0,0.02);
+
+	/* Code block specific variables (Light values) */
+	--code-bg: #f8fafc;
+	--code-header-bg: #eef2f6;
+	--code-text: #1e293b;
+	--code-border: #e2e8f0;
+	--inline-code-bg: rgba(11, 87, 208, 0.06);
+	--inline-code-color: #0b57d0;
+	--inline-code-border: rgba(11, 87, 208, 0.12);
+
+	/* Mermaid specific variables (Light values) */
+	--mermaid-bg: #f8fafc;
+	--mermaid-label-text: #1f1f1f;
+	--mermaid-node-border: #cbd5e1;
+
+	/* Header background (Light values) */
+	--header-bg: rgba(240, 244, 249, 0.85);
+}
+
+/* Blue Theme overrides (default dark-blue is set in :root, light-blue is set in [data-theme^="light"]) */
+[data-theme="dark-blue"] {
+	/* Uses :root defaults */
+}
+[data-theme="light-blue"] {
+	/* Uses [data-theme^="light"] defaults */
+}
+
+/* Yellow Theme (Warm Sepia / Amber Sand) overrides */
+[data-theme="dark-yellow"] {
+	--bg-primary: #151411;
+	--bg-secondary: #211f19;
+	--bg-tertiary: #2d2a22;
+	--bg-hover: #38352b;
+	--bg-active: #474337;
+	
+	--border-color: #3d392e;
+	--border-light: rgba(255, 255, 255, 0.08);
+
+	--text-primary: #ece8e1;
+	--text-secondary: #d0c8b8;
+	--text-muted: #9a917e;
+	--text-link: #f0b83f;
+
+	--accent-blue: #f0b83f;
+	--accent-blue-hover: #fcd375;
+	--accent-gradient: linear-gradient(74deg, #e09f1b 0, #f0b83f 15%, #ffd984 35%, #e09f1b 55%, #151411 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(240, 184, 63, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #211f19;
+	--code-header-bg: #2d2a22;
+	--code-text: #ece8e1;
+	--code-border: #3d392e;
+	--inline-code-bg: rgba(240, 184, 63, 0.09);
+	--inline-code-color: #f0b83f;
+	--inline-code-border: rgba(240, 184, 63, 0.16);
+
+	--mermaid-bg: #1c1a15;
+	--mermaid-label-text: #ece8e1;
+	--mermaid-node-border: #5a5444;
+
+	--header-bg: rgba(21, 20, 17, 0.85);
+}
+
+[data-theme="light-yellow"] {
 	--bg-primary: #faf8f5;     /* Soft warm off-white for main chat viewport */
 	--bg-secondary: #f5f2eb;   /* Soothing cream sand for Sidebars (LeftPane / RightPane) */
 	--bg-tertiary: #ebe7dd;    /* Deeper sand for inner sections and panel tabs */
@@ -78,11 +164,6 @@
 	--accent-gradient: linear-gradient(74deg, #ab5a1c 0, #c87c42 20%, #e3a677 44%, #d96570 56%, #ffffff 75%, #ffffff 100%);
 	--accent-glow: radial-gradient(circle at center, rgba(171, 90, 28, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
 
-	--shadow-sm: 0 1px 2px rgba(0,0,0,0.02);
-	--shadow-md: 0 4px 6px -1px rgba(0,0,0,0.04), 0 2px 4px -1px rgba(0,0,0,0.02);
-	--shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -2px rgba(0,0,0,0.02);
-
-	/* Code block specific variables (Light values) */
 	--code-bg: #faf8f5;
 	--code-header-bg: #f2ede4;
 	--code-text: #3a332d;
@@ -91,13 +172,224 @@
 	--inline-code-color: #ab5a1c;
 	--inline-code-border: rgba(171, 90, 28, 0.12);
 
-	/* Mermaid specific variables (Light values) */
 	--mermaid-bg: #faf8f5;
 	--mermaid-label-text: #2b2620;
 	--mermaid-node-border: #b0a79a;
 
-	/* Header background (Light values) */
 	--header-bg: rgba(250, 248, 245, 0.85);
+}
+
+/* Pink Theme (Blush Rose) overrides */
+[data-theme="dark-pink"] {
+	--bg-primary: #161214;
+	--bg-secondary: #231d21;
+	--bg-tertiary: #2e252b;
+	--bg-hover: #3a3037;
+	--bg-active: #4b3d47;
+	
+	--border-color: #3e323b;
+	--border-light: rgba(255, 255, 255, 0.08);
+
+	--text-primary: #ede2e8;
+	--text-secondary: #d3bfc9;
+	--text-muted: #a18995;
+	--text-link: #f48fb1;
+
+	--accent-blue: #f48fb1;
+	--accent-blue-hover: #f8bbd0;
+	--accent-gradient: linear-gradient(74deg, #ec407a 0, #f48fb1 15%, #f8bbd0 35%, #ec407a 55%, #161214 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(244, 143, 177, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #231d21;
+	--code-header-bg: #2e252b;
+	--code-text: #ede2e8;
+	--code-border: #3e323b;
+	--inline-code-bg: rgba(244, 143, 177, 0.09);
+	--inline-code-color: #f48fb1;
+	--inline-code-border: rgba(244, 143, 177, 0.16);
+
+	--mermaid-bg: #1e191c;
+	--mermaid-label-text: #ede2e8;
+	--mermaid-node-border: #5d4b58;
+
+	--header-bg: rgba(22, 18, 20, 0.85);
+}
+
+[data-theme="light-pink"] {
+	--bg-primary: #fcf7f9;
+	--bg-secondary: #f7edf1;
+	--bg-tertiary: #eedce2;
+	--bg-hover: #e4d0d7;
+	--bg-active: #d7bec7;
+	
+	--border-color: #e3ccd4;
+	--border-light: rgba(0, 0, 0, 0.04);
+
+	--text-primary: #33222a;
+	--text-secondary: #614d56;
+	--text-muted: #907983;
+	--text-link: #c2185b;
+
+	--accent-blue: #d81b60;
+	--accent-blue-hover: #ad1457;
+	--accent-gradient: linear-gradient(74deg, #d81b60 0, #ec407a 20%, #f48fb1 44%, #ffb74d 56%, #ffffff 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(216, 27, 96, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #fcf7f9;
+	--code-header-bg: #f6ecf0;
+	--code-text: #33222a;
+	--code-border: #ebd6de;
+	--inline-code-bg: rgba(216, 27, 96, 0.06);
+	--inline-code-color: #d81b60;
+	--inline-code-border: rgba(216, 27, 96, 0.12);
+
+	--mermaid-bg: #fcf7f9;
+	--mermaid-label-text: #33222a;
+	--mermaid-node-border: #ccaeb8;
+
+	--header-bg: rgba(252, 247, 249, 0.85);
+}
+
+/* Purple Theme (Lavender Amethyst) overrides */
+[data-theme="dark-purple"] {
+	--bg-primary: #131116;
+	--bg-secondary: #1f1c23;
+	--bg-tertiary: #29252e;
+	--bg-hover: #332f3a;
+	--bg-active: #423c4b;
+	
+	--border-color: #37313f;
+	--border-light: rgba(255, 255, 255, 0.08);
+
+	--text-primary: #eae6ee;
+	--text-secondary: #ccc2d5;
+	--text-muted: #9b8ea5;
+	--text-link: #c5a3ff;
+
+	--accent-blue: #c5a3ff;
+	--accent-blue-hover: #d7c2ff;
+	--accent-gradient: linear-gradient(74deg, #7c4dff 0, #b388ff 15%, #d7c2ff 35%, #7c4dff 55%, #131116 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(197, 163, 255, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #1f1c23;
+	--code-header-bg: #29252e;
+	--code-text: #eae6ee;
+	--code-border: #37313f;
+	--inline-code-bg: rgba(197, 163, 255, 0.09);
+	--inline-code-color: #c5a3ff;
+	--inline-code-border: rgba(197, 163, 255, 0.16);
+
+	--mermaid-bg: #19161c;
+	--mermaid-label-text: #eae6ee;
+	--mermaid-node-border: #544a5f;
+
+	--header-bg: rgba(19, 17, 22, 0.85);
+}
+
+[data-theme="light-purple"] {
+	--bg-primary: #faf7fc;
+	--bg-secondary: #f4eef7;
+	--bg-tertiary: #ebddec;
+	--bg-hover: #dfcee2;
+	--bg-active: #d1bbd5;
+	
+	--border-color: #dfcadf;
+	--border-light: rgba(0, 0, 0, 0.04);
+
+	--text-primary: #2a2033;
+	--text-secondary: #574a61;
+	--text-muted: #847590;
+	--text-link: #673ab7;
+
+	--accent-blue: #7e57c2;
+	--accent-blue-hover: #5e35b1;
+	--accent-gradient: linear-gradient(74deg, #7e57c2 0, #9575cd 20%, #b085f5 44%, #ec407a 56%, #ffffff 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(126, 87, 194, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #faf7fc;
+	--code-header-bg: #f3ecf6;
+	--code-text: #2a2033;
+	--code-border: #e7cbe7;
+	--inline-code-bg: rgba(126, 87, 194, 0.06);
+	--inline-code-color: #7e57c2;
+	--inline-code-border: rgba(126, 87, 194, 0.12);
+
+	--mermaid-bg: #faf7fc;
+	--mermaid-label-text: #2a2033;
+	--mermaid-node-border: #c8aec8;
+
+	--header-bg: rgba(250, 247, 252, 0.85);
+}
+
+/* Green Theme (Emerald/Sage) overrides */
+[data-theme="dark-green"] {
+	--bg-primary: #101412;
+	--bg-secondary: #1a201d;
+	--bg-tertiary: #232a26;
+	--bg-hover: #2b3430;
+	--bg-active: #37433e;
+	
+	--border-color: #2f3934;
+	--border-light: rgba(255, 255, 255, 0.08);
+
+	--text-primary: #e1ede5;
+	--text-secondary: #c1d1c6;
+	--text-muted: #8fa195;
+	--text-link: #81c784;
+
+	--accent-blue: #81c784;
+	--accent-blue-hover: #a5d6a7;
+	--accent-gradient: linear-gradient(74deg, #2e7d32 0, #81c784 15%, #a5d6a7 35%, #2e7d32 55%, #101412 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(129, 199, 132, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #1a201d;
+	--code-header-bg: #232a26;
+	--code-text: #e1ede5;
+	--code-border: #2f3934;
+	--inline-code-bg: rgba(129, 199, 132, 0.09);
+	--inline-code-color: #81c784;
+	--inline-code-border: rgba(129, 199, 132, 0.16);
+
+	--mermaid-bg: #151a18;
+	--mermaid-label-text: #e1ede5;
+	--mermaid-node-border: #46564e;
+
+	--header-bg: rgba(16, 20, 18, 0.85);
+}
+
+[data-theme="light-green"] {
+	--bg-primary: #f6faf7;
+	--bg-secondary: #ebf2ed;
+	--bg-tertiary: #dce8e0;
+	--bg-hover: #cedcd2;
+	--bg-active: #bccec1;
+	
+	--border-color: #cbdcd0;
+	--border-light: rgba(0, 0, 0, 0.04);
+
+	--text-primary: #1f2d24;
+	--text-secondary: #495a50;
+	--text-muted: #74877c;
+	--text-link: #2e7d32;
+
+	--accent-blue: #388e3c;
+	--accent-blue-hover: #1b5e20;
+	--accent-gradient: linear-gradient(74deg, #388e3c 0, #66bb6a 20%, #a5d6a7 44%, #ffb74d 56%, #ffffff 75%);
+	--accent-glow: radial-gradient(circle at center, rgba(56, 142, 60, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
+
+	--code-bg: #f6faf7;
+	--code-header-bg: #edf3ee;
+	--code-text: #1f2d24;
+	--code-border: #c4d7c8;
+	--inline-code-bg: rgba(56, 142, 60, 0.06);
+	--inline-code-color: #388e3c;
+	--inline-code-border: rgba(56, 142, 60, 0.12);
+
+	--mermaid-bg: #f6faf7;
+	--mermaid-label-text: #1f2d24;
+	--mermaid-node-border: #abbcae;
+
+	--header-bg: rgba(246, 250, 247, 0.85);
 }
 
 /* Global Reset */
@@ -1382,55 +1674,55 @@ pre[class*="language-"] {
 }
 
 /* Prism light theme syntax overrides */
-[data-theme="light"] .token.comment,
-[data-theme="light"] .token.prolog,
-[data-theme="light"] .token.doctype,
-[data-theme="light"] .token.cdata {
+[data-theme^="light"] .token.comment,
+[data-theme^="light"] .token.prolog,
+[data-theme^="light"] .token.doctype,
+[data-theme^="light"] .token.cdata {
 	color: #6a737d;
 }
 
-[data-theme="light"] .token.punctuation {
+[data-theme^="light"] .token.punctuation {
 	color: #24292f;
 }
 
-[data-theme="light"] .token.property,
-[data-theme="light"] .token.tag,
-[data-theme="light"] .token.boolean,
-[data-theme="light"] .token.number,
-[data-theme="light"] .token.constant,
-[data-theme="light"] .token.symbol,
-[data-theme="light"] .token.deleted {
+[data-theme^="light"] .token.property,
+[data-theme^="light"] .token.tag,
+[data-theme^="light"] .token.boolean,
+[data-theme^="light"] .token.number,
+[data-theme^="light"] .token.constant,
+[data-theme^="light"] .token.symbol,
+[data-theme^="light"] .token.deleted {
 	color: #0550ae;
 }
 
-[data-theme="light"] .token.selector,
-[data-theme="light"] .token.attr-name,
-[data-theme="light"] .token.string,
-[data-theme="light"] .token.char,
-[data-theme="light"] .token.builtin,
-[data-theme="light"] .token.inserted {
+[data-theme^="light"] .token.selector,
+[data-theme^="light"] .token.attr-name,
+[data-theme^="light"] .token.string,
+[data-theme^="light"] .token.char,
+[data-theme^="light"] .token.builtin,
+[data-theme^="light"] .token.inserted {
 	color: #116329;
 }
 
-[data-theme="light"] .token.operator,
-[data-theme="light"] .token.entity,
-[data-theme="light"] .token.url {
+[data-theme^="light"] .token.operator,
+[data-theme^="light"] .token.entity,
+[data-theme^="light"] .token.url {
 	color: #24292f;
 }
 
-[data-theme="light"] .token.atrule,
-[data-theme="light"] .token.attr-value,
-[data-theme="light"] .token.keyword {
+[data-theme^="light"] .token.atrule,
+[data-theme^="light"] .token.attr-value,
+[data-theme^="light"] .token.keyword {
 	color: #cf222e;
 }
 
-[data-theme="light"] .token.function,
-[data-theme="light"] .token.class-name {
+[data-theme^="light"] .token.function,
+[data-theme^="light"] .token.class-name {
 	color: #8250df;
 }
 
-[data-theme="light"] .token.regex,
-[data-theme="light"] .token.important,
-[data-theme="light"] .token.variable {
+[data-theme^="light"] .token.regex,
+[data-theme^="light"] .token.important,
+[data-theme^="light"] .token.variable {
 	color: #953800;
 }

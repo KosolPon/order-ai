@@ -11,14 +11,15 @@
 		isInitialized = false,
 		showContextPanel = false,
 		showSidebar = true,
-		theme = 'dark',
+		theme = 'dark-blue',
 		onSendPrompt,
 		onEditPrompt,
 		onStopGeneration,
 		onToggleContextPanel,
 		onOpenThinking,
 		onToggleSidebar,
-		onToggleTheme
+		onToggleTheme,
+		onSelectColor
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
@@ -26,7 +27,7 @@
 		isInitialized: boolean;
 		showContextPanel: boolean;
 		showSidebar: boolean;
-		theme: 'dark' | 'light';
+		theme: string;
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
@@ -34,6 +35,7 @@
 		onOpenThinking: (messageId: string) => void;
 		onToggleSidebar: () => void;
 		onToggleTheme: () => void;
+		onSelectColor: (color: string) => void;
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
@@ -707,14 +709,34 @@
 		</div>
 
 		<div class="header-actions">
+			<!-- Theme Color Picker -->
+			<div class="theme-color-picker">
+				{#each [
+					{ name: 'blue', label: 'Blue (ฟ้า)', color: '#3b82f6' },
+					{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
+					{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
+					{ name: 'purple', label: 'Purple (ม่วง)', color: '#a855f7' },
+					{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' }
+				] as col}
+					<button
+						class="color-dot {col.name}"
+						class:active={theme.endsWith(col.name)}
+						onclick={() => onSelectColor(col.name)}
+						title="Switch to {col.label} theme"
+						aria-label="Switch to {col.label} theme"
+						style="background-color: {col.color}"
+					></button>
+				{/each}
+			</div>
+
 			<!-- Theme Toggle Button -->
 			<button 
 				class="theme-toggle-btn"
 				onclick={onToggleTheme}
-				title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-				aria-label={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+				title={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+				aria-label={theme.startsWith('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
 			>
-				{#if theme === 'dark'}
+				{#if theme.startsWith('dark')}
 					<!-- Sun Icon -->
 					<svg viewBox="0 0 24 24" width="18" height="18">
 						<path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41zm-12.37 12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41z"/>
@@ -1941,5 +1963,39 @@
 		width: 18px;
 		height: 18px;
 		fill: currentColor;
+	}
+
+	.theme-color-picker {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-right: 8px;
+		padding: 4px 8px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 99px;
+		height: 34px;
+		box-sizing: border-box;
+	}
+
+	.color-dot {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		border: 1px solid rgba(0, 0, 0, 0.15);
+		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+		cursor: pointer;
+		padding: 0;
+		outline: none;
+		position: relative;
+	}
+
+	.color-dot:hover {
+		transform: scale(1.2);
+	}
+
+	.color-dot.active {
+		transform: scale(1.1);
+		box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-blue);
 	}
 </style>

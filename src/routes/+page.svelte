@@ -29,7 +29,20 @@
 	let drafts = $state<Record<string, string>>({});
 	let attachments = $state<Attachment[]>([]);
 	let isInitialized = $state(false);
-	let theme = $state<'dark' | 'light'>('dark');
+	let theme = $state<string>('dark-blue');
+
+	// Toggle between light and dark of the current color
+	function handleToggleTheme() {
+		const isDark = theme.startsWith('dark');
+		const color = theme.split('-')[1] || 'blue';
+		theme = isDark ? `light-${color}` : `dark-${color}`;
+	}
+
+	// Change color while preserving mode (light or dark)
+	function handleSelectColor(color: string) {
+		const isDark = theme.startsWith('dark');
+		theme = isDark ? `dark-${color}` : `light-${color}`;
+	}
 
 	// Context and Project States
 	let projects = $state<Project[]>([]);
@@ -233,11 +246,22 @@
 
 			// Load theme preference
 			const storedTheme = localStorage.getItem('theme');
-			if (storedTheme === 'light' || storedTheme === 'dark') {
+			const validThemes = [
+				'dark-blue', 'light-blue',
+				'dark-yellow', 'light-yellow',
+				'dark-pink', 'light-pink',
+				'dark-purple', 'light-purple',
+				'dark-green', 'light-green'
+			];
+			if (storedTheme && validThemes.includes(storedTheme)) {
 				theme = storedTheme;
+			} else if (storedTheme === 'light') {
+				theme = 'light-yellow'; // Map legacy light theme to light-yellow (sepia)
+			} else if (storedTheme === 'dark') {
+				theme = 'dark-blue'; // Map legacy dark theme to dark-blue (obsidian slate)
 			} else {
 				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-				theme = prefersDark ? 'dark' : 'light';
+				theme = prefersDark ? 'dark-blue' : 'light-blue';
 			}
 
 			isInitialized = true;
@@ -246,13 +270,23 @@
 
 	// Sync theme to document element and meta tag
 	$effect(() => {
-		if (theme === 'light') {
-			document.documentElement.setAttribute('data-theme', 'light');
-			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#faf8f5');
+		document.documentElement.setAttribute('data-theme', theme);
+		
+		// Update meta color based on active theme
+		let metaColor = '#131314'; // Default dark
+		if (theme.startsWith('dark')) {
+			if (theme.endsWith('yellow')) metaColor = '#151411';
+			else if (theme.endsWith('pink')) metaColor = '#161214';
+			else if (theme.endsWith('purple')) metaColor = '#131116';
+			else if (theme.endsWith('green')) metaColor = '#101412';
 		} else {
-			document.documentElement.setAttribute('data-theme', 'dark');
-			document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#131314');
+			metaColor = '#f0f4f9'; // Default light-blue
+			if (theme.endsWith('yellow')) metaColor = '#faf8f5';
+			else if (theme.endsWith('pink')) metaColor = '#fcf7f9';
+			else if (theme.endsWith('purple')) metaColor = '#faf7fc';
+			else if (theme.endsWith('green')) metaColor = '#f6faf7';
 		}
+		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', metaColor);
 		localStorage.setItem('theme', theme);
 	});
 
@@ -663,12 +697,14 @@
 							{
 								id: `m1-sys-${Date.now()}`,
 								role: 'system',
-								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.'
+								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.',
+								timestamp: Date.now()
 							},
 							{
 								id: `m1-user-${Date.now()}`,
 								role: 'user',
-								content: currentPrompt
+								content: currentPrompt,
+								timestamp: Date.now()
 							}
 						],
 						model: m1,
@@ -748,12 +784,14 @@
 							{
 								id: `m1-sys-${Date.now()}`,
 								role: 'system',
-								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.'
+								content: 'You are a professional prompt refiner and translator.\nTranslate the user\'s prompt to English if it is in Thai or another language.\nRefine and expand the prompt to make it clear, detailed, and optimized for an AI developer/assistant.\nPreserve all context, instructions, and reference attachments.\nOutput ONLY the refined English prompt. Do not add any conversational text, pleasantries, or explanations.',
+								timestamp: Date.now()
 							},
 							{
 								id: `m1-user-${Date.now()}`,
 								role: 'user',
-								content: currentPrompt
+								content: currentPrompt,
+								timestamp: Date.now()
 							}
 						],
 						model: m1,
@@ -836,12 +874,14 @@
 							{
 								id: `m3-sys-${Date.now()}`,
 								role: 'system',
-								content: 'You are a professional translator and editor.\nTranslate the following English response into natural, fluent Thai.\nEnsure all technical terms, code blocks, and markdown formatting are preserved exactly as they are.\nOutput ONLY the translated Thai response. Do not add any extra explanations, introduction, or pleasantries.'
+								content: 'You are a professional translator and editor.\nTranslate the following English response into natural, fluent Thai.\nEnsure all technical terms, code blocks, and markdown formatting are preserved exactly as they are.\nOutput ONLY the translated Thai response. Do not add any extra explanations, introduction, or pleasantries.',
+								timestamp: Date.now()
 							},
 							{
 								id: `m3-user-${Date.now()}`,
 								role: 'user',
-								content: englishSolution
+								content: englishSolution,
+								timestamp: Date.now()
 							}
 						],
 						model: m3,
@@ -1173,7 +1213,8 @@
 			{showContextPanel}
 			{showSidebar}
 			{theme}
-			onToggleTheme={() => theme = theme === 'dark' ? 'light' : 'dark'}
+			onToggleTheme={handleToggleTheme}
+			onSelectColor={handleSelectColor}
 			onToggleSidebar={() => showSidebar = !showSidebar}
 			onSendPrompt={handleSendPrompt}
 			onEditPrompt={handleEditPrompt}
@@ -1220,6 +1261,7 @@
 			{globalContext}
 			{activeThinking}
 			activeTab={rightPaneTab}
+			{isGenerating}
 			onChangeTab={(tab) => rightPaneTab = tab}
 			onUpdateChatContext={handleUpdateChatContext}
 			onUpdateChatProject={handleUpdateChatProject}

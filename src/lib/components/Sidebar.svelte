@@ -70,17 +70,17 @@
 
 	function removeModelStep(index: number) {
 		if (index > 0) {
-			activeModels = activeModels.filter((_, i) => i !== index);
-			modelTemperatures = modelTemperatures.filter((_, i) => i !== index);
+			activeModels = activeModels.filter((_: string, i: number) => i !== index);
+			modelTemperatures = modelTemperatures.filter((_: number, i: number) => i !== index);
 		}
 	}
 
 	function updateModelStep(index: number, val: string) {
-		activeModels = activeModels.map((m, i) => i === index ? val : m);
+		activeModels = activeModels.map((m: string, i: number) => i === index ? val : m);
 	}
 
 	function updateModelTemp(index: number, val: number) {
-		modelTemperatures = modelTemperatures.map((t, i) => i === index ? val : t);
+		modelTemperatures = modelTemperatures.map((t: number, i: number) => i === index ? val : t);
 	}
 
 	let editingId = $state<string | null>(null);
@@ -1842,7 +1842,7 @@
 		font-weight: 600;
 	}
 
-	:global([data-theme="light"]) .modal-btn.primary {
+	:global([data-theme^="light"]) .modal-btn.primary {
 		color: #ffffff; /* White text for high contrast on dark blue background in light mode */
 		font-weight: 500;
 	}
