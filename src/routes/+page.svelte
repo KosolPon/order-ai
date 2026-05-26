@@ -58,6 +58,7 @@
 	let contextPanelWidth = $state<number>(320);
 	let isResizingLeft = $state<boolean>(false);
 	let isResizingRight = $state<boolean>(false);
+	let fontSize = $state(15);
 
 	// Thinking / Reasoning states
 	let rightPaneTab = $state<'context' | 'thinking' | 'canvas'>('context');
@@ -253,6 +254,14 @@
 			const storedContextPanelWidth = localStorage.getItem('ollama_context_panel_width');
 			if (storedContextPanelWidth) {
 				contextPanelWidth = parseInt(storedContextPanelWidth, 10);
+			}
+
+			const storedFontSize = localStorage.getItem('chat_font_size');
+			if (storedFontSize) {
+				const parsed = parseInt(storedFontSize, 10);
+				if (!isNaN(parsed) && parsed >= 10 && parsed <= 30) {
+					fontSize = parsed;
+				}
 			}
 
 			// Load theme preference
@@ -1253,6 +1262,7 @@
 		--sidebar-border: {showSidebar ? '1px solid var(--border-color)' : 'none'};
 		--sidebar-transform: {showSidebar ? '0' : '-100%'};
 		--context-panel-width: {showContextPanel ? contextPanelWidth : 0}px;
+		--chat-font-size: {fontSize}px;
 	"
 >
 	{#if showSidebar}
@@ -1302,12 +1312,16 @@
 	<!-- Main Chat Area -->
 	<main class="main-content">
 		<ChatArea 
+			bind:fontSize={fontSize}
 			conversation={currentConversation}
 			{isGenerating}
 			{isInitialized}
 			{showContextPanel}
 			{showSidebar}
 			{theme}
+			{projects}
+			{conversations}
+			onSelectConversation={handleSelectConversation}
 			onToggleTheme={handleToggleTheme}
 			onSelectColor={handleSelectColor}
 			onToggleSidebar={() => showSidebar = !showSidebar}

@@ -843,7 +843,7 @@ pre[class*="language-"] {
 	background-color: var(--code-header-bg);
 	border-bottom: 1px solid var(--code-border);
 	font-family: var(--font-mono);
-	font-size: 0.8rem;
+	font-size: 0.82em;
 	color: var(--text-secondary);
 	text-transform: lowercase;
 }
@@ -855,7 +855,7 @@ pre[class*="language-"] {
 	background: none;
 	border: none;
 	color: var(--text-muted);
-	font-size: 0.75rem;
+	font-size: 0.9em;
 	padding: 4px 8px;
 	border-radius: 4px;
 	transition: background-color var(--transition-fast), color var(--transition-fast);

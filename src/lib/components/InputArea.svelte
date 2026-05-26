@@ -506,12 +506,13 @@
 		width: 100%;
 		max-width: 1000px;
 		margin: 0 auto;
-		padding: 0 16px 24px 16px;
+		padding: 4px 16px 24px 16px;
 		background-color: var(--bg-primary);
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 		box-sizing: border-box;
+		container-type: inline-size;
 	}
 
 	.input-wrapper {
@@ -924,9 +925,35 @@
 
 	@media (max-width: 768px) {
 		.input-container {
-			padding: 0 12px 16px 12px;
+			padding: 4px 12px 16px 12px;
+		}
+	}
+
+	@container (max-width: 720px) {
+		.input-row {
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 10px 12px;
 		}
 
+		.input-row .prompt-textarea {
+			width: 100%;
+			flex: 1 1 100%;
+			padding-right: 10px;
+		}
+
+		.input-row .model-selector-wrapper {
+			margin-right: auto;
+			margin-bottom: 0;
+		}
+
+		.input-row .action-buttons {
+			margin-left: auto;
+			margin-bottom: 0;
+		}
+	}
+
+	@container (max-width: 500px) {
 		.pill-box-single {
 			padding: 8px 10px;
 			border-radius: 20px;

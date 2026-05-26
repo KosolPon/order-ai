@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Conversation, Message, Attachment } from '$lib/types';
+	import type { Conversation, Message, Attachment, Project } from '$lib/types';
 	import { renderMarkdown, parseThinking } from '$lib/markdown';
 	import { tick, untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
@@ -12,6 +12,9 @@
 		showContextPanel = false,
 		showSidebar = true,
 		theme = 'dark-blue',
+		projects = [],
+		conversations = [],
+		fontSize = $bindable(15),
 		onSendPrompt,
 		onEditPrompt,
 		onStopGeneration,
@@ -20,7 +23,8 @@
 		onOpenCanvasFile,
 		onToggleSidebar,
 		onToggleTheme,
-		onSelectColor
+		onSelectColor,
+		onSelectConversation
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
@@ -29,6 +33,9 @@
 		showContextPanel: boolean;
 		showSidebar: boolean;
 		theme: string;
+		projects?: Project[];
+		conversations?: Conversation[];
+		fontSize?: number;
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
@@ -38,10 +45,10 @@
 		onToggleSidebar: () => void;
 		onToggleTheme: () => void;
 		onSelectColor: (color: string) => void;
+		onSelectConversation?: (id: string) => void;
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
-	let fontSize = $state(15);
 	let userScrolledUp = $state(false);
 	let lastConversationId = $state<string | null>(null);
 	let editingMessageId = $state<string | null>(null);
@@ -550,6 +557,15 @@
 		editingMessageId = null;
 	}
 
+	function handleEditKeydown(e: KeyboardEvent, msgId: string) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			if (editingMessageContent.trim() && !isGenerating && !isBusy) {
+				saveEditPrompt(msgId);
+			}
+		}
+	}
+
 	// Load stored font size on mount
 	$effect(() => {
 		untrack(() => {
@@ -577,29 +593,85 @@
 		}
 	}
 
-	// Suggestions for empty state
-	const suggestions = [
-		{
-			title: 'Write a Svelte 5 component',
-			desc: 'for a sleek modal dialog using runes',
-			prompt: 'Write a Svelte 5 component for a sleek modal dialog. Use TypeScript and Svelte 5 runes ($state, $props, $effect). Add beautiful transition animations and CSS styling.'
-		},
-		{
-			title: 'Explain Svelte 5 Runes',
-			desc: 'versus Svelte 3/4 stores and reactivity',
-			prompt: 'Can you explain Svelte 5 Runes ($state, $derived, $effect) and compare them with Svelte 3/4 reactive statements ($:) and stores? Provide code examples showing how to convert a store-based component to runes.'
-		},
-		{
-			title: 'Create a Python script',
-			desc: 'to parse a JSON log file and extract errors',
-			prompt: 'Write a Python script to parse a JSON log file, extract all logs that have level "ERROR" or "CRITICAL", and write them into a CSV file. Include sample data and make the code well-documented.'
-		},
-		{
-			title: 'Design a CSS layout',
-			desc: 'for a glassmorphism dashboard card',
-			prompt: 'Design a modern CSS glassmorphism dashboard card. Provide the HTML structure and complete CSS styles. Include hover effects, backdrop-filter, border gradients, and dynamic shadow effects.'
-		}
+	// Determine if the current new chat belongs to a project
+	const currentProject = $derived(
+		conversation && conversation.projectId
+			? projects.find((p: Project) => p.id === conversation.projectId) || null
+			: null
+	);
+
+	const themeColors = [
+		{ name: 'blue', label: 'Blue (ฟ้า)', color: '#3b82f6' },
+		{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
+		{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
+		{ name: 'purple', label: 'Purple (ม่วง)', color: '#a855f7' },
+		{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' },
+		{ name: 'gray', label: 'Gray (เทา)', color: '#6b7280' }
 	];
+
+	const activeColor = $derived(themeColors.find(c => theme.endsWith(c.name)) || themeColors[0]);
+
+	// Get latest conversations for the display
+	const recentChats = $derived.by(() => {
+		// Filter out the current empty/new conversation
+		const otherConvs = conversations.filter((c: Conversation) => c.id !== conversation?.id);
+		
+		if (currentProject) {
+			// Inside a project: show only conversations belonging to this project
+			return otherConvs
+				.filter((c: Conversation) => c.projectId === currentProject.id && c.messages.length > 0)
+				.sort((a: Conversation, b: Conversation) => {
+					const timeA = a.messages[a.messages.length - 1]?.timestamp || a.createdAt;
+					const timeB = b.messages[b.messages.length - 1]?.timestamp || b.createdAt;
+					return timeB - timeA;
+				})
+				.slice(0, 4);
+		} else {
+			// General/Independent chat: show all latest conversations overall
+			return otherConvs
+				.filter((c: Conversation) => c.messages.length > 0)
+				.sort((a: Conversation, b: Conversation) => {
+					const timeA = a.messages[a.messages.length - 1]?.timestamp || a.createdAt;
+					const timeB = b.messages[b.messages.length - 1]?.timestamp || b.createdAt;
+					return timeB - timeA;
+				})
+				.slice(0, 4);
+		}
+	});
+
+	function formatRelativeTime(timestamp: number): string {
+		if (!timestamp) return '';
+		const diffMs = Date.now() - timestamp;
+		if (diffMs < 0) return 'now';
+		
+		const diffMins = Math.floor(diffMs / 60000);
+		if (diffMins < 1) return 'now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		
+		const diffHours = Math.floor(diffMins / 60);
+		if (diffHours < 24) return `${diffHours}h ago`;
+		
+		const diffDays = Math.floor(diffHours / 24);
+		return `${diffDays}d ago`;
+	}
+
+	function getChatLastMessageSnippet(conv: Conversation): string {
+		if (!conv.messages || conv.messages.length === 0) return '';
+		// Find the last user message or last assistant message to show snippet
+		// Iterate backwards to find the last message with content
+		for (let i = conv.messages.length - 1; i >= 0; i--) {
+			const msg = conv.messages[i];
+			if (msg.content) {
+				const cleaned = msg.content.replace(/<[^>]*>/g, '').replace(/<\/?think>[\s\S]*?(<\/think>|$)/gi, '').trim();
+				if (cleaned) {
+					return cleaned.slice(0, 75) + (cleaned.length > 75 ? '...' : '');
+				}
+			}
+		}
+		return '';
+	}
+
+
 
 	// Smart scroll controller
 	$effect(() => {
@@ -723,24 +795,26 @@
 
 		<div class="header-actions">
 			<!-- Theme Color Picker -->
-			<div class="theme-color-picker">
-				{#each [
-					{ name: 'blue', label: 'Blue (ฟ้า)', color: '#3b82f6' },
-					{ name: 'yellow', label: 'Yellow (เหลือง)', color: '#eab308' },
-					{ name: 'pink', label: 'Pink (ชมพู)', color: '#ec4899' },
-					{ name: 'purple', label: 'Purple (ม่วง)', color: '#a855f7' },
-					{ name: 'green', label: 'Green (เขียว)', color: '#22c55e' },
-					{ name: 'gray', label: 'Gray (เทา)', color: '#6b7280' }
-				] as col}
-					<button
-						class="color-dot {col.name}"
-						class:active={theme.endsWith(col.name)}
-						onclick={() => onSelectColor(col.name)}
-						title="Switch to {col.label} theme"
-						aria-label="Switch to {col.label} theme"
-						style="background-color: {col.color}"
-					></button>
-				{/each}
+			<div class="theme-selector-container">
+				<button 
+					class="theme-picker-trigger"
+					title="Change theme color"
+					aria-label="Change theme color"
+				>
+					<span class="active-color-dot" style="background-color: {activeColor.color}"></span>
+				</button>
+				<div class="theme-picker-popup">
+					{#each themeColors as col}
+						<button
+							class="color-dot {col.name}"
+							class:active={theme.endsWith(col.name)}
+							onclick={() => onSelectColor(col.name)}
+							title="Switch to {col.label} theme"
+							aria-label="Switch to {col.label} theme"
+							style="background-color: {col.color}"
+						></button>
+					{/each}
+				</div>
 			</div>
 
 			<!-- Theme Toggle Button -->
@@ -853,35 +927,92 @@
 		bind:this={chatContainer} 
 		onscroll={handleScroll}
 		onclick={handleViewportClick}
-		style="--chat-font-size: {fontSize}px"
 	>
 		{#if !isInitialized}
 			<div class="chat-loading-placeholder">
 				<div class="spinner-glow"></div>
 			</div>
 		{:else if !conversation || conversation.messages.length === 0}
-			<!-- Gemini-style Welcome Screen -->
+			<!-- Dynamic Welcome Screen -->
 			<div class="welcome-container animate-fade-in">
 				<div class="welcome-header">
-					<h1 class="gradient-text">Hello, Developer</h1>
-					<h2 class="subtitle-text">What would you like to build or discuss today?</h2>
+					{#if currentProject}
+						<div class="project-indicator-badge">
+							<svg viewBox="0 0 24 24" width="18" height="18" class="project-folder-icon">
+								<path fill="currentColor" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+							</svg>
+							<span>PROJECT WORKSPACE</span>
+						</div>
+						<h1 class="project-welcome-title">{currentProject.name}</h1>
+						<h2 class="subtitle-text">Chat with AI powered by Svelte 5 and local Ollama models.</h2>
+					{:else}
+						<h1 class="gradient-text">Hello, Developer</h1>
+						<h2 class="subtitle-text">What would you like to build or discuss today?</h2>
+					{/if}
 				</div>
 
-				<div class="suggestions-grid">
-					{#each suggestions as sug}
-						<button 
-							class="suggestion-card" 
-							onclick={() => onSendPrompt(sug.prompt)}
-						>
-							<div class="sug-title">{sug.title}</div>
-							<div class="sug-desc">{sug.desc}</div>
-							<div class="sug-icon">
-								<svg viewBox="0 0 24 24" width="18" height="18">
-									<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
-								</svg>
+				<div class="welcome-dashboard-layout" class:has-project-files={currentProject && currentProject.files && currentProject.files.length > 0}>
+					<div class="dashboard-main">
+						{#if recentChats.length > 0}
+							<div class="dashboard-section">
+								<h3 class="section-title">
+									<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align: middle; margin-right: 6px; display: inline-block;">
+										<path fill="currentColor" d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.67-9.83 0-2.68 2.68-2.68 7.03 0 9.71 2.68 2.68 7.03 2.68 9.71 0 1.96-1.96 2.44-4.69 1.45-7.1h2.1c.9 3.32-.08 7-2.92 9.84-3.87 3.87-10.13 3.87-14 0-3.87-3.87-3.87-10.13 0-14 3.87-3.87 10.13-3.87 14 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.75 1.23-4.25-2.5V8h1.5z"/>
+									</svg>
+									Recent Conversations
+								</h3>
+								<div class="recent-chats-grid">
+									{#each recentChats as rChat}
+										<button 
+											class="recent-chat-card" 
+											onclick={() => onSelectConversation?.(rChat.id)}
+										>
+											<div class="chat-card-top">
+												<div class="chat-card-title">{rChat.title}</div>
+												<div class="chat-card-snippet">{getChatLastMessageSnippet(rChat)}</div>
+											</div>
+											<div class="chat-card-footer">
+												<span class="chat-card-model">{rChat.model || 'Default'}</span>
+												<span class="chat-card-time">{formatRelativeTime(rChat.messages[rChat.messages.length - 1]?.timestamp || rChat.createdAt)}</span>
+											</div>
+										</button>
+									{/each}
+								</div>
 							</div>
-						</button>
-					{/each}
+						{:else}
+							<div class="empty-dashboard-message animate-fade-in">
+								<p>เริ่มพิมพ์คำถามเพื่อเริ่มการสนทนาใหม่ได้ที่ด้านล่างนี้ได้เลย</p>
+							</div>
+						{/if}
+					</div>
+
+					{#if currentProject && currentProject.files && currentProject.files.length > 0}
+						<div class="dashboard-sidebar">
+							<div class="sidebar-box">
+								<h3 class="box-title">
+									<svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align: middle; margin-right: 6px; display: inline-block;">
+										<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+									</svg>
+									Reference Files ({currentProject.files.length})
+								</h3>
+								<div class="file-list-scroll">
+									{#each currentProject.files as pFile}
+										<div class="file-badge-card" title={pFile.name}>
+											<span class="file-icon-mini">
+												<svg viewBox="0 0 24 24" width="12" height="12">
+													<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+												</svg>
+											</span>
+											<div class="file-badge-details">
+												<span class="file-badge-name">{pFile.name}</span>
+												<span class="file-badge-size">{(pFile.size / 1024).toFixed(1)} KB</span>
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{:else}
@@ -920,6 +1051,7 @@
 											<textarea 
 												class="edit-prompt-textarea"
 												bind:value={editingMessageContent}
+												onkeydown={(e) => handleEditKeydown(e, msg.id)}
 												rows="3"
 											></textarea>
 											<div class="edit-prompt-actions">
@@ -1374,66 +1506,278 @@
 		line-height: 1.3;
 	}
 
-	.suggestions-grid {
+	/* Dynamic Welcome Screen Extensions */
+	.project-indicator-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		background: rgba(168, 199, 250, 0.08);
+		border: 1px solid rgba(168, 199, 250, 0.2);
+		color: var(--accent-blue);
+		padding: 4px 10px;
+		border-radius: 99px;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		width: fit-content;
+		margin-bottom: 12px;
+	}
+
+	.project-folder-icon {
+		color: var(--accent-blue);
+	}
+
+	.project-welcome-title {
+		font-family: var(--font-title);
+		font-size: 2.8rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		line-height: 1.2;
+		margin-bottom: 8px;
+	}
+
+	.welcome-dashboard-layout {
+		display: flex;
+		flex-direction: row;
+		gap: 24px;
+		width: 100%;
+	}
+
+	.dashboard-main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 32px;
+		min-width: 0;
+	}
+
+	.dashboard-sidebar {
+		width: 280px;
+		flex-shrink: 0;
+	}
+
+	.dashboard-section {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+
+	.section-title {
+		font-family: var(--font-title);
+		font-size: 1.05rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0;
+		display: flex;
+		align-items: center;
+		opacity: 0.9;
+	}
+
+	.empty-dashboard-message {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		padding: 32px;
+		text-align: center;
+		color: var(--text-muted);
+		font-size: 0.95rem;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.recent-chats-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 16px;
 	}
 
-	.suggestion-card {
+	.recent-chat-card {
 		background-color: var(--bg-secondary);
 		border: 1px solid var(--border-color);
 		border-radius: 16px;
-		padding: 20px;
+		padding: 16px;
 		text-align: left;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
-		height: 130px;
+		height: 120px;
+		cursor: pointer;
 		position: relative;
-		transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+		min-width: 0;
+		font-family: inherit;
 	}
 
-	.suggestion-card:hover {
+	.recent-chat-card:hover {
 		background-color: var(--bg-hover);
 		border-color: var(--border-light);
 		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 	}
 
-	.sug-title {
-		font-size: 0.95rem;
+	.recent-chat-card:active {
+		transform: translateY(0);
+	}
+
+	.chat-card-top {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.chat-card-title {
+		font-size: 0.9rem;
 		font-weight: 600;
 		color: var(--text-primary);
 		margin-bottom: 6px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.sug-desc {
-		font-size: 0.85rem;
+	.chat-card-snippet {
+		font-size: 0.78rem;
 		color: var(--text-muted);
 		line-height: 1.4;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		height: 2.8em;
 	}
 
-	.sug-icon {
-		position: absolute;
-		bottom: 16px;
-		right: 16px;
+	.chat-card-footer {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 0.72rem;
+		width: 100%;
+		border-top: 1px solid rgba(255, 255, 255, 0.03);
+		padding-top: 8px;
+		margin-top: 6px;
+	}
+
+	.chat-card-model {
+		color: var(--accent-blue);
+		background-color: rgba(168, 199, 250, 0.08);
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-weight: 500;
+		max-width: 60%;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.chat-card-time {
 		color: var(--text-muted);
-		background: var(--bg-primary);
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
+	}
+
+
+
+	/* Sidebar Box styling */
+	.sidebar-box {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		height: 100%;
+		max-height: 400px;
+	}
+
+	.box-title {
+		font-family: var(--font-title);
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0;
+		opacity: 0.9;
+	}
+
+	.file-list-scroll {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		overflow-y: auto;
+		flex: 1;
+		padding-right: 4px;
+	}
+
+	.file-list-scroll::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	.file-list-scroll::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 99px;
+	}
+
+	.file-badge-card {
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 10px;
+		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
-		opacity: 0;
-		transform: scale(0.8);
-		transition: opacity var(--transition-fast), transform var(--transition-fast);
+		border-radius: 8px;
+		padding: 8px 12px;
+		min-width: 0;
+		transition: border-color var(--transition-fast);
 	}
 
-	.suggestion-card:hover .sug-icon {
-		opacity: 1;
-		transform: scale(1);
+	.file-badge-card:hover {
+		border-color: var(--accent-blue);
+	}
+
+	.file-icon-mini {
+		color: var(--text-muted);
+		display: flex;
+		align-items: center;
+		flex-shrink: 0;
+	}
+
+	.file-badge-details {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.file-badge-name {
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.file-badge-size {
+		font-size: 0.7rem;
+		color: var(--text-muted);
+		margin-top: 1px;
+	}
+
+	/* Responsive tweaks */
+	@media (max-width: 1024px) {
+		.welcome-dashboard-layout {
+			flex-direction: column;
+		}
+
+		.dashboard-sidebar {
+			width: 100%;
+		}
+
+		.sidebar-box {
+			max-height: 250px;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.recent-chats-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	/* Message thread styling */
@@ -1893,11 +2237,11 @@
 		background-color: rgba(0, 0, 0, 0.05);
 		max-height: 200px;
 		overflow-y: auto;
+		font-size: calc(var(--chat-font-size, 15px) * 0.82);
 	}
 
 	.thoughts-content :global(p) {
 		margin-bottom: 0.5rem;
-		font-size: 0.8rem;
 		line-height: 1.5;
 		color: var(--text-secondary);
 	}
@@ -1912,7 +2256,7 @@
 	.thoughts-content :global(h4),
 	.thoughts-content :global(h5),
 	.thoughts-content :global(h6) {
-		font-size: 0.85rem;
+		font-size: 1.05em;
 		margin-top: 10px;
 		margin-bottom: 4px;
 		color: var(--text-secondary);
@@ -1925,18 +2269,17 @@
 	}
 
 	.thoughts-content :global(li) {
-		font-size: 0.8rem;
 		color: var(--text-secondary);
 		margin-bottom: 2px;
 	}
 
 	.thoughts-content :global(code) {
-		font-size: 0.82em;
+		font-size: 0.9em;
 	}
 
 	.thoughts-content :global(.code-block-wrapper) {
 		margin: 8px 0;
-		font-size: 0.8rem;
+		font-size: 0.95em;
 	}
 
 	.thoughts-content :global(.code-block-header) {
@@ -1994,17 +2337,83 @@
 		fill: currentColor;
 	}
 
-	.theme-color-picker {
+	.theme-selector-container {
+		position: relative;
+		display: inline-block;
+	}
+
+	.theme-picker-trigger {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		margin-right: 8px;
-		padding: 4px 8px;
+		justify-content: center;
+		color: var(--text-secondary);
 		background-color: var(--bg-secondary);
 		border: 1px solid var(--border-color);
-		border-radius: 99px;
-		height: 34px;
-		box-sizing: border-box;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		cursor: pointer;
+		flex-shrink: 0;
+		padding: 0;
+		outline: none;
+	}
+
+	.theme-picker-trigger:hover {
+		background-color: var(--bg-hover);
+		border-color: var(--border-light);
+		transform: scale(1.05);
+	}
+
+	.theme-picker-trigger:active {
+		transform: scale(0.95);
+	}
+
+	.active-color-dot {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 1px solid rgba(0, 0, 0, 0.15);
+		transition: transform var(--transition-fast);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	}
+
+	.theme-picker-popup {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%) translateY(8px);
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 20px;
+		padding: 8px 10px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		box-shadow: var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.15));
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+		transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+		z-index: 50;
+	}
+
+	/* Bridge to keep hover active */
+	.theme-picker-popup::before {
+		content: '';
+		position: absolute;
+		top: -8px;
+		left: 0;
+		right: 0;
+		height: 8px;
+		background: transparent;
+	}
+
+	.theme-selector-container:hover .theme-picker-popup {
+		opacity: 1;
+		visibility: visible;
+		pointer-events: auto;
+		transform: translateX(-50%) translateY(0);
 	}
 
 	.color-dot {
@@ -2025,6 +2434,6 @@
 
 	.color-dot.active {
 		transform: scale(1.1);
-		box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-blue);
+		box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-blue);
 	}
 </style>

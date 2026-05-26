@@ -337,7 +337,7 @@
 		color: transparent !important;
 		caret-color: var(--text-primary) !important;
 		font-family: var(--font-mono), monospace !important;
-		font-size: 0.88rem !important;
+		font-size: calc(var(--chat-font-size, 15px) * 0.88) !important;
 		line-height: 1.5 !important;
 		padding: 16px 20px !important;
 		border: none !important;
@@ -362,7 +362,7 @@
 		pointer-events: none;
 		overflow: hidden !important;
 		font-family: var(--font-mono), monospace !important;
-		font-size: 0.88rem !important;
+		font-size: calc(var(--chat-font-size, 15px) * 0.88) !important;
 		line-height: 1.5 !important;
 		white-space: pre !important;
 		box-sizing: border-box !important;

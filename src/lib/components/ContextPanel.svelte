@@ -756,11 +756,11 @@
 		padding: 16px;
 		overflow-y: auto;
 		height: calc(100% - 40px);
+		font-size: calc(var(--chat-font-size, 15px) * 0.85);
 	}
 
 	.thinking-scroller :global(p) {
 		margin-bottom: 0.75rem;
-		font-size: 0.82rem;
 		line-height: 1.55;
 		color: var(--text-secondary);
 	}
@@ -775,7 +775,7 @@
 	.thinking-scroller :global(h4),
 	.thinking-scroller :global(h5),
 	.thinking-scroller :global(h6) {
-		font-size: 0.9rem;
+		font-size: 1.05em;
 		margin-top: 12px;
 		margin-bottom: 6px;
 		color: var(--text-primary);
@@ -788,18 +788,17 @@
 	}
 
 	.thinking-scroller :global(li) {
-		font-size: 0.82rem;
 		color: var(--text-secondary);
 		margin-bottom: 3px;
 	}
 
 	.thinking-scroller :global(code) {
-		font-size: 0.85em;
+		font-size: 0.9em;
 	}
 
 	.thinking-scroller :global(.code-block-wrapper) {
 		margin: 10px 0;
-		font-size: 0.82rem;
+		font-size: 0.95em;
 	}
 
 	.thinking-scroller :global(.code-block-header) {
