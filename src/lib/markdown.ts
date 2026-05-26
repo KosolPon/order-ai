@@ -329,14 +329,62 @@ function renderVideoPlayer(href: string, title: string): string {
 	</div>`;
 }
 
+function cleanCodeFences(text: string): string {
+	let cleaned = text.trim();
+	if (cleaned.startsWith('```')) {
+		const firstLineEnd = cleaned.indexOf('\n');
+		if (firstLineEnd !== -1) {
+			cleaned = cleaned.substring(firstLineEnd + 1);
+		} else {
+			cleaned = '';
+		}
+	}
+	if (cleaned.endsWith('```')) {
+		cleaned = cleaned.substring(0, cleaned.length - 3).trim();
+	}
+	return cleaned;
+}
+
 function preprocessCanvasTags(text: string): string {
 	if (!text) return '';
 	
 	let processed = text;
 	
 	// 1. Handle fully closed tags
-	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)<\/canvas>/gi, (match, name, type) => {
+	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)<\/canvas>/gi, (match, name, type, content) => {
 		const cleanName = name.replace(/'/g, "\\'");
+		
+		// Determine language/type for formatting in chat
+		let lang = (type || '').toLowerCase().trim();
+		if (!lang) {
+			const lowerName = name.toLowerCase();
+			if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
+				lang = 'html';
+			} else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
+				lang = 'markdown';
+			} else if (lowerName.endsWith('.js') || lowerName.endsWith('.jsx')) {
+				lang = 'javascript';
+			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
+				lang = 'typescript';
+			} else if (lowerName.endsWith('.py')) {
+				lang = 'python';
+			} else if (lowerName.endsWith('.css')) {
+				lang = 'css';
+			} else if (lowerName.endsWith('.json')) {
+				lang = 'json';
+			} else {
+				lang = 'code';
+			}
+		}
+
+		let renderedContent = '';
+		if (lang === 'markdown') {
+			renderedContent = `\n\n${content}\n\n`;
+		} else {
+			const cleanContent = cleanCodeFences(content);
+			renderedContent = `\n\n\`\`\`${lang === 'code' ? '' : lang}\n${cleanContent}\n\`\`\`\n\n`;
+		}
+
 		return `\n\n<div class="canvas-artifact-card" data-file-name="${cleanName}" onclick="window.openCanvasFile('${cleanName}')" role="button" tabindex="0">
 			<div class="artifact-card-icon">
 				<svg viewBox="0 0 24 24" width="20" height="20">
@@ -350,12 +398,43 @@ function preprocessCanvasTags(text: string): string {
 			<div class="artifact-card-action">
 				Open Canvas ↗
 			</div>
-		</div>\n\n`;
+		</div>\n\n${renderedContent}`;
 	});
-
+ 
 	// 2. Handle unclosed tags at the end of the text (streaming)
-	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)$/gi, (match, name, type) => {
+	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)$/gi, (match, name, type, content) => {
 		const cleanName = name.replace(/'/g, "\\'");
+		
+		let lang = (type || '').toLowerCase().trim();
+		if (!lang) {
+			const lowerName = name.toLowerCase();
+			if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
+				lang = 'html';
+			} else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
+				lang = 'markdown';
+			} else if (lowerName.endsWith('.js') || lowerName.endsWith('.jsx')) {
+				lang = 'javascript';
+			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
+				lang = 'typescript';
+			} else if (lowerName.endsWith('.py')) {
+				lang = 'python';
+			} else if (lowerName.endsWith('.css')) {
+				lang = 'css';
+			} else if (lowerName.endsWith('.json')) {
+				lang = 'json';
+			} else {
+				lang = 'code';
+			}
+		}
+
+		let renderedContent = '';
+		if (lang === 'markdown') {
+			renderedContent = `\n\n${content}\n\n`;
+		} else {
+			const cleanContent = cleanCodeFences(content);
+			renderedContent = `\n\n\`\`\`${lang === 'code' ? '' : lang}\n${cleanContent}\n\`\`\`\n\n`;
+		}
+
 		return `\n\n<div class="canvas-artifact-card processing" data-file-name="${cleanName}" onclick="window.openCanvasFile('${cleanName}')" role="button" tabindex="0">
 			<div class="artifact-card-icon animate-pulse">
 				<svg viewBox="0 0 24 24" width="20" height="20">
@@ -369,9 +448,9 @@ function preprocessCanvasTags(text: string): string {
 			<div class="artifact-card-action">
 				<div class="typing-indicator small-indicator"><span></span><span></span><span></span></div>
 			</div>
-		</div>\n\n`;
+		</div>\n\n${renderedContent}`;
 	});
-
+ 
 	return processed;
 }
 

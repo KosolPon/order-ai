@@ -668,8 +668,6 @@
 		// Append critical canvas syntax instructions for the AI
 		if (useCanvas) {
 			parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
-		} else {
-			parts.push(`[CRITICAL DIRECTIVE]: DO NOT use <canvas> tags. If you need to write any source code, HTML, or markdown, please write it inside standard markdown code blocks (fenced with \`\`\`).`);
 		}
 
 		const combined = parts.join('\n\n');
