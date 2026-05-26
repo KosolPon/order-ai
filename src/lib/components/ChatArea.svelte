@@ -17,6 +17,7 @@
 		onStopGeneration,
 		onToggleContextPanel,
 		onOpenThinking,
+		onOpenCanvasFile,
 		onToggleSidebar,
 		onToggleTheme,
 		onSelectColor
@@ -33,6 +34,7 @@
 		onStopGeneration: () => void;
 		onToggleContextPanel: () => void;
 		onOpenThinking: (messageId: string) => void;
+		onOpenCanvasFile?: (name: string) => void;
 		onToggleSidebar: () => void;
 		onToggleTheme: () => void;
 		onSelectColor: (color: string) => void;
@@ -677,6 +679,17 @@
 			}
 		};
 	}
+
+	function handleViewportClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		const card = target.closest('.canvas-artifact-card');
+		if (card) {
+			const fileName = card.getAttribute('data-file-name');
+			if (fileName && onOpenCanvasFile) {
+				onOpenCanvasFile(fileName);
+			}
+		}
+	}
 </script>
 
 <div class="chat-area">
@@ -750,20 +763,7 @@
 				{/if}
 			</button>
 
-			{#if conversation}
-				<button 
-					class="context-toggle-btn-header" 
-					class:active-panel={showContextPanel}
-					onclick={onToggleContextPanel}
-					title="Toggle Context Settings"
-				>
-					<svg viewBox="0 0 24 24" width="16" height="16">
-						<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-					</svg>
-					<span>Context</span>
-				</button>
-			{/if}
-
+			<!-- Export Button -->
 			{#if conversation && conversation.messages.length > 0}
 				<div class="export-controls">
 					<button 
@@ -772,12 +772,8 @@
 						aria-expanded={isExportMenuOpen}
 						title="Export Chat"
 					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
+						<svg viewBox="0 0 24 24" width="18" height="18">
 							<path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
-						</svg>
-						<span>Export</span>
-						<svg class="chevron-down" class:open={isExportMenuOpen} viewBox="0 0 24 24" width="12" height="12">
-							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
 						</svg>
 					</button>
 
@@ -828,6 +824,27 @@
 					A+
 				</button>
 			</div>
+
+			<!-- Toggle Context / Canvas panel -->
+			{#if conversation}
+				<button 
+					class="context-toggle-btn-header" 
+					class:active-panel={showContextPanel}
+					onclick={onToggleContextPanel}
+					title={showContextPanel ? "Hide Right Panel" : "Show Right Panel"}
+					aria-label={showContextPanel ? "Hide Right Panel" : "Show Right Panel"}
+				>
+					<svg viewBox="0 0 24 24" width="18" height="18">
+						{#if showContextPanel}
+							<!-- Right Sidebar Shown Icon (Splitted Layout box) -->
+							<path fill="currentColor" d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H5V6h9v12zm5 0h-3V6h3v12z"/>
+						{:else}
+							<!-- Right Sidebar Hidden Icon (Empty Layout box) -->
+							<path fill="currentColor" d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12z"/>
+						{/if}
+					</svg>
+				</button>
+			{/if}
 		</div>
 	</header>
 
@@ -835,6 +852,7 @@
 		class="chat-viewport" 
 		bind:this={chatContainer} 
 		onscroll={handleScroll}
+		onclick={handleViewportClick}
 		style="--chat-font-size: {fontSize}px"
 	>
 		{#if !isInitialized}
@@ -1185,23 +1203,28 @@
 	}
 
 	.export-btn {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		justify-content: center;
+		color: var(--text-secondary);
 		background-color: var(--bg-secondary);
 		border: 1px solid var(--border-color);
-		border-radius: 20px;
-		padding: 6px 14px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: var(--text-secondary);
-		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+		flex-shrink: 0;
 	}
 
 	.export-btn:hover {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
 		border-color: var(--border-light);
+		transform: scale(1.05);
+	}
+
+	.export-btn:active {
+		transform: scale(0.95);
 	}
 
 	.export-btn svg {
@@ -1773,28 +1796,33 @@
 	}
 
 	.context-toggle-btn-header {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		justify-content: center;
+		color: var(--text-secondary);
 		background-color: var(--bg-secondary);
 		border: 1px solid var(--border-color);
-		border-radius: 20px;
-		padding: 6px 14px;
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: var(--text-secondary);
-		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 		cursor: pointer;
+		flex-shrink: 0;
 	}
 
 	.context-toggle-btn-header:hover {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
 		border-color: var(--border-light);
+		transform: scale(1.05);
+	}
+
+	.context-toggle-btn-header:active {
+		transform: scale(0.95);
 	}
 
 	.context-toggle-btn-header.active-panel {
-		background-color: rgba(168, 199, 250, 0.15);
+		background-color: color-mix(in srgb, var(--accent-blue) 15%, transparent);
 		color: var(--accent-blue);
 		border-color: var(--accent-blue);
 	}

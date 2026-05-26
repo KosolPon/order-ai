@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Conversation, Project } from '$lib/types';
 	import { renderMarkdown, type ParsedThinking } from '$lib/markdown';
+	import { db } from '$lib/db';
+	import { liveQuery } from 'dexie';
+	import CanvasPanel from './CanvasPanel.svelte';
 
 	let {
 		conversation = null,
@@ -9,6 +12,8 @@
 		activeThinking = null,
 		activeTab = 'context',
 		isGenerating = false,
+		activeCanvasFileName = null,
+		onChangeActiveCanvasFile,
 		onChangeTab,
 		onUpdateChatContext,
 		onUpdateChatProject,
@@ -19,14 +24,29 @@
 		projects: Project[];
 		globalContext: string;
 		activeThinking: ParsedThinking | null;
-		activeTab: 'context' | 'thinking';
+		activeTab: 'context' | 'thinking' | 'canvas';
 		isGenerating: boolean;
-		onChangeTab: (tab: 'context' | 'thinking') => void;
+		activeCanvasFileName: string | null;
+		onChangeActiveCanvasFile: (name: string | null) => void;
+		onChangeTab: (tab: 'context' | 'thinking' | 'canvas') => void;
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
 		onEditProjectSettings: (projectId: string) => void;
 		onClose: () => void;
 	}>();
+
+	// Reactive Canvas files count
+	let canvasFilesCount = $state(0);
+	$effect(() => {
+		if (!conversation) {
+			canvasFilesCount = 0;
+			return;
+		}
+		const subscription = liveQuery(() => db.canvasFiles.where({ chatId: conversation.id }).count()).subscribe((count) => {
+			canvasFilesCount = count;
+		});
+		return () => subscription.unsubscribe();
+	});
 
 	// Active project derived from current conversation's projectId
 	const activeProject = $derived(
@@ -139,6 +159,21 @@
 				Thinking
 				{#if activeThinking?.isThinking && isGenerating}
 					<span class="thinking-dot"></span>
+				{/if}
+			</button>
+			<button 
+				type="button"
+				class="panel-tab-btn" 
+				class:active={activeTab === 'canvas'} 
+				onclick={() => onChangeTab('canvas')}
+				title="View Canvas workspace"
+			>
+				<svg viewBox="0 0 24 24" width="14" height="14">
+					<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+				</svg>
+				Canvas
+				{#if canvasFilesCount > 0}
+					<span class="canvas-badge-count">{canvasFilesCount}</span>
 				{/if}
 			</button>
 		</div>
@@ -274,6 +309,12 @@
 					</div>
 				{/if}
 			</div>
+		{:else if activeTab === 'canvas'}
+			<CanvasPanel
+				chatId={conversation.id}
+				activeFileName={activeCanvasFileName}
+				onChangeActiveFile={onChangeActiveCanvasFile}
+			/>
 		{/if}
 	</div>
 {/if}
@@ -818,5 +859,16 @@
 		border-top: 1px dashed var(--border-color);
 		padding-top: 12px;
 		width: 100%;
+	}
+	.canvas-badge-count {
+		font-size: 0.65rem;
+		font-weight: 700;
+		background-color: var(--accent-blue);
+		color: var(--bg-primary);
+		padding: 1px 5px;
+		border-radius: 8px;
+		margin-left: 4px;
+		min-width: 16px;
+		text-align: center;
 	}
 </style>

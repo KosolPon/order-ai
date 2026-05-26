@@ -329,9 +329,81 @@ function renderVideoPlayer(href: string, title: string): string {
 	</div>`;
 }
 
+function preprocessCanvasTags(text: string): string {
+	if (!text) return '';
+	
+	let processed = text;
+	
+	// 1. Handle fully closed tags
+	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)<\/canvas>/gi, (match, name, type) => {
+		const cleanName = name.replace(/'/g, "\\'");
+		return `\n\n<div class="canvas-artifact-card" data-file-name="${cleanName}" onclick="window.openCanvasFile('${cleanName}')" role="button" tabindex="0">
+			<div class="artifact-card-icon">
+				<svg viewBox="0 0 24 24" width="20" height="20">
+					<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+				</svg>
+			</div>
+			<div class="artifact-card-info">
+				<div class="artifact-card-title">${name}</div>
+				<div class="artifact-card-meta">Click to open interactive view</div>
+			</div>
+			<div class="artifact-card-action">
+				Open Canvas ↗
+			</div>
+		</div>\n\n`;
+	});
+
+	// 2. Handle unclosed tags at the end of the text (streaming)
+	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)$/gi, (match, name, type) => {
+		const cleanName = name.replace(/'/g, "\\'");
+		return `\n\n<div class="canvas-artifact-card processing" data-file-name="${cleanName}" onclick="window.openCanvasFile('${cleanName}')" role="button" tabindex="0">
+			<div class="artifact-card-icon animate-pulse">
+				<svg viewBox="0 0 24 24" width="20" height="20">
+					<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+				</svg>
+			</div>
+			<div class="artifact-card-info">
+				<div class="artifact-card-title">${name}</div>
+				<div class="artifact-card-meta">Writing file... (Click to view)</div>
+			</div>
+			<div class="artifact-card-action">
+				<div class="typing-indicator small-indicator"><span></span><span></span><span></span></div>
+			</div>
+		</div>\n\n`;
+	});
+
+	return processed;
+}
+
 const markedInstance = new Marked();
 // @ts-ignore
 markedInstance.use({ renderer });
+
+function replaceArrowSymbols(text: string): string {
+	if (!text) return '';
+	
+	// Split by code blocks and inline code to avoid replacing symbols inside code
+	const parts = text.split(/(```[\s\S]*?```|`[^`\n]*?`)/g);
+	for (let i = 0; i < parts.length; i++) {
+		// Even indexes are outside of code blocks/inline code
+		if (i % 2 === 0) {
+			parts[i] = parts[i]
+				// Math/LaTeX Arrow Replacements (with $...$ wrapping ONLY)
+				.replace(/\$\\(long)?rightarrows?\$/gi, '→')
+				.replace(/\$\\to\$/gi, '→')
+				.replace(/\$\\(long)?leftarrows?\$/gi, '←')
+				.replace(/\$\\gets\$/gi, '←')
+				.replace(/\$\\(long)?leftrightarrows?\$/gi, '↔')
+				.replace(/\$\\(long)?Rightarrows?\$/gi, '⇒')
+				.replace(/\$\\(long)?Leftarrows?\$/gi, '⇐')
+				.replace(/\$\\(long)?Leftrightarrows?\$/gi, '⇔')
+				.replace(/\$\\uparrow\$/gi, '↑')
+				.replace(/\$\\downarrow\$/gi, '↓')
+				.replace(/\$\\updownarrow\$/gi, '↕');
+		}
+	}
+	return parts.join('');
+}
 
 const markdownCache = new Map<string, string>();
 
@@ -344,7 +416,9 @@ export function renderMarkdown(markdown: string): string {
 	const cached = markdownCache.get(markdown);
 	if (cached) return cached;
 
-	const rendered = markedInstance.parse(markdown) as string;
+	const arrowProcessed = replaceArrowSymbols(markdown);
+	const preprocessed = preprocessCanvasTags(arrowProcessed);
+	const rendered = markedInstance.parse(preprocessed) as string;
 
 	// Limit cache size to 500 entries to prevent memory leaks
 	if (markdownCache.size > 500) {

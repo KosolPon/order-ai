@@ -35,6 +35,7 @@
 	let isListening = $state(false);
 	let recognition: any = null;
 	let baseInput = '';
+	let isMultiline = $state(false);
 
 	function initSpeechRecognition() {
 		if (typeof window === 'undefined') return;
@@ -115,6 +116,7 @@
 			if (textareaElement) {
 				textareaElement.style.height = 'auto';
 			}
+			isMultiline = false;
 		} else {
 			adjustHeight();
 		}
@@ -125,6 +127,14 @@
 			textareaElement.style.height = 'auto';
 			const scrollHeight = textareaElement.scrollHeight;
 			textareaElement.style.height = `${Math.min(scrollHeight, 200)}px`;
+			
+			// Detect multiline:
+			// 1. Text contains newline.
+			// 2. scrollHeight is greater than standard single line (approx 45px).
+			// 3. input length is substantial (e.g. > 50 chars).
+			isMultiline = scrollHeight > 45 || input.includes('\n') || input.length > 50;
+		} else {
+			isMultiline = false;
 		}
 	}
 
@@ -313,7 +323,7 @@
 			{/if}
 
 			<!-- Row 2: Input Controls (Horizontal Align) -->
-			<div class="input-row">
+			<div class="input-row" class:multiline={isMultiline}>
 				<!-- Prompt Textarea on the left -->
 				<textarea
 					bind:this={textareaElement}
@@ -514,6 +524,28 @@
 		align-items: flex-end;
 		gap: 12px;
 		width: 100%;
+	}
+
+	.input-row.multiline {
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px 12px;
+	}
+
+	.input-row.multiline .prompt-textarea {
+		width: 100%;
+		flex: 1 1 100%;
+		padding-right: 10px;
+	}
+
+	.input-row.multiline .model-selector-wrapper {
+		margin-right: auto;
+		margin-bottom: 0;
+	}
+
+	.input-row.multiline .action-buttons {
+		margin-left: auto;
+		margin-bottom: 0;
 	}
 
 	.prompt-textarea {

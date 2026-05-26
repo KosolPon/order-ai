@@ -8,6 +8,8 @@
 	import type { Conversation, Message, OllamaModel, Attachment, Project, ProjectFile } from '$lib/types';
 	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL } from '$lib/ollama';
 	import { parseThinking } from '$lib/markdown';
+	import { db } from '$lib/db';
+	import { parseCanvasTags } from '$lib/canvasParser';
 
 	// Reactive States
 	let conversations = $state<Conversation[]>([]);
@@ -58,9 +60,10 @@
 	let isResizingRight = $state<boolean>(false);
 
 	// Thinking / Reasoning states
-	let rightPaneTab = $state<'context' | 'thinking'>('context');
+	let rightPaneTab = $state<'context' | 'thinking' | 'canvas'>('context');
 	let lastOpenedThinkingMsgId = $state<string | null>(null);
 	let selectedThinkingMsgId = $state<string | null>(null);
+	let activeCanvasFileName = $state<string | null>(null);
 
 	// Abort controller to cancel streaming
 	let abortController: AbortController | null = null;
@@ -230,7 +233,7 @@
 			}
 
 			const storedRightPaneTab = localStorage.getItem('ollama_right_pane_tab');
-			if (storedRightPaneTab === 'context' || storedRightPaneTab === 'thinking') {
+			if (storedRightPaneTab === 'context' || storedRightPaneTab === 'thinking' || storedRightPaneTab === 'canvas') {
 				rightPaneTab = storedRightPaneTab;
 			}
 
@@ -263,6 +266,14 @@
 			} else {
 				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 				theme = prefersDark ? 'dark-blue' : 'light-blue';
+			}
+
+			if (typeof window !== 'undefined') {
+				(window as any).openCanvasFile = (name: string) => {
+					activeCanvasFileName = name;
+					showContextPanel = true;
+					rightPaneTab = 'canvas';
+				};
 			}
 
 			isInitialized = true;
@@ -574,8 +585,24 @@
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, projectId } : c));
 	}
 
-	// Build combined system prompt from Global + Project + Chat levels
-	function getCombinedSystemPrompt(conv: Conversation | null): string {
+	// Extract files from message and save them to IndexedDB
+	async function saveCanvasFilesFromMessage(chatId: string, content: string) {
+		const extracted = parseCanvasTags(content);
+		if (extracted.length === 0) return;
+
+		for (const file of extracted) {
+			await db.canvasFiles.put({
+				chatId,
+				name: file.name,
+				type: file.type,
+				content: file.content,
+				updatedAt: Date.now()
+			});
+		}
+	}
+
+	// Build combined system prompt from Global + Project + Chat levels + Canvas files
+	async function getCombinedSystemPrompt(conv: Conversation | null): Promise<string> {
 		if (!conv) return '';
 		const parts: string[] = [];
 
@@ -611,6 +638,19 @@
 			parts.push(`[Chat Context]:\n${conv.context.trim()}`);
 		}
 
+		// Inject Canvas Files (Artifacts) from IndexedDB
+		const canvasFiles = await db.canvasFiles.where({ chatId: conv.id }).toArray();
+		if (canvasFiles.length > 0) {
+			let canvasPrompt = `[Active Canvas Files (Artifacts) in this Chat]:\nThese are files that you or the user have created/modified in the interactive Canvas. You can reference, reuse, or update these files.\n`;
+			for (const file of canvasFiles) {
+				canvasPrompt += `\nFile "${file.name}" (${file.type}):\n\`\`\`\n${file.content}\n\`\`\``;
+			}
+			parts.push(canvasPrompt);
+		}
+
+		// Append critical canvas syntax instructions for the AI
+		parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
+
 		const combined = parts.join('\n\n');
 		console.log('[System Context Debug] Calculated System Prompt:', combined);
 		return combined;
@@ -633,7 +673,30 @@
 						...conv,
 						messages: conv.messages.map((m) => {
 							if (m.id === assistantMsgId) {
-								return { ...m, content: m.content + text };
+								const newContent = m.content + text;
+								
+								// Asynchronously extract and save canvas files to IndexedDB as they stream
+								const extracted = parseCanvasTags(newContent);
+								if (extracted.length > 0) {
+									extracted.forEach((file) => {
+										db.canvasFiles.put({
+											chatId: activeConvId,
+											name: file.name,
+											type: file.type,
+											content: file.content,
+											updatedAt: Date.now()
+										});
+									});
+
+									// Automatically open and switch to Canvas if not opened yet
+									if (!activeCanvasFileName) {
+										activeCanvasFileName = extracted[0].name;
+										showContextPanel = true;
+										rightPaneTab = 'canvas';
+									}
+								}
+								
+								return { ...m, content: newContent };
 							}
 							return m;
 						})
@@ -905,6 +968,21 @@
 				);
 			}
 
+			// After finishing execution chain, extract and save canvas files
+			const activeConv = conversations.find(c => c.id === activeConvId);
+			const finalMsg = activeConv?.messages.find(m => m.id === assistantMsgId);
+			if (finalMsg && finalMsg.content) {
+				await saveCanvasFilesFromMessage(activeConvId, finalMsg.content);
+				
+				// Automatically switch tab and open the first newly generated/updated canvas file
+				const extracted = parseCanvasTags(finalMsg.content);
+				if (extracted.length > 0) {
+					activeCanvasFileName = extracted[0].name;
+					showContextPanel = true;
+					rightPaneTab = 'canvas';
+				}
+			}
+
 			isGenerating = false;
 			abortController = null;
 		} catch (error: any) {
@@ -1020,7 +1098,7 @@
 
 		// 3. Initiate streaming
 		const activeConv = conversations.find(c => c.id === activeConvId);
-		const systemPrompt = getCombinedSystemPrompt(activeConv || null);
+		const systemPrompt = await getCombinedSystemPrompt(activeConv || null);
 		await executeModelChain(
 			activeConvId,
 			assistantMsgId,
@@ -1060,7 +1138,7 @@
 
 		// Initiate streaming
 		const conv = conversations.find(c => c.id === activeConvId);
-		const systemPrompt = getCombinedSystemPrompt(conv || null);
+		const systemPrompt = await getCombinedSystemPrompt(conv || null);
 		await executeModelChain(
 			activeConvId,
 			assistantMsgId,
@@ -1134,8 +1212,8 @@
 		
 		const handleMouseMove = (moveEvent: MouseEvent) => {
 			if (!isResizingRight) return;
-			// Constrain right pane width between 250px and 800px
-			const newWidth = Math.max(250, Math.min(800, window.innerWidth - moveEvent.clientX));
+			// Constrain right pane width between 250px and almost full screen (leave 100px)
+			const newWidth = Math.max(250, Math.min(window.innerWidth - 100, window.innerWidth - moveEvent.clientX));
 			contextPanelWidth = newWidth;
 		};
 		
@@ -1229,6 +1307,11 @@
 				showContextPanel = true;
 				rightPaneTab = 'thinking';
 			}}
+			onOpenCanvasFile={(name) => {
+				activeCanvasFileName = name;
+				showContextPanel = true;
+				rightPaneTab = 'canvas';
+			}}
 		/>
 
 		<!-- Input Area at the bottom -->
@@ -1267,6 +1350,8 @@
 			{activeThinking}
 			activeTab={rightPaneTab}
 			{isGenerating}
+			activeCanvasFileName={activeCanvasFileName}
+			onChangeActiveCanvasFile={(name) => activeCanvasFileName = name}
 			onChangeTab={(tab) => rightPaneTab = tab}
 			onUpdateChatContext={handleUpdateChatContext}
 			onUpdateChatProject={handleUpdateChatProject}
