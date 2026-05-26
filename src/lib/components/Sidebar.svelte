@@ -27,7 +27,8 @@
 		onDeleteProject,
 		onNewConversationInProject,
 		projectSettingsToOpenId = $bindable(null),
-		isSettingsOpen = $bindable(false)
+		isSettingsOpen = $bindable(false),
+		customizeSettings = $bindable(false)
 	} = $props<{
 		conversations: Conversation[];
 		currentConversationId: string | null;
@@ -55,6 +56,7 @@
 		onNewConversationInProject: (projectId: string) => void;
 		projectSettingsToOpenId: string | null;
 		isSettingsOpen?: boolean;
+		customizeSettings: boolean;
 	}>();
 
 	let showAdvancedSettings = $state(false);
@@ -584,36 +586,38 @@
 								</select>
 
 								<!-- Temp slider for this model -->
-								<div class="step-temp-container">
-									<div class="setting-label-row">
-										<label style="font-size: 0.7rem;">จินตนาการ (Temp):</label>
-										<div class="setting-value-wrapper">
-											<button 
-												class="reset-individual-btn" 
-												onclick={() => modelTemperatures[idx] = (idx === 1 ? 0.2 : 0.7)} 
-												title="Reset Temperature"
-											>
-												<svg viewBox="0 0 24 24" width="10" height="10">
-													<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-												</svg>
-											</button>
-											<span class="setting-value" style="font-size: 0.7rem; padding: 0 4px;">
-												{(modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7).toFixed(2)}
-											</span>
+								{#if customizeSettings}
+									<div class="step-temp-container animate-fade-in">
+										<div class="setting-label-row">
+											<label style="font-size: 0.7rem;">จินตนาการ (Temp):</label>
+											<div class="setting-value-wrapper">
+												<button 
+													class="reset-individual-btn" 
+													onclick={() => modelTemperatures[idx] = (idx === 1 ? 0.2 : 0.7)} 
+													title="Reset Temperature"
+												>
+													<svg viewBox="0 0 24 24" width="10" height="10">
+														<path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+													</svg>
+												</button>
+												<span class="setting-value" style="font-size: 0.7rem; padding: 0 4px;">
+													{(modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7).toFixed(2)}
+												</span>
+											</div>
+										</div>
+										<div class="slider-container">
+											<input 
+												type="range" 
+												min="0" 
+												max="1.5" 
+												step="0.05" 
+												value={modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7}
+												oninput={(e) => updateModelTemp(idx, parseFloat(e.currentTarget.value))}
+												class="temperature-slider"
+											/>
 										</div>
 									</div>
-									<div class="slider-container">
-										<input 
-											type="range" 
-											min="0" 
-											max="1.5" 
-											step="0.05" 
-											value={modelTemperatures[idx] !== undefined ? modelTemperatures[idx] : 0.7}
-											oninput={(e) => updateModelTemp(idx, parseFloat(e.currentTarget.value))}
-											class="temperature-slider"
-										/>
-									</div>
-								</div>
+								{/if}
 							</div>
 						{/each}
 					</div>
@@ -632,6 +636,21 @@
 					{/if}
 				</div>
 
+				<!-- Customize Settings Toggle -->
+				<div class="setting-item checkbox-setting-item" style="border-top: 1px solid var(--border-light); padding-top: 12px; margin-top: 6px;">
+					<label class="checkbox-label" for="customize-settings">
+						<input 
+							type="checkbox" 
+							id="customize-settings" 
+							bind:checked={customizeSettings} 
+						/>
+						<span>ปรับแต่งการตั้งค่าโมเดลเอง (Customize Settings)</span>
+					</label>
+					<p class="setting-help-text" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; line-height: 1.35;">
+						หากไม่ได้ติ๊ก ระบบจะรันโมเดลด้วยค่าเริ่มต้นจาก Modelfile ใน Ollama โดยตรง (เช่น temperature, num_ctx) เพื่อความเสถียรและประหยัดแรมเครื่อง
+					</p>
+				</div>
+
 				<div class="setting-item">
 					<label for="sidebar-global-context">Global Context (All Chats)</label>
 					<textarea 
@@ -644,26 +663,27 @@
 				</div>
 
 				<!-- Collapsible Advanced Settings -->
-				<div class="advanced-settings-wrapper" style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 10px;">
-					<button 
-						type="button" 
-						class="advanced-settings-toggle-btn"
-						onclick={() => showAdvancedSettings = !showAdvancedSettings}
-					>
-						<span>การตั้งค่าขั้นสูง (Advanced Settings)</span>
-						<svg 
-							class="chevron" 
-							class:open={showAdvancedSettings} 
-							viewBox="0 0 24 24" 
-							width="14" 
-							height="14"
+				{#if customizeSettings}
+					<div class="advanced-settings-wrapper animate-fade-in" style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 10px;">
+						<button 
+							type="button" 
+							class="advanced-settings-toggle-btn"
+							onclick={() => showAdvancedSettings = !showAdvancedSettings}
 						>
-							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-						</svg>
-					</button>
+							<span>การตั้งค่าขั้นสูง (Advanced Settings)</span>
+							<svg 
+								class="chevron" 
+								class:open={showAdvancedSettings} 
+								viewBox="0 0 24 24" 
+								width="14" 
+								height="14"
+							>
+								<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+							</svg>
+						</button>
 
-					{#if showAdvancedSettings}
-						<div class="advanced-settings-panel animate-fade-in" style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+						{#if showAdvancedSettings}
+							<div class="advanced-settings-panel animate-fade-in" style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
 							<!-- Top P -->
 							<div class="setting-item">
 								<div class="setting-label-row">
@@ -816,8 +836,9 @@
 						</div>
 					{/if}
 				</div>
+			{/if}
 
-				<div class="connection-status text-muted">
+			<div class="connection-status text-muted">
 					{#if isConnected}
 						<span class="text-success">Connected. Found {models.length} models.</span>
 					{:else}

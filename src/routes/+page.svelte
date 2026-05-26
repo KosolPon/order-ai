@@ -25,6 +25,7 @@
 	let numPredict = $state<number>(0);
 	let repeatPenalty = $state<number>(1.1);
 	let isSettingsOpen = $state<boolean>(false);
+	let customizeSettings = $state<boolean>(false);
 	let isConnected = $state<boolean>(false);
 	let isGenerating = $state<boolean>(false);
 	let input = $state<string>('');
@@ -210,6 +211,9 @@
 			const storedRepeatPenalty = localStorage.getItem('ollama_repeatpenalty');
 			if (storedRepeatPenalty) repeatPenalty = parseFloat(storedRepeatPenalty);
 
+			const storedCustomizeSettings = localStorage.getItem('ollama_customize_settings');
+			if (storedCustomizeSettings) customizeSettings = storedCustomizeSettings === 'true';
+
 			const storedDrafts = localStorage.getItem('ollama_drafts');
 			if (storedDrafts) {
 				try {
@@ -356,7 +360,13 @@
 			else if (theme.endsWith('cyan')) metaColor = '#f5fbfc';
 			else if (theme.endsWith('gray')) metaColor = '#f5f5f5';
 		}
-		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', metaColor);
+		let metaEl = document.querySelector('meta[name="theme-color"]');
+		if (!metaEl) {
+			metaEl = document.createElement('meta');
+			metaEl.setAttribute('name', 'theme-color');
+			document.head.appendChild(metaEl);
+		}
+		metaEl.setAttribute('content', metaColor);
 		localStorage.setItem('theme', theme);
 	});
 
@@ -421,6 +431,10 @@
 
 	$effect(() => {
 		localStorage.setItem('ollama_repeatpenalty', String(repeatPenalty));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_customize_settings', String(customizeSettings));
 	});
 
 	// Save drafts to localStorage with 500ms debounce
@@ -801,7 +815,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},
@@ -843,7 +858,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -885,7 +901,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},
@@ -930,7 +947,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -974,7 +992,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -1020,7 +1039,8 @@
 						topK,
 						numCtx,
 						numPredict,
-						repeatPenalty
+						repeatPenalty,
+						customizeSettings
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},
@@ -1327,6 +1347,7 @@
 		bind:numCtx
 		bind:numPredict
 		bind:repeatPenalty
+		bind:customizeSettings
 		onSelectConversation={handleSelectConversation}
 		onNewConversation={handleNewConversation}
 		onDeleteConversation={handleDeleteConversation}

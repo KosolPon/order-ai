@@ -76,13 +76,14 @@ export async function streamChat(
 		numCtx?: number;
 		numPredict?: number;
 		repeatPenalty?: number;
+		customizeSettings?: boolean;
 	},
 	onChunk: (chunk: string) => void,
 	onDone: (fullResponse: string) => void,
 	onError: (error: Error) => void,
 	signal?: AbortSignal
 ) {
-	const { messages, model, systemPrompt, ollamaUrl = DEFAULT_OLLAMA_URL, temperature = 0.7, topP, topK, numCtx, numPredict, repeatPenalty } = options;
+	const { messages, model, systemPrompt, ollamaUrl = DEFAULT_OLLAMA_URL, temperature = 0.7, topP, topK, numCtx, numPredict, repeatPenalty, customizeSettings = false } = options;
 
 	try {
 		// Prepare chat payload
@@ -148,22 +149,27 @@ export async function streamChat(
 			headers['x-ollama-url'] = ollamaUrl;
 		}
 
+		const requestBody: any = {
+			model,
+			messages: chatMessages,
+			stream: true
+		};
+
+		if (customizeSettings) {
+			requestBody.options = {
+				temperature,
+				top_p: topP,
+				top_k: topK,
+				num_ctx: numCtx,
+				num_predict: numPredict === 0 ? -1 : numPredict,
+				repeat_penalty: repeatPenalty
+			};
+		}
+
 		const response = await fetch(target.url, {
 			method: 'POST',
 			headers,
-			body: JSON.stringify({
-				model,
-				messages: chatMessages,
-				options: {
-					temperature,
-					top_p: topP,
-					top_k: topK,
-					num_ctx: numCtx,
-					num_predict: numPredict === 0 ? -1 : numPredict,
-					repeat_penalty: repeatPenalty
-				},
-				stream: true
-			}),
+			body: JSON.stringify(requestBody),
 			signal
 		});
 
