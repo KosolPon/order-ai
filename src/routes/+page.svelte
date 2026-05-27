@@ -1591,6 +1591,7 @@
 			{theme}
 			{projects}
 			{conversations}
+			{models}
 			rightPaneTab={rightPaneTab}
 			onSelectConversation={handleSelectConversation}
 			onToggleTheme={handleToggleTheme}

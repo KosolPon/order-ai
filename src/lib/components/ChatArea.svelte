@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Conversation, Message, Attachment, Project } from '$lib/types';
+	import type { Conversation, Message, Attachment, Project, OllamaModel } from '$lib/types';
 	import { renderMarkdown, parseThinking } from '$lib/markdown';
 	import { tick, untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
@@ -14,6 +14,7 @@
 		theme = 'dark-blue',
 		projects = [],
 		conversations = [],
+		models = [],
 		fontSize = $bindable(15),
 		fontFamily = $bindable('inter'),
 		rightPaneTab = 'context',
@@ -37,6 +38,7 @@
 		theme: string;
 		projects?: Project[];
 		conversations?: Conversation[];
+		models?: (OllamaModel & { source?: 'local' | 'cloud' | 'gemini' })[];
 		fontSize?: number;
 		fontFamily?: string;
 		rightPaneTab?: 'context' | 'thinking' | 'canvas';
@@ -58,6 +60,27 @@
 	let lastScrollHeight = 0;
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageContent = $state('');
+
+	function getModelGroup(modelName: string | undefined): 'local' | 'cloud' | 'gemini' {
+		if (!modelName) return 'local';
+		
+		const parts = modelName.split(' ➔ ');
+		const lastName = (parts[parts.length - 1] || '').trim();
+		const name = lastName.toLowerCase();
+		
+		if (name.startsWith('gemini-') || name.includes('gemini')) {
+			return 'gemini';
+		}
+		
+		if (models && models.length > 0) {
+			const found = models.find((m: any) => m.name.toLowerCase() === name);
+			if (found && found.source) {
+				return found.source;
+			}
+		}
+		
+		return 'local';
+	}
 
 	let openedThoughts = $state<Record<string, boolean>>({});
 
@@ -1163,10 +1186,21 @@
 							{#if msg.role === 'user'}
 								<div class="avatar user-avatar">U</div>
 							{:else}
-								<div class="avatar ai-avatar">
-									<svg viewBox="0 0 24 24" width="16" height="16">
-										<path fill="currentColor" d="M12 2L2 22h20L12 2zm0 3.99L18.8 19H5.2L12 5.99zM12 17c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1zm0-7.75c.41 0 .75-.34.75-.75s-.34-.75-.75-.75-.75.34-.75.75.34.75.75.75z"/>
-									</svg>
+								{@const group = getModelGroup(msg.model || conversation?.model)}
+								<div class="avatar ai-avatar {group}" title={msg.model || conversation?.model || 'Assistant'}>
+									{#if group === 'gemini'}
+										<svg viewBox="0 0 24 24" width="18" height="18">
+											<path fill="currentColor" d="M9 21c0-5-4-9-9-9 5 0 9-4 9-9 0 5 4 9 9 9-5 0-9 4-9 9zM19 10c0-2.8-2.2-5-5-5 2.8 0 5-2.2 5-5 0 2.8 2.2 5 5 5-2.8 0-5 2.2-5 5z"/>
+										</svg>
+									{:else if group === 'cloud'}
+										<svg viewBox="0 0 24 24" width="18" height="18">
+											<path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+										</svg>
+									{:else}
+										<svg viewBox="0 0 24 24" width="18" height="18">
+											<path fill="currentColor" d="M9 9h6v6H9V9zm12 2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/>
+										</svg>
+									{/if}
 								</div>
 							{/if}
 						</div>
@@ -1310,12 +1344,24 @@
 				{/each}
 
 				{#if showThinking}
+					{@const activeModel = conversation.messages[conversation.messages.length - 1]?.model || conversation.model}
+					{@const group = getModelGroup(activeModel)}
 					<div class="message-wrapper assistant generating">
 						<div class="message-avatar">
-							<div class="avatar ai-avatar animate-pulse">
-								<svg viewBox="0 0 24 24" width="16" height="16">
-									<path fill="currentColor" d="M12 2L2 22h20L12 2zm0 3.99L18.8 19H5.2L12 5.99zM12 17c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1zm0-7.75c.41 0 .75-.34.75-.75s-.34-.75-.75-.75-.75.34-.75.75.34.75.75.75z"/>
-								</svg>
+							<div class="avatar ai-avatar animate-pulse {group}" title={activeModel || 'Assistant'}>
+								{#if group === 'gemini'}
+									<svg viewBox="0 0 24 24" width="18" height="18">
+										<path fill="currentColor" d="M9 21c0-5-4-9-9-9 5 0 9-4 9-9 0 5 4 9 9 9-5 0-9 4-9 9zM19 10c0-2.8-2.2-5-5-5 2.8 0 5-2.2 5-5 0 2.8 2.2 5 5 5-2.8 0-5 2.2-5 5z"/>
+									</svg>
+								{:else if group === 'cloud'}
+									<svg viewBox="0 0 24 24" width="18" height="18">
+										<path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+									</svg>
+								{:else}
+									<svg viewBox="0 0 24 24" width="18" height="18">
+										<path fill="currentColor" d="M9 9h6v6H9V9zm12 2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/>
+									</svg>
+								{/if}
 							</div>
 						</div>
 						<div class="message-body">
@@ -2148,9 +2194,29 @@
 	}
 
 	.ai-avatar {
-		background: linear-gradient(135deg, #4285f4, #9b72cb);
 		color: #ffffff;
 		box-shadow: var(--shadow-sm);
+		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+	}
+
+	.ai-avatar:hover {
+		transform: scale(1.05);
+		box-shadow: var(--shadow-md);
+	}
+
+	.ai-avatar.local {
+		background: linear-gradient(135deg, #1e293b, #475569);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.ai-avatar.cloud {
+		background: linear-gradient(135deg, #0284c7, #6366f1);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.ai-avatar.gemini {
+		background: linear-gradient(135deg, #7c3aed, #db2777, #2563eb);
+		border: 1px solid rgba(255, 255, 255, 0.1);
 	}
 
 	.message-body {
