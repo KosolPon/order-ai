@@ -1293,7 +1293,7 @@
 	.advanced-sliders-container {
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 10px;
 		transition: opacity 0.2s ease, pointer-events 0.2s ease;
 	}
 
@@ -1307,7 +1307,7 @@
 		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
 		border-radius: 8px;
-		padding: 12px 14px;
+		padding: 8px 12px;
 	}
 
 	.advanced-tuning-card label {
@@ -1378,5 +1378,72 @@
 
 	.scrollbar-custom::-webkit-scrollbar-thumb:hover {
 		background: var(--text-muted);
+	}
+
+	@media (max-width: 768px) {
+		.settings-modal-content {
+			flex-direction: column;
+			height: 90vh;
+			max-height: 90vh;
+			width: 95vw;
+		}
+
+		.settings-sidebar {
+			width: 100%;
+			border-right: none;
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		.settings-brand {
+			padding: 12px 16px;
+			font-size: 1rem;
+		}
+
+		.settings-nav {
+			flex-direction: row;
+			padding: 6px 12px;
+			gap: 6px;
+			overflow-x: auto;
+			white-space: nowrap;
+			scrollbar-width: none;
+		}
+
+		.settings-nav::-webkit-scrollbar {
+			display: none;
+		}
+
+		.nav-tab-btn {
+			padding: 8px 12px;
+			font-size: 0.8rem;
+			border-radius: 6px;
+		}
+
+		.nav-tab-btn.active {
+			border-left: none;
+			border-bottom: 2px solid var(--accent-blue);
+			border-radius: 6px 6px 0 0;
+			background-color: rgba(168, 199, 250, 0.05);
+		}
+
+		.nav-tab-btn span {
+			display: none;
+		}
+
+		.nav-tab-btn.active span {
+			display: inline;
+		}
+
+		.settings-header {
+			padding: 12px 16px;
+		}
+
+		.settings-body {
+			padding: 16px;
+			gap: 16px;
+		}
+
+		.connection-tabs-header {
+			flex-direction: column;
+		}
 	}
 </style>
