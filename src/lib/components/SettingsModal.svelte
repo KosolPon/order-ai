@@ -223,6 +223,48 @@
 	function updateModelTemp(index: number, val: number) {
 		modelTemperatures = modelTemperatures.map((t: number, i: number) => i === index ? val : t);
 	}
+
+	let activeDropdownIdx = $state<number | null>(null);
+	let searchQuery = $state('');
+	let activeDropdownTab = $state<'all' | 'local' | 'cloud' | 'gemini'>('all');
+
+	let dropdownEl = $state<HTMLElement | null>(null);
+	let dropdownTriggers = $state<HTMLElement[]>([]);
+
+	function handleOutsideDropdownClick(e: MouseEvent) {
+		if (activeDropdownIdx !== null) {
+			const clickedInsideTrigger = dropdownTriggers.some(trigger => trigger && trigger.contains(e.target as Node));
+			const clickedInsideDropdown = dropdownEl && dropdownEl.contains(e.target as Node);
+			if (!clickedInsideTrigger && !clickedInsideDropdown) {
+				activeDropdownIdx = null;
+			}
+		}
+	}
+
+	$effect(() => {
+		if (activeDropdownIdx !== null) {
+			window.addEventListener('click', handleOutsideDropdownClick);
+		}
+		return () => {
+			window.removeEventListener('click', handleOutsideDropdownClick);
+		};
+	});
+
+	let filteredDropdownModels = $derived(
+		models.filter(m => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+	);
+
+	let localDropdownModels = $derived(
+		filteredDropdownModels.filter(m => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+	);
+
+	let cloudDropdownModels = $derived(
+		filteredDropdownModels.filter(m => m.source === 'cloud')
+	);
+
+	let geminiDropdownModels = $derived(
+		filteredDropdownModels.filter(m => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+	);
 </script>
 
 {#if isSettingsOpen}
@@ -542,46 +584,196 @@
 										</div>
 
 										<div class="chain-card-body">
-											<div class="modal-form-item">
+											<div class="modal-form-item custom-select-container">
 												<label for="select-model-{idx}">Selected Model</label>
-												<select 
-													id="select-model-{idx}"
-													class="modal-select" 
-													value={model}
-													onchange={(e) => updateModelStep(idx, e.currentTarget.value)}
+												<!-- svelte-ignore a11y_click_events_have_key_events -->
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<div 
+													bind:this={dropdownTriggers[idx]}
+													class="custom-select-trigger"
+													onclick={(e) => {
+														searchQuery = '';
+														activeDropdownTab = 'all';
+														activeDropdownIdx = activeDropdownIdx === idx ? null : idx;
+													}}
 												>
-													{#if models.length === 0}
-														<option value="">No models found</option>
-													{:else}
-														{#if !model}
-															<option value="">Select a model...</option>
-														{/if}
+													<span class="trigger-text">{model || 'Select a model...'}</span>
+													<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
+														<path fill="currentColor" d="M7 10l5 5 5-5z"/>
+													</svg>
+												</div>
 
-														{#if models.some((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))}
-															<optgroup label="Local (Ollama Local)">
-																{#each models.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-'))) as m}
-																	<option value={m.name}>{m.name}</option>
-																{/each}
-															</optgroup>
-														{/if}
+												{#if activeDropdownIdx === idx}
+													<!-- Custom Dropdown Panel -->
+													<div 
+														bind:this={dropdownEl} 
+														class="custom-select-dropdown"
+														onclick={(e) => e.stopPropagation()}
+													>
+														<!-- Search Header -->
+														<div class="dropdown-search-wrapper">
+															<svg class="search-icon" viewBox="0 0 24 24" width="12" height="12">
+																<path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+															</svg>
+															<input 
+																type="text" 
+																placeholder="ค้นหาโมเดล..." 
+																bind:value={searchQuery}
+																onkeydown={(e) => {
+																	if (e.key === 'Escape') activeDropdownIdx = null;
+																}}
+															/>
+														</div>
 
-														{#if models.some((m: any) => m.source === 'cloud')}
-															<optgroup label="Cloud (Ollama Cloud)">
-																{#each models.filter((m: any) => m.source === 'cloud') as m}
-																	<option value={m.name}>{m.name}</option>
-																{/each}
-															</optgroup>
-														{/if}
+														<!-- Tabs Header -->
+														<div class="dropdown-tabs">
+															<button 
+																type="button"
+																class="dropdown-tab-btn" 
+																class:active={activeDropdownTab === 'all'}
+																onclick={() => activeDropdownTab = 'all'}
+															>
+																ทั้งหมด ({filteredDropdownModels.length})
+															</button>
+															<button 
+																type="button"
+																class="dropdown-tab-btn" 
+																class:active={activeDropdownTab === 'local'}
+																onclick={() => activeDropdownTab = 'local'}
+															>
+																Local ({localDropdownModels.length})
+															</button>
+															<button 
+																type="button"
+																class="dropdown-tab-btn" 
+																class:active={activeDropdownTab === 'cloud'}
+																onclick={() => activeDropdownTab = 'cloud'}
+															>
+																Cloud ({cloudDropdownModels.length})
+															</button>
+															<button 
+																type="button"
+																class="dropdown-tab-btn" 
+																class:active={activeDropdownTab === 'gemini'}
+																onclick={() => activeDropdownTab = 'gemini'}
+															>
+																Gemini ({geminiDropdownModels.length})
+															</button>
+														</div>
 
-														{#if models.some((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))}
-															<optgroup label="Cloud (Google Gemini)">
-																{#each models.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-'))) as m}
-																	<option value={m.name}>{m.name}</option>
-																{/each}
-															</optgroup>
-														{/if}
-													{/if}
-												</select>
+														<!-- Model List -->
+														<div class="dropdown-list-container scrollbar-custom">
+															{#if activeDropdownTab === 'all'}
+																{#if localDropdownModels.length > 0}
+																	<div class="dropdown-group-header">Local (Ollama Local)</div>
+																	{#each localDropdownModels as m}
+																		<!-- svelte-ignore a11y_click_events_have_key_events -->
+																		<!-- svelte-ignore a11y_no_static_element_interactions -->
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge local">L</span>
+																		</div>
+																	{/each}
+																{/if}
+
+																{#if cloudDropdownModels.length > 0}
+																	<div class="dropdown-group-header">Cloud (Ollama Cloud)</div>
+																	{#each cloudDropdownModels as m}
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge cloud">C</span>
+																		</div>
+																	{/each}
+																{/if}
+
+																{#if geminiDropdownModels.length > 0}
+																	<div class="dropdown-group-header">Gemini (Google Gemini)</div>
+																	{#each geminiDropdownModels as m}
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge gemini">G</span>
+																		</div>
+																	{/each}
+																{/if}
+															{:else if activeDropdownTab === 'local'}
+																{#if localDropdownModels.length > 0}
+																	{#each localDropdownModels as m}
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge local">L</span>
+																		</div>
+																	{/each}
+																{:else}
+																	<div class="dropdown-empty">ไม่พบโมเดล Local</div>
+																{/if}
+															{:else if activeDropdownTab === 'cloud'}
+																{#if cloudDropdownModels.length > 0}
+																	{#each cloudDropdownModels as m}
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge cloud">C</span>
+																		</div>
+																	{/each}
+																{:else}
+																	<div class="dropdown-empty">ไม่พบโมเดล Cloud</div>
+																{/if}
+															{:else if activeDropdownTab === 'gemini'}
+																{#if geminiDropdownModels.length > 0}
+																	{#each geminiDropdownModels as m}
+																		<div 
+																			class="dropdown-item" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<span class="item-text" title={m.name}>{m.name}</span>
+																			<span class="item-badge gemini">G</span>
+																		</div>
+																	{/each}
+																{:else}
+																	<div class="dropdown-empty">ไม่พบโมเดล Gemini</div>
+																{/if}
+															{/if}
+														</div>
+													</div>
+												{/if}
 											</div>
 
 											{#if customizeSettings}
@@ -1787,5 +1979,190 @@
 		.connection-tabs-header {
 			flex-direction: column;
 		}
+	}
+
+	/* Custom select in settings modal styles */
+	.custom-select-container {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.custom-select-trigger {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 8px 12px;
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		cursor: pointer;
+		position: relative;
+		transition: border-color var(--transition-fast);
+	}
+
+	.custom-select-trigger:hover {
+		border-color: var(--border-light);
+		background-color: var(--bg-hover);
+	}
+
+	.custom-select-trigger .trigger-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 90%;
+	}
+
+	.custom-select-dropdown {
+		position: relative;
+		margin-top: 4px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		box-shadow: var(--shadow-lg);
+		z-index: 1000;
+		display: flex;
+		flex-direction: column;
+		max-height: 250px;
+		overflow: hidden;
+		animation: dropdown-fade-in 0.12s ease-out;
+	}
+
+	@keyframes dropdown-fade-in {
+		from { opacity: 0; transform: translateY(-4px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	.dropdown-search-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+	}
+
+	.dropdown-search-wrapper input {
+		border: none;
+		background: transparent;
+		color: var(--text-primary);
+		font-size: 0.78rem;
+		width: 100%;
+		outline: none;
+	}
+
+	.dropdown-search-wrapper .search-icon {
+		color: var(--text-muted);
+	}
+
+	.dropdown-tabs {
+		display: flex;
+		border-bottom: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		padding: 2px 8px 0 8px;
+		gap: 2px;
+	}
+
+	.dropdown-tab-btn {
+		background: transparent;
+		border: none;
+		border-bottom: 2px solid transparent;
+		color: var(--text-secondary);
+		padding: 6px 8px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--transition-fast);
+	}
+
+	.dropdown-tab-btn:hover {
+		color: var(--text-primary);
+	}
+
+	.dropdown-tab-btn.active {
+		color: var(--accent-blue);
+		border-bottom-color: var(--accent-blue);
+	}
+
+	.dropdown-list-container {
+		overflow-y: auto;
+		max-height: 180px;
+		padding: 6px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.dropdown-group-header {
+		font-size: 0.65rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		padding: 4px 6px 2px 6px;
+		letter-spacing: 0.3px;
+	}
+
+	.dropdown-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 6px 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
+		font-size: 0.78rem;
+		color: var(--text-primary);
+		gap: 8px;
+	}
+
+	.dropdown-item:hover {
+		background-color: var(--bg-hover);
+	}
+
+	.dropdown-item.selected {
+		background-color: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
+		color: var(--accent-blue);
+	}
+
+	.dropdown-item .item-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex: 1;
+	}
+
+	.item-badge {
+		font-size: 0.6rem;
+		font-weight: 600;
+		padding: 1px 3px;
+		border-radius: 3px;
+		text-transform: uppercase;
+		flex-shrink: 0;
+	}
+
+	.item-badge.local {
+		background-color: rgba(66, 133, 244, 0.15);
+		color: #8ab4f8;
+	}
+
+	.item-badge.cloud {
+		background-color: rgba(217, 101, 112, 0.15);
+		color: #f28b82;
+	}
+
+	.item-badge.gemini {
+		background-color: rgba(155, 114, 203, 0.15);
+		color: #c5a3eb;
+	}
+
+	.dropdown-empty {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		text-align: center;
+		padding: 8px 0;
 	}
 </style>

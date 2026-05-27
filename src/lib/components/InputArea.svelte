@@ -39,6 +39,72 @@
 	let baseInput = '';
 	let isMultiline = $state(false);
 
+	let showModelPopup = $state(false);
+	let searchQuery = $state('');
+	let activeTab = $state<'all' | 'local' | 'cloud' | 'gemini'>('all');
+	let pinnedModelNames = $state<string[]>([]);
+	
+	let popupEl = $state<HTMLElement | null>(null);
+	let wrapperEl = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			const stored = localStorage.getItem('pinned_models');
+			if (stored) {
+				try {
+					pinnedModelNames = JSON.parse(stored);
+				} catch (e) {
+					console.error(e);
+				}
+			}
+		}
+	});
+
+	function handleOutsideClick(e: MouseEvent) {
+		if (showModelPopup && popupEl && !popupEl.contains(e.target as Node) && wrapperEl && !wrapperEl.contains(e.target as Node)) {
+			showModelPopup = false;
+		}
+	}
+
+	$effect(() => {
+		if (showModelPopup) {
+			window.addEventListener('click', handleOutsideClick);
+		}
+		return () => {
+			window.removeEventListener('click', handleOutsideClick);
+		};
+	});
+
+	function togglePin(modelName: string, e: MouseEvent) {
+		e.stopPropagation();
+		if (pinnedModelNames.includes(modelName)) {
+			pinnedModelNames = pinnedModelNames.filter(name => name !== modelName);
+		} else {
+			pinnedModelNames = [...pinnedModelNames, modelName];
+		}
+		localStorage.setItem('pinned_models', JSON.stringify(pinnedModelNames));
+	}
+
+	let filteredModels = $derived(
+		models.filter(m => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+	);
+
+	let pinnedModels = $derived(
+		filteredModels.filter(m => pinnedModelNames.includes(m.name))
+	);
+
+	let localModels = $derived(
+		filteredModels.filter(m => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+	);
+
+	let cloudModels = $derived(
+		filteredModels.filter(m => m.source === 'cloud')
+	);
+
+	let geminiModels = $derived(
+		filteredModels.filter(m => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+	);
+
 	function initSpeechRecognition() {
 		if (typeof window === 'undefined') return;
 		const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -340,14 +406,22 @@
 				></textarea>
 
 				<!-- Model Selector on the right of prompt -->
+				<!-- Model Selector on the right of prompt -->
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div 
+					bind:this={wrapperEl}
 					class="model-selector-wrapper"
 					class:disabled={isGenerating || models.length === 0}
 					class:routing-active={activeModels.length > 1}
 					title={activeModels.length > 1 ? `โหมดลูกโซ่: ${activeModels.join(' ➔ ')}` : 'คลิกเพื่อเลือกโมเดล'}
-					onclick={activeModels.length > 1 ? onModelPillClick : undefined}
+					onclick={(e) => {
+						if (activeModels.length > 1) {
+							onModelPillClick();
+						} else if (!isGenerating && models.length > 0) {
+							showModelPopup = !showModelPopup;
+						}
+					}}
 				>
 					{#if activeModels.length > 1}
 						<svg class="model-icon collaboration-glow" viewBox="0 0 24 24" width="16" height="16">
@@ -363,42 +437,293 @@
 						<span class="model-selected-text">
 							{selectedModel || (models.length === 0 ? "No models found" : "Select model")}
 						</span>
-						<select 
-							class="model-select" 
-							bind:value={selectedModel}
-							disabled={isGenerating || models.length === 0}
-						>
-							{#if models.length === 0}
-								<option value="">No models found</option>
-							{:else}
-								{#if models.some((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))}
-									<optgroup label="Local (Ollama Local)">
-										{#each models.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-'))) as model}
-											<option value={model.name}>{model.name}</option>
-										{/each}
-									</optgroup>
-								{/if}
-
-								{#if models.some((m: any) => m.source === 'cloud')}
-									<optgroup label="Cloud (Ollama Cloud)">
-										{#each models.filter((m: any) => m.source === 'cloud') as model}
-											<option value={model.name}>{model.name}</option>
-										{/each}
-									</optgroup>
-								{/if}
-
-								{#if models.some((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))}
-									<optgroup label="Cloud (Google Gemini)">
-										{#each models.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-'))) as model}
-											<option value={model.name}>{model.name}</option>
-										{/each}
-									</optgroup>
-								{/if}
-							{/if}
-						</select>
 						<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
 							<path fill="currentColor" d="M7 10l5 5 5-5z"/>
 						</svg>
+
+						{#if showModelPopup}
+							<!-- Custom Popup -->
+							<div 
+								bind:this={popupEl} 
+								class="model-popup" 
+								onclick={(e) => e.stopPropagation()}
+							>
+								<!-- Search and Header -->
+								<div class="model-popup-header">
+									<div class="search-input-wrapper">
+										<svg class="search-icon" viewBox="0 0 24 24" width="14" height="14">
+											<path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+										</svg>
+										<input 
+											type="text" 
+											placeholder="ค้นหาโมเดล..." 
+											bind:value={searchQuery}
+											onclick={(e) => e.stopPropagation()}
+											onkeydown={(e) => {
+												if (e.key === 'Escape') showModelPopup = false;
+											}}
+										/>
+										{#if searchQuery}
+											<button 
+												class="clear-search-btn" 
+												onclick={(e) => { e.stopPropagation(); searchQuery = ''; }}
+											>
+												✕
+											</button>
+										{/if}
+									</div>
+								</div>
+
+								<!-- Tabs Header -->
+								<div class="model-popup-tabs">
+									<button 
+										class="tab-btn" 
+										class:active={activeTab === 'all'}
+										onclick={(e) => { e.stopPropagation(); activeTab = 'all'; }}
+									>
+										ทั้งหมด ({filteredModels.length})
+									</button>
+									<button 
+										class="tab-btn" 
+										class:active={activeTab === 'local'}
+										onclick={(e) => { e.stopPropagation(); activeTab = 'local'; }}
+									>
+										Local ({localModels.length})
+									</button>
+									<button 
+										class="tab-btn" 
+										class:active={activeTab === 'cloud'}
+										onclick={(e) => { e.stopPropagation(); activeTab = 'cloud'; }}
+									>
+										Cloud ({cloudModels.length})
+									</button>
+									<button 
+										class="tab-btn" 
+										class:active={activeTab === 'gemini'}
+										onclick={(e) => { e.stopPropagation(); activeTab = 'gemini'; }}
+									>
+										Gemini ({geminiModels.length})
+									</button>
+								</div>
+
+								<!-- Models List Scroll Area -->
+								<div class="model-popup-list">
+									{#if activeTab === 'all'}
+										<!-- Pinned Section in All Tab -->
+										{#if pinnedModels.length > 0}
+											<div class="model-group-title">ที่ปักหมุดไว้</div>
+											<div class="model-grid">
+												{#each pinnedModels as model}
+													<div 
+														class="model-item-card" 
+														class:selected={selectedModel === model.name}
+														onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+													>
+														<div class="model-card-content">
+															<div class="model-name-row">
+																<span class="model-name-text" title={model.name}>{model.name}</span>
+																<span class="model-source-badge {model.source || 'local'}">
+																	{model.source === 'gemini' ? 'G' : model.source === 'cloud' ? 'C' : 'L'}
+																</span>
+															</div>
+														</div>
+														<button 
+															class="pin-btn pinned" 
+															onclick={(e) => togglePin(model.name, e)}
+															title="ถอนหมุดโมเดล"
+														>
+															★
+														</button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+
+										<!-- Local Section -->
+										{#if localModels.length > 0}
+											<div class="model-group-title">Local (Ollama Local)</div>
+											<div class="model-grid">
+												{#each localModels as model}
+													<div 
+														class="model-item-card" 
+														class:selected={selectedModel === model.name}
+														onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+													>
+														<div class="model-card-content">
+															<div class="model-name-row">
+																<span class="model-name-text" title={model.name}>{model.name}</span>
+																<span class="model-source-badge local">L</span>
+															</div>
+														</div>
+														<button 
+															class="pin-btn" 
+															class:pinned={pinnedModelNames.includes(model.name)}
+															onclick={(e) => togglePin(model.name, e)}
+															title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+														>
+															★
+														</button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+
+										<!-- Cloud Section -->
+										{#if cloudModels.length > 0}
+											<div class="model-group-title">Cloud (Ollama Cloud)</div>
+											<div class="model-grid">
+												{#each cloudModels as model}
+													<div 
+														class="model-item-card" 
+														class:selected={selectedModel === model.name}
+														onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+													>
+														<div class="model-card-content">
+															<div class="model-name-row">
+																<span class="model-name-text" title={model.name}>{model.name}</span>
+																<span class="model-source-badge cloud">C</span>
+															</div>
+														</div>
+														<button 
+															class="pin-btn" 
+															class:pinned={pinnedModelNames.includes(model.name)}
+															onclick={(e) => togglePin(model.name, e)}
+															title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+														>
+															★
+														</button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+
+										<!-- Gemini Section -->
+										{#if geminiModels.length > 0}
+											<div class="model-group-title">Gemini (Google Gemini)</div>
+											<div class="model-grid">
+												{#each geminiModels as model}
+													<div 
+														class="model-item-card" 
+														class:selected={selectedModel === model.name}
+														onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+													>
+														<div class="model-card-content">
+															<div class="model-name-row">
+																<span class="model-name-text" title={model.name}>{model.name}</span>
+																<span class="model-source-badge gemini">G</span>
+															</div>
+														</div>
+														<button 
+															class="pin-btn" 
+															class:pinned={pinnedModelNames.includes(model.name)}
+															onclick={(e) => togglePin(model.name, e)}
+															title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+														>
+															★
+														</button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+
+										{#if filteredModels.length === 0}
+											<div class="no-models-msg">ไม่พบโมเดลที่ค้นหา</div>
+										{/if}
+
+									{:else}
+										<!-- Tab handlers for individual groups -->
+										{#if activeTab === 'local'}
+											{#if localModels.length > 0}
+												<div class="model-grid">
+													{#each localModels as model}
+														<div 
+															class="model-item-card" 
+															class:selected={selectedModel === model.name}
+															onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+														>
+															<div class="model-card-content">
+																<div class="model-name-row">
+																	<span class="model-name-text" title={model.name}>{model.name}</span>
+																	<span class="model-source-badge local">L</span>
+																</div>
+															</div>
+															<button 
+																class="pin-btn" 
+																class:pinned={pinnedModelNames.includes(model.name)}
+																onclick={(e) => togglePin(model.name, e)}
+																title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+															>
+																★
+															</button>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<div class="no-models-msg">ไม่พบโมเดล Local</div>
+											{/if}
+										{:else if activeTab === 'cloud'}
+											{#if cloudModels.length > 0}
+												<div class="model-grid">
+													{#each cloudModels as model}
+														<div 
+															class="model-item-card" 
+															class:selected={selectedModel === model.name}
+															onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+														>
+															<div class="model-card-content">
+																<div class="model-name-row">
+																	<span class="model-name-text" title={model.name}>{model.name}</span>
+																	<span class="model-source-badge cloud">C</span>
+																</div>
+															</div>
+															<button 
+																class="pin-btn" 
+																class:pinned={pinnedModelNames.includes(model.name)}
+																onclick={(e) => togglePin(model.name, e)}
+																title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+															>
+																★
+															</button>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<div class="no-models-msg">ไม่พบโมเดล Cloud</div>
+											{/if}
+										{:else if activeTab === 'gemini'}
+											{#if geminiModels.length > 0}
+												<div class="model-grid">
+													{#each geminiModels as model}
+														<div 
+															class="model-item-card" 
+															class:selected={selectedModel === model.name}
+															onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+														>
+															<div class="model-card-content">
+																<div class="model-name-row">
+																	<span class="model-name-text" title={model.name}>{model.name}</span>
+																	<span class="model-source-badge gemini">G</span>
+																</div>
+															</div>
+															<button 
+																class="pin-btn" 
+																class:pinned={pinnedModelNames.includes(model.name)}
+																onclick={(e) => togglePin(model.name, e)}
+																title={pinnedModelNames.includes(model.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+															>
+																★
+															</button>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<div class="no-models-msg">ไม่พบโมเดล Gemini</div>
+											{/if}
+										{/if}
+									{/if}
+								</div>
+							</div>
+						{/if}
 					{/if}
 				</div>
 
@@ -675,24 +1000,261 @@
 		pointer-events: none;
 	}
 
-	.model-select {
+	/* Custom Model Popup styles */
+	.model-popup {
 		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		opacity: 0;
-		cursor: pointer;
-		z-index: 2;
-		appearance: none;
-		-webkit-appearance: none;
-		border: none;
-		outline: none;
-		background: transparent;
+		bottom: 44px;
+		right: 0;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		box-shadow: var(--shadow-lg);
+		z-index: 100;
+		width: 440px;
+		min-height: 180px;
+		max-width: calc(100vw - 32px);
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		animation: popup-fade-in 0.15s ease-out;
+		cursor: default;
 	}
 
-	.model-select:disabled {
-		cursor: not-allowed;
+	@keyframes popup-fade-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.model-popup-header {
+		padding: 12px;
+		border-bottom: 1px solid var(--border-color);
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: var(--bg-primary);
+	}
+
+	.search-input-wrapper {
+		display: flex;
+		align-items: center;
+		width: 100%;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 6px 10px;
+		gap: 8px;
+		position: relative;
+	}
+
+	.search-input-wrapper input {
+		border: none;
+		background: transparent;
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		width: 100%;
+		outline: none;
+	}
+
+	.search-icon {
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.clear-search-btn {
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		font-size: 0.75rem;
+		padding: 2px 4px;
+		border-radius: 50%;
+	}
+
+	.clear-search-btn:hover {
+		color: var(--text-primary);
+		background-color: var(--bg-hover);
+	}
+
+	.model-popup-tabs {
+		display: flex;
+		border-bottom: 1px solid var(--border-color);
+		background-color: var(--bg-primary);
+		padding: 4px 12px 0 12px;
+		gap: 4px;
+		overflow-x: auto;
+	}
+
+	.tab-btn {
+		background: transparent;
+		border: none;
+		border-bottom: 2px solid transparent;
+		color: var(--text-secondary);
+		padding: 8px 12px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--transition-fast);
+		border-radius: 6px 6px 0 0;
+	}
+
+	.tab-btn:hover {
+		color: var(--text-primary);
+		background-color: var(--bg-hover);
+	}
+
+	.tab-btn.active {
+		color: var(--accent-blue);
+		border-bottom-color: var(--accent-blue);
+		background-color: var(--bg-secondary);
+	}
+
+	.model-popup-list {
+		max-height: 320px;
+		overflow-y: auto;
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.model-group-title {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		letter-spacing: 0.5px;
+		margin-bottom: 4px;
+	}
+
+	.model-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 8px;
+	}
+
+	@media (max-width: 480px) {
+		.model-grid {
+			grid-template-columns: 1fr;
+		}
+		.model-popup {
+			width: 290px;
+		}
+	}
+
+	.model-item-card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 10px 12px;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		gap: 8px;
+		position: relative;
+	}
+
+	.model-item-card:hover {
+		background-color: var(--bg-hover);
+		border-color: var(--border-light);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.model-item-card.selected {
+		background-color: color-mix(in srgb, var(--accent-blue) 12%, var(--bg-primary));
+		border-color: var(--accent-blue);
+	}
+
+	.model-card-content {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.model-name-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 6px;
+		width: 100%;
+		min-width: 0;
+	}
+
+	.model-name-text {
+		font-size: 0.85rem;
+		font-weight: 550;
+		color: var(--text-primary);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex: 1;
+	}
+
+	.model-source-badge {
+		font-size: 0.65rem;
+		font-weight: 600;
+		padding: 2px 4px;
+		border-radius: 4px;
+		width: fit-content;
+		text-transform: uppercase;
+		letter-spacing: 0.2px;
+		flex-shrink: 0;
+	}
+
+	.model-source-badge.local {
+		background-color: rgba(66, 133, 244, 0.15);
+		color: #8ab4f8;
+	}
+
+	.model-source-badge.cloud {
+		background-color: rgba(217, 101, 112, 0.15);
+		color: #f28b82;
+	}
+
+	.model-source-badge.gemini {
+		background-color: rgba(155, 114, 203, 0.15);
+		color: #c5a3eb;
+	}
+
+	.pin-btn {
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		font-size: 1rem;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		padding: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 4px;
+		z-index: 10;
+	}
+
+	.pin-btn:hover {
+		color: #fdd663;
+		transform: scale(1.1);
+	}
+
+	.pin-btn.pinned {
+		color: #fdd663;
+	}
+
+	.no-models-msg {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		text-align: center;
+		padding: 16px 0;
 	}
 
 	.chevron-down {
