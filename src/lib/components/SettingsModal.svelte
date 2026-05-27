@@ -141,7 +141,7 @@
 				try {
 					const fetched = await fetchModels(url, key);
 					enableOllamaCloud = true;
-					const count = fetched.filter(m => m.name.includes('cloud')).length;
+					const count = fetched.length;
 					localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${count} ตัว` };
 					onRefreshModels();
 				} catch (error: any) {
