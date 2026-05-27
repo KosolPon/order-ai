@@ -217,11 +217,13 @@
 	}
 
 	function updateModelStep(index: number, val: string) {
-		activeModels = activeModels.map((m: string, i: number) => i === index ? val : m);
+		activeModels[index] = val;
+		activeModels = [...activeModels];
 	}
 
 	function updateModelTemp(index: number, val: number) {
-		modelTemperatures = modelTemperatures.map((t: number, i: number) => i === index ? val : t);
+		modelTemperatures[index] = val;
+		modelTemperatures = [...modelTemperatures];
 	}
 
 	let activeDropdownIdx = $state<number | null>(null);
