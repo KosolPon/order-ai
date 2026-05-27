@@ -16,6 +16,7 @@
 		conversations = [],
 		fontSize = $bindable(15),
 		fontFamily = $bindable('inter'),
+		rightPaneTab = 'context',
 		onSendPrompt,
 		onEditPrompt,
 		onStopGeneration,
@@ -38,6 +39,7 @@
 		conversations?: Conversation[];
 		fontSize?: number;
 		fontFamily?: string;
+		rightPaneTab?: 'context' | 'thinking' | 'canvas';
 		onSendPrompt: (prompt: string) => void;
 		onEditPrompt: (messageId: string, newContent: string) => void;
 		onStopGeneration: () => void;
@@ -66,7 +68,11 @@
 			if (lastMsg.role === 'assistant') {
 				const parsed = parseThinking(lastMsg.content);
 				if (parsed.isThinking && openedThoughts[lastMsg.id] === undefined) {
-					openedThoughts[lastMsg.id] = true;
+					if (showContextPanel && rightPaneTab === 'thinking') {
+						openedThoughts[lastMsg.id] = false;
+					} else {
+						openedThoughts[lastMsg.id] = true;
+					}
 				}
 			}
 		}

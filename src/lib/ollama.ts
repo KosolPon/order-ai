@@ -1,4 +1,5 @@
 import type { OllamaModel, Message } from './types';
+import { decryptData } from './crypto';
 
 // Default Ollama API URL
 export const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
@@ -297,8 +298,12 @@ export async function streamChat(
 		};
 
 		if (isGemini) {
-			const apiKey = options.geminiApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : '') || '';
-			headers['x-gemini-key'] = apiKey;
+			let apiKey = options.geminiApiKey;
+			if (!apiKey && typeof window !== 'undefined') {
+				const storedKey = localStorage.getItem('gemini_api_key') || '';
+				apiKey = await decryptData(storedKey);
+			}
+			headers['x-gemini-key'] = apiKey || '';
 		} else {
 			if (target.useProxy) {
 				headers['x-ollama-url'] = ollamaUrl;

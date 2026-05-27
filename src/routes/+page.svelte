@@ -11,6 +11,7 @@
 	import { parseThinking } from '$lib/markdown';
 	import { db } from '$lib/db';
 	import { parseCanvasTags } from '$lib/canvasParser';
+	import { encryptData, decryptData } from '$lib/crypto';
 
 	// Reactive States
 	let conversations = $state<Conversation[]>([]);
@@ -171,18 +172,18 @@
 
 	// Load data from localStorage on Mount
 	$effect(() => {
-		untrack(() => {
+		untrack(async () => {
 			const storedUrl = localStorage.getItem('ollama_url');
-			if (storedUrl) ollamaUrl = storedUrl;
+			if (storedUrl) ollamaUrl = await decryptData(storedUrl);
 
 			const storedGeminiKey = localStorage.getItem('gemini_api_key');
-			if (storedGeminiKey) geminiApiKey = storedGeminiKey;
+			if (storedGeminiKey) geminiApiKey = await decryptData(storedGeminiKey);
 
 			const storedOllamaCloudKey = localStorage.getItem('ollama_cloud_api_key');
-			if (storedOllamaCloudKey) ollamaCloudApiKey = storedOllamaCloudKey;
+			if (storedOllamaCloudKey) ollamaCloudApiKey = await decryptData(storedOllamaCloudKey);
 
 			const storedOllamaCloudUrl = localStorage.getItem('ollama_cloud_url');
-			if (storedOllamaCloudUrl) ollamaCloudUrl = storedOllamaCloudUrl;
+			if (storedOllamaCloudUrl) ollamaCloudUrl = await decryptData(storedOllamaCloudUrl);
 
 			const storedProviderMode = localStorage.getItem('ollama_provider_mode');
 			if (storedProviderMode) {
@@ -432,11 +433,21 @@
 
 	// Save data to localStorage on state changes
 	$effect(() => {
-		localStorage.setItem('ollama_url', ollamaUrl);
+		const val = ollamaUrl;
+		if (isInitialized) {
+			encryptData(val).then(encrypted => {
+				localStorage.setItem('ollama_url', encrypted);
+			});
+		}
 	});
 
 	$effect(() => {
-		localStorage.setItem('gemini_api_key', geminiApiKey);
+		const val = geminiApiKey;
+		if (isInitialized) {
+			encryptData(val).then(encrypted => {
+				localStorage.setItem('gemini_api_key', encrypted);
+			});
+		}
 	});
 
 	$effect(() => {
@@ -468,11 +479,21 @@
 	});
 
 	$effect(() => {
-		localStorage.setItem('ollama_cloud_api_key', ollamaCloudApiKey);
+		const val = ollamaCloudApiKey;
+		if (isInitialized) {
+			encryptData(val).then(encrypted => {
+				localStorage.setItem('ollama_cloud_api_key', encrypted);
+			});
+		}
 	});
 
 	$effect(() => {
-		localStorage.setItem('ollama_cloud_url', ollamaCloudUrl);
+		const val = ollamaCloudUrl;
+		if (isInitialized) {
+			encryptData(val).then(encrypted => {
+				localStorage.setItem('ollama_cloud_url', encrypted);
+			});
+		}
 	});
 
 	$effect(() => {
