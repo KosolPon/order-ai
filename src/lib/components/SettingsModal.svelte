@@ -44,7 +44,7 @@
 		globalContext: string;
 		isConnected: boolean;
 		isOllamaCloudConnected: boolean;
-		models: OllamaModel[];
+		models: (OllamaModel & { source?: 'local' | 'cloud' | 'gemini' })[];
 		onRefreshModels: () => void;
 	}>();
 
@@ -556,9 +556,30 @@
 														{#if !model}
 															<option value="">Select a model...</option>
 														{/if}
-														{#each models as m}
-															<option value={m.name}>{m.name}</option>
-														{/each}
+
+														{#if models.some((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))}
+															<optgroup label="Local (Ollama Local)">
+																{#each models.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-'))) as m}
+																	<option value={m.name}>{m.name}</option>
+																{/each}
+															</optgroup>
+														{/if}
+
+														{#if models.some((m: any) => m.source === 'cloud')}
+															<optgroup label="Cloud (Ollama Cloud)">
+																{#each models.filter((m: any) => m.source === 'cloud') as m}
+																	<option value={m.name}>{m.name}</option>
+																{/each}
+															</optgroup>
+														{/if}
+
+														{#if models.some((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))}
+															<optgroup label="Cloud (Google Gemini)">
+																{#each models.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-'))) as m}
+																	<option value={m.name}>{m.name}</option>
+																{/each}
+															</optgroup>
+														{/if}
 													{/if}
 												</select>
 											</div>

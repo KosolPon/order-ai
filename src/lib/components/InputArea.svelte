@@ -16,7 +16,7 @@
 		onStop
 	} = $props<{
 		input: string;
-		models: OllamaModel[];
+		models: (OllamaModel & { source?: 'local' | 'cloud' | 'gemini' })[];
 		selectedModel: string;
 		activeModels?: string[];
 		onModelPillClick: () => void;
@@ -371,9 +371,29 @@
 							{#if models.length === 0}
 								<option value="">No models found</option>
 							{:else}
-								{#each models as model}
-									<option value={model.name}>{model.name}</option>
-								{/each}
+								{#if models.some((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))}
+									<optgroup label="Local (Ollama Local)">
+										{#each models.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-'))) as model}
+											<option value={model.name}>{model.name}</option>
+										{/each}
+									</optgroup>
+								{/if}
+
+								{#if models.some((m: any) => m.source === 'cloud')}
+									<optgroup label="Cloud (Ollama Cloud)">
+										{#each models.filter((m: any) => m.source === 'cloud') as model}
+											<option value={model.name}>{model.name}</option>
+										{/each}
+									</optgroup>
+								{/if}
+
+								{#if models.some((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))}
+									<optgroup label="Cloud (Google Gemini)">
+										{#each models.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-'))) as model}
+											<option value={model.name}>{model.name}</option>
+										{/each}
+									</optgroup>
+								{/if}
 							{/if}
 						</select>
 						<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">

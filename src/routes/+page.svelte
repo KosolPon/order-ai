@@ -28,13 +28,13 @@
 	let models = $derived.by(() => {
 		const list = [];
 		if (enableOllamaLocal) {
-			list.push(...ollamaModels);
+			list.push(...ollamaModels.map(m => ({ ...m, source: 'local' as const })));
 		}
 		if (enableOllamaCloud && ollamaCloudApiKey.trim()) {
-			list.push(...ollamaCloudModels);
+			list.push(...ollamaCloudModels.map(m => ({ ...m, source: 'cloud' as const })));
 		}
 		if (enableGemini && geminiApiKey.trim()) {
-			list.push(...GEMINI_MODELS);
+			list.push(...GEMINI_MODELS.map(m => ({ ...m, source: 'gemini' as const })));
 		}
 		return list.sort((a, b) => a.name.localeCompare(b.name));
 	});
