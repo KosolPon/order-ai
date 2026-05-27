@@ -19,27 +19,24 @@
 	let geminiApiKey = $state<string>('');
 	let ollamaCloudApiKey = $state<string>('');
 	let ollamaCloudUrl = $state<string>('https://ollama.com');
-	let providerMode = $state<'ollama' | 'ollama-cloud' | 'gemini' | 'all'>('ollama');
+	let enableOllamaLocal = $state<boolean>(true);
+	let enableOllamaCloud = $state<boolean>(false);
+	let enableGemini = $state<boolean>(false);
 	let ollamaModels = $state<OllamaModel[]>([]);
 	let ollamaCloudModels = $state<OllamaModel[]>([]);
 	let isOllamaCloudConnected = $state<boolean>(false);
 	let models = $derived.by(() => {
-		if (providerMode === 'gemini') {
-			return geminiApiKey.trim() ? GEMINI_MODELS : [];
-		} else if (providerMode === 'ollama-cloud') {
-			return ollamaCloudApiKey.trim() ? ollamaCloudModels : [];
-		} else if (providerMode === 'all') {
-			const list = [...ollamaModels];
-			if (ollamaCloudApiKey.trim()) {
-				list.push(...ollamaCloudModels);
-			}
-			if (geminiApiKey.trim()) {
-				list.push(...GEMINI_MODELS);
-			}
-			return list.sort((a, b) => a.name.localeCompare(b.name));
-		} else {
-			return ollamaModels;
+		const list = [];
+		if (enableOllamaLocal) {
+			list.push(...ollamaModels);
 		}
+		if (enableOllamaCloud && ollamaCloudApiKey.trim()) {
+			list.push(...ollamaCloudModels);
+		}
+		if (enableGemini && geminiApiKey.trim()) {
+			list.push(...GEMINI_MODELS);
+		}
+		return list.sort((a, b) => a.name.localeCompare(b.name));
 	});
 	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
@@ -188,15 +185,32 @@
 			if (storedOllamaCloudUrl) ollamaCloudUrl = storedOllamaCloudUrl;
 
 			const storedProviderMode = localStorage.getItem('ollama_provider_mode');
-			if (storedProviderMode === 'both') {
-				providerMode = 'all';
-			} else if (
-				storedProviderMode === 'ollama' || 
-				storedProviderMode === 'ollama-cloud' || 
-				storedProviderMode === 'gemini' || 
-				storedProviderMode === 'all'
-			) {
-				providerMode = storedProviderMode;
+			if (storedProviderMode) {
+				if (storedProviderMode === 'ollama') {
+					enableOllamaLocal = true;
+					enableOllamaCloud = false;
+					enableGemini = false;
+				} else if (storedProviderMode === 'ollama-cloud') {
+					enableOllamaLocal = false;
+					enableOllamaCloud = true;
+					enableGemini = false;
+				} else if (storedProviderMode === 'gemini') {
+					enableOllamaLocal = false;
+					enableOllamaCloud = false;
+					enableGemini = true;
+				} else if (storedProviderMode === 'all' || storedProviderMode === 'both') {
+					enableOllamaLocal = true;
+					enableOllamaCloud = true;
+					enableGemini = true;
+				}
+				localStorage.removeItem('ollama_provider_mode');
+			} else {
+				const storedLocal = localStorage.getItem('ollama_enable_local');
+				if (storedLocal !== null) enableOllamaLocal = storedLocal === 'true';
+				const storedCloud = localStorage.getItem('ollama_enable_cloud');
+				if (storedCloud !== null) enableOllamaCloud = storedCloud === 'true';
+				const storedGemini = localStorage.getItem('ollama_enable_gemini');
+				if (storedGemini !== null) enableGemini = storedGemini === 'true';
 			}
 
 			const storedChats = localStorage.getItem('ollama_conversations');
@@ -426,11 +440,19 @@
 	});
 
 	$effect(() => {
-		localStorage.setItem('ollama_provider_mode', providerMode);
+		localStorage.setItem('ollama_enable_local', String(enableOllamaLocal));
 	});
 
 	$effect(() => {
-		if (providerMode) {
+		localStorage.setItem('ollama_enable_cloud', String(enableOllamaCloud));
+	});
+
+	$effect(() => {
+		localStorage.setItem('ollama_enable_gemini', String(enableGemini));
+	});
+
+	$effect(() => {
+		if (enableOllamaLocal || enableOllamaCloud || enableGemini) {
 			untrack(() => {
 				const availableModels = models;
 				if (availableModels.length > 0) {
@@ -581,7 +603,7 @@
 
 	// Trigger model loading whenever URL/keys change
 	$effect(() => {
-		if (ollamaUrl) {
+		if (enableOllamaLocal && ollamaUrl) {
 			untrack(() => {
 				loadModels();
 			});
@@ -589,7 +611,7 @@
 	});
 
 	$effect(() => {
-		if (ollamaCloudUrl || ollamaCloudApiKey) {
+		if (enableOllamaCloud && (ollamaCloudUrl || ollamaCloudApiKey)) {
 			untrack(() => {
 				loadCloudModels();
 			});
@@ -1478,7 +1500,9 @@
 		{currentConversationId}
 		{projects}
 		{geminiApiKey}
-		{providerMode}
+		{enableOllamaLocal}
+		{enableOllamaCloud}
+		{enableGemini}
 		{isConnected}
 		{isOllamaCloudConnected}
 		onSelectConversation={handleSelectConversation}
@@ -1590,7 +1614,9 @@
 		bind:ollamaCloudUrl
 		bind:ollamaCloudApiKey
 		bind:geminiApiKey
-		bind:providerMode
+		bind:enableOllamaLocal
+		bind:enableOllamaCloud
+		bind:enableGemini
 		bind:activeModels
 		bind:modelTemperatures
 		bind:topP

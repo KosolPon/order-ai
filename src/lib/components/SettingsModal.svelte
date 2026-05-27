@@ -8,7 +8,9 @@
 		ollamaCloudUrl = $bindable(),
 		ollamaCloudApiKey = $bindable(),
 		geminiApiKey = $bindable(),
-		providerMode = $bindable(),
+		enableOllamaLocal = $bindable(),
+		enableOllamaCloud = $bindable(),
+		enableGemini = $bindable(),
 		activeModels = $bindable(),
 		modelTemperatures = $bindable(),
 		topP = $bindable(),
@@ -28,7 +30,9 @@
 		ollamaCloudUrl: string;
 		ollamaCloudApiKey: string;
 		geminiApiKey: string;
-		providerMode: 'ollama' | 'ollama-cloud' | 'gemini' | 'all';
+		enableOllamaLocal: boolean;
+		enableOllamaCloud: boolean;
+		enableGemini: boolean;
 		activeModels: string[];
 		modelTemperatures: number[];
 		topP: number;
@@ -44,9 +48,133 @@
 		onRefreshModels: () => void;
 	}>();
 
+	import { fetchModels } from '$lib/ollama';
+
 	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context'>('connections');
 	let showOllamaCloudKey = $state(false);
 	let showGeminiKey = $state(false);
+
+	let localEnableOllamaLocal = $state(enableOllamaLocal);
+	let localEnableOllamaCloud = $state(enableOllamaCloud);
+	let localEnableGemini = $state(enableGemini);
+
+	let testingLocal = $state(false);
+	let testingCloud = $state(false);
+	let testingGemini = $state(false);
+
+	let localStatusLocal = $state<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
+	let localStatusCloud = $state<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
+	let localStatusGemini = $state<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
+
+	$effect(() => {
+		localEnableOllamaLocal = enableOllamaLocal;
+	});
+	$effect(() => {
+		localEnableOllamaCloud = enableOllamaCloud;
+	});
+	$effect(() => {
+		localEnableGemini = enableGemini;
+	});
+
+	function handleLocalToggle(service: 'local' | 'cloud' | 'gemini', checked: boolean) {
+		if (service === 'local') {
+			localEnableOllamaLocal = checked;
+			if (!checked) {
+				enableOllamaLocal = false;
+				localStatusLocal = { type: 'idle', message: '' };
+				onRefreshModels();
+			}
+		} else if (service === 'cloud') {
+			localEnableOllamaCloud = checked;
+			if (!checked) {
+				enableOllamaCloud = false;
+				localStatusCloud = { type: 'idle', message: '' };
+				onRefreshModels();
+			}
+		} else if (service === 'gemini') {
+			localEnableGemini = checked;
+			if (!checked) {
+				enableGemini = false;
+				localStatusGemini = { type: 'idle', message: '' };
+				onRefreshModels();
+			}
+		}
+	}
+
+	async function testOllamaLocal() {
+		if (!ollamaUrl) {
+			localStatusLocal = { type: 'error', message: 'กรุณากรอก Ollama Server URL (Please enter URL)' };
+			alert('กรุณากรอก Ollama Server URL');
+			return;
+		}
+		testingLocal = true;
+		localStatusLocal = { type: 'idle', message: 'กำลังเชื่อมต่อและทดสอบ... (Testing...)' };
+		try {
+			const fetched = await fetchModels(ollamaUrl);
+			enableOllamaLocal = true;
+			const count = fetched.filter(m => !m.name.includes('gemini') && !m.name.includes('cloud')).length;
+			localStatusLocal = { type: 'success', message: `เชื่อมต่อสำเร็จ! โหลดโมเดลทั้งหมด ${count} ตัว` };
+			onRefreshModels();
+		} catch (error: any) {
+			enableOllamaLocal = false;
+			const errMsg = error?.message || 'เชื่อมต่อล้มเหลว ตรวจสอบว่าเปิด Ollama หรือยัง และตั้งค่า CORS ถูกต้องหรือไม่';
+			localStatusLocal = { type: 'error', message: errMsg };
+			alert(`เชื่อมต่อล้มเหลว: ${errMsg}`);
+		} finally {
+			testingLocal = false;
+		}
+	}
+
+	async function testOllamaCloud() {
+		if (!ollamaCloudUrl || !ollamaCloudApiKey) {
+			localStatusCloud = { type: 'error', message: 'กรุณากรอก Cloud Base URL และ API Key' };
+			alert('กรุณากรอก Cloud Base URL และ API Key');
+			return;
+		}
+		testingCloud = true;
+		localStatusCloud = { type: 'idle', message: 'กำลังทดสอบการเชื่อมต่อ... (Testing...)' };
+		try {
+			const fetched = await fetchModels(ollamaCloudUrl, ollamaCloudApiKey);
+			enableOllamaCloud = true;
+			const count = fetched.filter(m => m.name.includes('cloud')).length;
+			localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${count} ตัว` };
+			onRefreshModels();
+		} catch (error: any) {
+			enableOllamaCloud = false;
+			const errMsg = error?.message || 'เชื่อมต่อ Ollama Cloud ล้มเหลว ตรวจสอบ URL และ API Key';
+			localStatusCloud = { type: 'error', message: errMsg };
+			alert(`เชื่อมต่อ Ollama Cloud ล้มเหลว: ${errMsg}`);
+		} finally {
+			testingCloud = false;
+		}
+	}
+
+	async function testGemini() {
+		if (!geminiApiKey || !geminiApiKey.trim()) {
+			localStatusGemini = { type: 'error', message: 'กรุณากรอก Google Gemini API Key' };
+			alert('กรุณากรอก Google Gemini API Key');
+			return;
+		}
+		testingGemini = true;
+		localStatusGemini = { type: 'idle', message: 'กำลังตรวจสอบ API Key... (Testing...)' };
+		try {
+			const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
+			if (!res.ok) {
+				const errData = await res.json().catch(() => ({}));
+				throw new Error(errData.error?.message || `HTTP error ${res.status}`);
+			}
+			enableGemini = true;
+			localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ!' };
+			onRefreshModels();
+		} catch (error: any) {
+			enableGemini = false;
+			const errMsg = error?.message || 'ตรวจสอบ API Key ล้มเหลว กรุณาเช็คความถูกต้องของ API Key';
+			localStatusGemini = { type: 'error', message: errMsg };
+			alert(`ตรวจสอบ API Key ล้มเหลว: ${errMsg}`);
+		} finally {
+			testingGemini = false;
+		}
+	}
 
 	function closeSettings() {
 		isSettingsOpen = false;
@@ -182,157 +310,202 @@
 				<div class="settings-body scrollbar-custom">
 					{#if activeTab === 'connections'}
 						<div class="settings-section">
-							<div class="setting-item-large">
-								<span class="setting-title-label">Connection Mode (โหมดเชื่อมต่อ)</span>
-								<div class="connection-tabs-header">
-									<button 
-										type="button"
-										class="connection-tab-item" 
-										class:active={providerMode === 'ollama'}
-										onclick={() => providerMode = 'ollama'}
-									>
-										Ollama (Local)
-									</button>
-									<button 
-										type="button"
-										class="connection-tab-item" 
-										class:active={providerMode === 'ollama-cloud'}
-										onclick={() => providerMode = 'ollama-cloud'}
-									>
-										Ollama (Cloud)
-									</button>
-									<button 
-										type="button"
-										class="connection-tab-item" 
-										class:active={providerMode === 'gemini'}
-										onclick={() => providerMode = 'gemini'}
-									>
-										Gemini (Cloud)
-									</button>
-									<button 
-										type="button"
-										class="connection-tab-item" 
-										class:active={providerMode === 'all'}
-										onclick={() => providerMode = 'all'}
-									>
-										All Combined
-									</button>
+							<!-- Ollama Local -->
+							<div class="api-service-card">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>Ollama (Local Workstation)</h4>
+										<p>Execute open-source LLMs locally on your machine</p>
+									</div>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableOllamaLocal} onchange={(e) => handleLocalToggle('local', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
 								</div>
+								{#if localEnableOllamaLocal}
+									<div class="api-service-body animate-fade-in">
+										<div class="setting-item-block">
+											<label for="modal-ollama-url">Ollama Server URL</label>
+											<div class="modal-input-group">
+												<input 
+													id="modal-ollama-url"
+													type="text" 
+													placeholder="http://localhost:11434" 
+													bind:value={ollamaUrl}
+												/>
+											</div>
+											<div class="status-alert" class:success={enableOllamaLocal} class:error={!enableOllamaLocal}>
+												<span class="status-alert-dot"></span>
+												<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่ออยู่ (Connected). โหลดโมเดลท้องถิ่นได้.` : 'ไม่ได้เปิดใช้งานหรือยังไม่ได้กดทดสอบ (Disabled or untested).')}</span>
+											</div>
+										</div>
+
+										<button 
+											type="button"
+											class="modal-action-btn font-mono" 
+											onclick={testOllamaLocal} 
+											disabled={testingLocal}
+											style="margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;"
+										>
+											{#if testingLocal}
+												<svg class="animate-spin" viewBox="0 0 24 24" width="16" height="16" style="animation: spin 1s linear infinite;">
+													<path fill="currentColor" d="M12 4V2C6.48 2 2 6.48 2 12h2c0-4.41 3.59-8 8-8z"/>
+												</svg>
+												<span>กำลังทดสอบ... (Testing...)</span>
+											{:else}
+												<span>ทดสอบและบันทึกการเชื่อมต่อ (Test & Save Connection)</span>
+											{/if}
+										</button>
+
+										{#if !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
+											<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
+												<h4>CORS Configuration Guide</h4>
+												<p>To connect local Ollama from a deployed site, you need to enable CORS origins:</p>
+												<ol>
+													<li>Close the Ollama application.</li>
+													<li>Run in Terminal to allow CORS:
+														<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
+													</li>
+													<li>Restart Ollama.</li>
+												</ol>
+											</div>
+										{/if}
+									</div>
+								{/if}
 							</div>
 
-							{#if providerMode === 'ollama' || providerMode === 'all'}
-								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
-									<label for="modal-ollama-url">Ollama Server URL</label>
-									<div class="modal-input-group">
-										<input 
-											id="modal-ollama-url"
-											type="text" 
-											placeholder="http://localhost:11434" 
-											bind:value={ollamaUrl}
-										/>
-										<button class="modal-refresh-btn" onclick={onRefreshModels} title="Refresh connection">
-											<svg viewBox="0 0 24 24" width="16" height="16">
-												<path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-											</svg>
-											<span>Test & Sync</span>
-										</button>
+							<!-- Ollama Cloud -->
+							<div class="api-service-card">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>Ollama Cloud</h4>
+										<p>Connect to a hosted/remote Ollama endpoint</p>
 									</div>
-									{#if providerMode === 'ollama'}
-										<div class="status-alert" class:success={isConnected} class:error={!isConnected}>
-											<span class="status-alert-dot"></span>
-											<span>{isConnected ? `Connected. Loaded ${models.length} local models.` : 'Disconnected. Verify local Ollama server is running.'}</span>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableOllamaCloud} onchange={(e) => handleLocalToggle('cloud', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
+								</div>
+								{#if localEnableOllamaCloud}
+									<div class="api-service-body animate-fade-in">
+										<div class="setting-item-block">
+											<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
+											<input 
+												id="modal-ollama-cloud-url"
+												type="text" 
+												class="modal-text-input"
+												placeholder="https://ollama.com" 
+												bind:value={ollamaCloudUrl}
+											/>
 										</div>
-									{/if}
-								</div>
-							{/if}
 
-							{#if providerMode === 'ollama-cloud' || providerMode === 'all'}
-								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
-									<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
-									<input 
-										id="modal-ollama-cloud-url"
-										type="text" 
-										class="modal-text-input"
-										placeholder="https://ollama.com" 
-										bind:value={ollamaCloudUrl}
-									/>
-								</div>
+										<div class="setting-item-block" style="margin-top: 10px;">
+											<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
+											<div class="modal-input-group">
+												<input 
+													id="modal-ollama-cloud-key"
+													type={showOllamaCloudKey ? 'text' : 'password'} 
+													placeholder="Ollama Cloud API Key..." 
+													bind:value={ollamaCloudApiKey}
+												/>
+												<button 
+													class="modal-eye-btn" 
+													onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
+													title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
+												>
+													{#if showOllamaCloudKey}
+														<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+													{:else}
+														<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+													{/if}
+												</button>
+											</div>
+											<div class="status-alert" class:success={enableOllamaCloud} class:error={!enableOllamaCloud}>
+												<span class="status-alert-dot"></span>
+												<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud อยู่ (Connected).' : 'ไม่ได้เปิดใช้งานหรือยังไม่ได้กดทดสอบ (Disabled or untested).')}</span>
+											</div>
+										</div>
 
-								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
-									<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
-									<div class="modal-input-group">
-										<input 
-											id="modal-ollama-cloud-key"
-											type={showOllamaCloudKey ? 'text' : 'password'} 
-											placeholder="Ollama Cloud API Key..." 
-											bind:value={ollamaCloudApiKey}
-										/>
 										<button 
-											class="modal-eye-btn" 
-											onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
-											title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
+											type="button"
+											class="modal-action-btn font-mono" 
+											onclick={testOllamaCloud} 
+											disabled={testingCloud}
+											style="margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;"
 										>
-											{#if showOllamaCloudKey}
-												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+											{#if testingCloud}
+												<svg class="animate-spin" viewBox="0 0 24 24" width="16" height="16" style="animation: spin 1s linear infinite;">
+													<path fill="currentColor" d="M12 4V2C6.48 2 2 6.48 2 12h2c0-4.41 3.59-8 8-8z"/>
+												</svg>
+												<span>กำลังทดสอบ... (Testing...)</span>
 											{:else}
-												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+												<span>ทดสอบและบันทึกการเชื่อมต่อ (Test & Save Connection)</span>
 											{/if}
 										</button>
 									</div>
-									{#if providerMode === 'ollama-cloud'}
-										<div class="status-alert" class:success={isOllamaCloudConnected} class:error={!isOllamaCloudConnected}>
-											<span class="status-alert-dot"></span>
-											<span>{isOllamaCloudConnected ? `Connected. Loaded ${models.length} cloud models.` : 'Disconnected. API Key is required for Ollama Cloud connection.'}</span>
-										</div>
-									{/if}
-								</div>
-							{/if}
+								{/if}
+							</div>
 
-							{#if providerMode === 'gemini' || providerMode === 'all'}
-								<div class="setting-item-block" transition:fade={{ duration: 120 }}>
-									<label for="modal-gemini-key">Google Gemini API Key (Cloud)</label>
-									<div class="modal-input-group">
-										<input 
-											id="modal-gemini-key"
-											type={showGeminiKey ? 'text' : 'password'} 
-											placeholder="AI Studio Gemini API Key..." 
-											bind:value={geminiApiKey}
-										/>
+							<!-- Gemini Cloud -->
+							<div class="api-service-card">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>Google Gemini (Cloud)</h4>
+										<p>Connect directly to official Gemini API Studio models</p>
+									</div>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableGemini} onchange={(e) => handleLocalToggle('gemini', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
+								</div>
+								{#if localEnableGemini}
+									<div class="api-service-body animate-fade-in">
+										<div class="setting-item-block">
+											<label for="modal-gemini-key">Google Gemini API Key</label>
+											<div class="modal-input-group">
+												<input 
+													id="modal-gemini-key"
+													type={showGeminiKey ? 'text' : 'password'} 
+													placeholder="AI Studio Gemini API Key..." 
+													bind:value={geminiApiKey}
+												/>
+												<button 
+													class="modal-eye-btn" 
+													onclick={() => showGeminiKey = !showGeminiKey} 
+													title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
+												>
+													{#if showGeminiKey}
+														<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+													{:else}
+														<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+													{/if}
+												</button>
+											</div>
+											<div class="status-alert" class:success={enableGemini} class:error={!enableGemini}>
+												<span class="status-alert-dot"></span>
+												<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ไม่ได้เปิดใช้งานหรือยังไม่ได้กดทดสอบ (Disabled or untested).')}</span>
+											</div>
+										</div>
+
 										<button 
-											class="modal-eye-btn" 
-											onclick={() => showGeminiKey = !showGeminiKey} 
-											title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
+											type="button"
+											class="modal-action-btn font-mono" 
+											onclick={testGemini} 
+											disabled={testingGemini}
+											style="margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;"
 										>
-											{#if showGeminiKey}
-												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+											{#if testingGemini}
+												<svg class="animate-spin" viewBox="0 0 24 24" width="16" height="16" style="animation: spin 1s linear infinite;">
+													<path fill="currentColor" d="M12 4V2C6.48 2 2 6.48 2 12h2c0-4.41 3.59-8 8-8z"/>
+												</svg>
+												<span>กำลังทดสอบ... (Testing...)</span>
 											{:else}
-												<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+												<span>ทดสอบและบันทึกการเชื่อมต่อ (Test & Save Connection)</span>
 											{/if}
 										</button>
 									</div>
-									{#if providerMode === 'gemini'}
-										<div class="status-alert" class:success={!!geminiApiKey.trim()} class:error={!geminiApiKey.trim()}>
-											<span class="status-alert-dot"></span>
-											<span>{geminiApiKey.trim() ? 'Google Gemini Cloud service API Key loaded.' : 'Google Gemini connection requires a valid API Studio Key.'}</span>
-										</div>
-									{/if}
-								</div>
-							{/if}
-
-							{#if providerMode === 'ollama' && !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
-								<div class="cors-help-card animate-fade-in">
-									<h4>CORS Configuration Guide</h4>
-									<p>To connect a local Ollama instance from a remote/deployed page, you need to enable CORS origins:</p>
-									<ol>
-										<li>Shut down the Ollama desktop client completely.</li>
-										<li>Open terminal and define environment variable:
-											<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
-										</li>
-										<li>Restart the Ollama application.</li>
-									</ol>
-									<p class="cors-tip-note">Tip: Or use ngrok to tunnel to port 11434 with HTTPS support.</p>
-								</div>
-							{/if}
+								{/if}
+							</div>
 						</div>
 					{:else if activeTab === 'chain'}
 						<div class="settings-section">
@@ -636,16 +809,43 @@
 						</div>
 					{/if}
 				</div>
-
-				<div class="settings-footer">
-					<button class="settings-save-btn" onclick={closeSettings}>Close & Apply</button>
-				</div>
 			</div>
 		</div>
 	</div>
 {/if}
 
 <style>
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+
+	.modal-action-btn {
+		background-color: var(--accent-blue);
+		color: var(--bg-primary);
+		border: none;
+		border-radius: 8px;
+		padding: 10px 16px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), transform 0.1s ease;
+	}
+
+	.modal-action-btn:hover:not(:disabled) {
+		background-color: var(--accent-blue-hover);
+		transform: translateY(-1px);
+	}
+
+	.modal-action-btn:active:not(:disabled) {
+		transform: translateY(0);
+	}
+
+	.modal-action-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
 	/* Settings Modal Structure */
 	.modal-backdrop {
 		position: fixed;
@@ -816,39 +1016,100 @@
 		letter-spacing: 0.5px;
 	}
 
-	.connection-tabs-header {
-		display: flex;
+	/* API Service Card */
+	.api-service-card {
 		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
-		border-radius: 8px;
-		padding: 4px;
-		gap: 4px;
+		border-radius: 12px;
+		padding: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		transition: border-color var(--transition-fast);
 	}
 
-	.connection-tab-item {
-		flex: 1;
-		padding: 8px 12px;
-		background: none;
-		border: none;
-		border-radius: 6px;
-		color: var(--text-secondary);
-		font-size: 0.82rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: background-color var(--transition-fast), color var(--transition-fast);
-		text-align: center;
+	.api-service-card:focus-within {
+		border-color: var(--accent-blue);
 	}
 
-	.connection-tab-item:hover {
-		background-color: var(--bg-hover);
+	.api-service-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+	}
+
+	.api-service-info h4 {
+		margin: 0 0 2px 0;
+		font-family: var(--font-title);
+		font-size: 0.95rem;
+		font-weight: 600;
 		color: var(--text-primary);
 	}
 
-	.connection-tab-item.active {
+	.api-service-info p {
+		margin: 0;
+		font-size: 0.76rem;
+		color: var(--text-muted);
+		line-height: 1.35;
+	}
+
+	.api-service-body {
+		border-top: 1px dashed var(--border-light);
+		padding-top: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	/* Toggle Switch CSS */
+	.toggle-switch {
+		position: relative;
+		display: inline-block;
+		width: 42px;
+		height: 24px;
+		flex-shrink: 0;
+	}
+
+	.toggle-switch input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.toggle-slider {
+		position: absolute;
+		cursor: pointer;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-color: var(--bg-tertiary);
+		transition: .2s ease;
+		border-radius: 24px;
+		border: 1px solid var(--border-color);
+	}
+
+	.toggle-slider:before {
+		position: absolute;
+		content: "";
+		height: 16px;
+		width: 16px;
+		left: 3px;
+		bottom: 3px;
+		background-color: var(--text-muted);
+		transition: .2s ease;
+		border-radius: 50%;
+	}
+
+	.toggle-switch input:checked + .toggle-slider {
+		background-color: rgba(168, 199, 250, 0.12);
+		border-color: var(--accent-blue);
+	}
+
+	.toggle-switch input:checked + .toggle-slider:before {
+		transform: translateX(18px);
 		background-color: var(--accent-blue);
-		color: var(--bg-primary);
-		font-weight: 600;
-		box-shadow: var(--shadow-sm);
 	}
 
 	.setting-item-block {
