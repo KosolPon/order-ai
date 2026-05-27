@@ -634,6 +634,35 @@
 										<!-- Tab handlers for individual groups -->
 										{#if activeTab === 'local'}
 											{#if localModels.length > 0}
+												<!-- Pinned Local Section -->
+												{#if localModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+													<div class="model-group-title">ที่ปักหมุดไว้</div>
+													<div class="model-grid" style="margin-bottom: 8px;">
+														{#each localModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+															<div 
+																class="model-item-card" 
+																class:selected={selectedModel === model.name}
+																onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+															>
+																<div class="model-card-content">
+																	<div class="model-name-row">
+																		<span class="model-name-text" title={model.name}>{model.name}</span>
+																		<span class="model-source-badge local">L</span>
+																	</div>
+																</div>
+																<button 
+																	class="pin-btn pinned" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ถอนหมุดโมเดล"
+																>
+																	★
+																</button>
+															</div>
+														{/each}
+													</div>
+													<div class="model-group-title">โมเดลทั้งหมด</div>
+												{/if}
+
 												<div class="model-grid">
 													{#each localModels as model}
 														<div 
@@ -663,6 +692,35 @@
 											{/if}
 										{:else if activeTab === 'cloud'}
 											{#if cloudModels.length > 0}
+												<!-- Pinned Cloud Section -->
+												{#if cloudModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+													<div class="model-group-title">ที่ปักหมุดไว้</div>
+													<div class="model-grid" style="margin-bottom: 8px;">
+														{#each cloudModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+															<div 
+																class="model-item-card" 
+																class:selected={selectedModel === model.name}
+																onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+															>
+																<div class="model-card-content">
+																	<div class="model-name-row">
+																		<span class="model-name-text" title={model.name}>{model.name}</span>
+																		<span class="model-source-badge cloud">C</span>
+																	</div>
+																</div>
+																<button 
+																	class="pin-btn pinned" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ถอนหมุดโมเดล"
+																>
+																	★
+																</button>
+															</div>
+														{/each}
+													</div>
+													<div class="model-group-title">โมเดลทั้งหมด</div>
+												{/if}
+
 												<div class="model-grid">
 													{#each cloudModels as model}
 														<div 
@@ -692,6 +750,35 @@
 											{/if}
 										{:else if activeTab === 'gemini'}
 											{#if geminiModels.length > 0}
+												<!-- Pinned Gemini Section -->
+												{#if geminiModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+													<div class="model-group-title">ที่ปักหมุดไว้</div>
+													<div class="model-grid" style="margin-bottom: 8px;">
+														{#each geminiModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+															<div 
+																class="model-item-card" 
+																class:selected={selectedModel === model.name}
+																onclick={() => { selectedModel = model.name; showModelPopup = false; }}
+															>
+																<div class="model-card-content">
+																	<div class="model-name-row">
+																		<span class="model-name-text" title={model.name}>{model.name}</span>
+																		<span class="model-source-badge gemini">G</span>
+																	</div>
+																</div>
+																<button 
+																	class="pin-btn pinned" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ถอนหมุดโมเดล"
+																>
+																	★
+																</button>
+															</div>
+														{/each}
+													</div>
+													<div class="model-group-title">โมเดลทั้งหมด</div>
+												{/if}
+
 												<div class="model-grid">
 													{#each geminiModels as model}
 														<div 
@@ -1010,7 +1097,7 @@
 		border-radius: 16px;
 		box-shadow: var(--shadow-lg);
 		z-index: 100;
-		width: 440px;
+		width: 480px;
 		min-height: 180px;
 		max-width: calc(100vw - 32px);
 		box-sizing: border-box;

@@ -41,6 +41,8 @@
 	});
 	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
+	let prevSelectedModel = $state<string>('');
+	let prevFirstActive = $state<string>('');
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
 	let topP = $state<number>(0.9);
 	let topK = $state<number>(40);
@@ -388,6 +390,8 @@
 			}
 
 			isInitialized = true;
+			prevSelectedModel = selectedModel;
+			prevFirstActive = activeModels[0] || '';
 		});
 	});
 
@@ -519,13 +523,21 @@
 	// Synchronize selectedModel and activeModels[0]
 	$effect(() => {
 		if (!isInitialized) return;
-		const firstActive = activeModels[0] || '';
-		if (selectedModel !== firstActive) {
-			if (activeModels[0] !== selectedModel) {
-				activeModels[0] = selectedModel;
-			} else {
-				selectedModel = firstActive;
-			}
+		
+		const currentSelected = selectedModel;
+		const currentFirstActive = activeModels[0] || '';
+
+		if (currentSelected !== prevSelectedModel) {
+			// selectedModel changed (from main prompt selector) -> update activeModels[0]
+			activeModels[0] = currentSelected;
+			activeModels = [...activeModels];
+			prevSelectedModel = currentSelected;
+			prevFirstActive = currentSelected;
+		} else if (currentFirstActive !== prevFirstActive) {
+			// activeModels[0] changed (from settings selector Step 1) -> update selectedModel
+			selectedModel = currentFirstActive;
+			prevSelectedModel = currentFirstActive;
+			prevFirstActive = currentFirstActive;
 		}
 	});
 
