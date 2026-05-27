@@ -451,18 +451,22 @@
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_enable_local', String(enableOllamaLocal));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_enable_cloud', String(enableOllamaCloud));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_enable_gemini', String(enableGemini));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		if (enableOllamaLocal || enableOllamaCloud || enableGemini) {
 			untrack(() => {
 				const availableModels = models;
@@ -497,12 +501,14 @@
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		if (!isGenerating) {
 			localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
 		}
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		if (currentConversationId) {
 			localStorage.setItem('ollama_active_id', currentConversationId);
 		} else {
@@ -512,6 +518,7 @@
 
 	// Synchronize selectedModel and activeModels[0]
 	$effect(() => {
+		if (!isInitialized) return;
 		const firstActive = activeModels[0] || '';
 		if (selectedModel !== firstActive) {
 			if (activeModels[0] !== selectedModel) {
@@ -524,6 +531,7 @@
 
 	// Save active models and temperatures to localStorage
 	$effect(() => {
+		if (!isInitialized) return;
 		if (activeModels && activeModels.length > 0) {
 			localStorage.setItem('ollama_active_models', JSON.stringify(activeModels));
 			localStorage.setItem('ollama_selected_model', activeModels[0]);
@@ -531,35 +539,43 @@
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_model_temperatures', JSON.stringify(modelTemperatures));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_topp', String(topP));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_topk', String(topK));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_numctx', String(numCtx));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_numpredict', String(numPredict));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_repeatpenalty', String(repeatPenalty));
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_customize_settings', String(customizeSettings));
 	});
 
 	// Save drafts to localStorage with 500ms debounce
 	$effect(() => {
+		if (!isInitialized) return;
 		const dataToSave = JSON.stringify(drafts);
 		const timeout = setTimeout(() => {
 			localStorage.setItem('ollama_drafts', dataToSave);
@@ -569,6 +585,7 @@
 
 	// Save projects to localStorage with quota protection
 	$effect(() => {
+		if (!isInitialized) return;
 		try {
 			localStorage.setItem('ollama_projects', JSON.stringify(projects));
 		} catch (error: any) {
@@ -582,6 +599,7 @@
 
 	// Save global context to localStorage
 	$effect(() => {
+		if (!isInitialized) return;
 		localStorage.setItem('ollama_global_context', globalContext);
 	});
 
@@ -1561,6 +1579,7 @@
 			{theme}
 			{projects}
 			{conversations}
+			rightPaneTab={rightPaneTab}
 			onSelectConversation={handleSelectConversation}
 			onToggleTheme={handleToggleTheme}
 			onSelectColor={handleSelectColor}
