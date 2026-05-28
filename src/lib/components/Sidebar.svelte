@@ -256,12 +256,6 @@
 			</svg>
 			<span>Order AI</span>
 		</div>
-		<button class="new-chat-btn" onclick={onNewConversation}>
-			<svg viewBox="0 0 24 24" width="18" height="18">
-				<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-			</svg>
-			<span>New Conversation</span>
-		</button>
 	</div>
 
 	<!-- History Navigation -->
@@ -388,6 +382,11 @@
 
 		<div class="history-header unassigned-header">
 			<div class="history-title">Independent Chats</div>
+			<button class="add-project-btn" onclick={onNewConversation} title="New Independent Chat">
+				<svg viewBox="0 0 24 24" width="16" height="16">
+					<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+				</svg>
+			</button>
 		</div>
 
 		{#if independentConvs.length === 0}

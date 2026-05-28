@@ -1014,6 +1014,11 @@
 		margin-bottom: 0;
 	}
 
+	.input-row.multiline .model-selector-wrapper .model-popup {
+		left: 0;
+		right: auto;
+	}
+
 	.prompt-textarea {
 		flex: 1;
 		width: 100%;
