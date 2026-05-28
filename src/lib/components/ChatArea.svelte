@@ -2172,6 +2172,13 @@
 		flex-direction: row;
 	}
 
+	@media (max-width: 768px) {
+		.message-wrapper, .message-wrapper.user {
+			flex-direction: column;
+			gap: 8px;
+		}
+	}
+
 	.message-avatar {
 		flex-shrink: 0;
 	}

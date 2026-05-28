@@ -1701,6 +1701,11 @@
 			margin-left: auto;
 			margin-bottom: 0;
 		}
+
+		.model-popup {
+			left: 0;
+			right: auto;
+		}
 	}
 
 	@container (max-width: 500px) {
@@ -1711,7 +1716,7 @@
 		}
 
 		.prompt-textarea {
-			font-size: 0.95rem;
+			font-size: 16px; /* prevent iOS zoom */
 		}
 
 		.model-selected-text {

@@ -2189,7 +2189,9 @@
 			flex-direction: column;
 			height: 90vh;
 			max-height: 90vh;
-			width: 95vw;
+			width: 100%;
+			max-width: calc(100vw - 32px);
+			box-sizing: border-box;
 		}
 
 		.settings-sidebar {
