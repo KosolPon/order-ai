@@ -432,7 +432,9 @@
 			document.head.appendChild(metaEl);
 		}
 		metaEl.setAttribute('content', metaColor);
-		localStorage.setItem('theme', theme);
+		if (isInitialized) {
+			localStorage.setItem('theme', theme);
+		}
 	});
 
 	// Save data to localStorage on state changes
