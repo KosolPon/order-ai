@@ -89,27 +89,37 @@
 	function handleLocalToggle(service: 'local' | 'cloud' | 'gemini', checked: boolean) {
 		if (service === 'local') {
 			localEnableOllamaLocal = checked;
-			if (!checked) {
-				enableOllamaLocal = false;
-				onRefreshModels();
-			}
+			enableOllamaLocal = checked;
+			onRefreshModels();
 		} else if (service === 'cloud') {
 			localEnableOllamaCloud = checked;
-			if (!checked) {
-				enableOllamaCloud = false;
-				onRefreshModels();
-			}
+			enableOllamaCloud = checked;
+			onRefreshModels();
 		} else if (service === 'gemini') {
 			localEnableGemini = checked;
-			if (!checked) {
-				enableGemini = false;
-				onRefreshModels();
-			}
+			enableGemini = checked;
+			onRefreshModels();
 		}
 	}
 
+	// Initialize connection status messages when modal is opened based on pre-established parent connection states
+	$effect(() => {
+		if (isSettingsOpen) {
+			if (isConnected && enableOllamaLocal) {
+				localStatusLocal = { type: 'success', message: 'เชื่อมต่อสำเร็จ! (Connected)' };
+			}
+			if (isOllamaCloudConnected && enableOllamaCloud) {
+				localStatusCloud = { type: 'success', message: 'เชื่อมต่อ Ollama Cloud สำเร็จ! (Connected)' };
+			}
+			if (geminiApiKey && enableGemini) {
+				localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ! (Active)' };
+			}
+		}
+	});
+
 	// Auto-validate Ollama Local in background
 	$effect(() => {
+		if (!isSettingsOpen) return;
 		const url = ollamaUrl;
 		if (url) {
 			if (!isValidUrl(url)) {
@@ -146,21 +156,9 @@
 		}
 	});
 
-	// Sync localEnableOllamaLocal to enableOllamaLocal
-	$effect(() => {
-		if (localEnableOllamaLocal) {
-			if (localStatusLocal.type === 'success') {
-				enableOllamaLocal = true;
-			} else {
-				enableOllamaLocal = false;
-			}
-		} else {
-			enableOllamaLocal = false;
-		}
-	});
-
 	// Auto-validate Ollama Cloud in background
 	$effect(() => {
+		if (!isSettingsOpen) return;
 		const url = ollamaCloudUrl;
 		const key = ollamaCloudApiKey;
 		if (url && key) {
@@ -197,21 +195,9 @@
 		}
 	});
 
-	// Sync localEnableOllamaCloud to enableOllamaCloud
-	$effect(() => {
-		if (localEnableOllamaCloud) {
-			if (localStatusCloud.type === 'success') {
-				enableOllamaCloud = true;
-			} else {
-				enableOllamaCloud = false;
-			}
-		} else {
-			enableOllamaCloud = false;
-		}
-	});
-
 	// Auto-validate Gemini Key in background
 	$effect(() => {
+		if (!isSettingsOpen) return;
 		const key = geminiApiKey;
 		if (key) {
 			const timer = setTimeout(async () => {
@@ -242,19 +228,6 @@
 			enableGemini = false;
 			localEnableGemini = false;
 			localStatusGemini = { type: 'idle', message: '' };
-		}
-	});
-
-	// Sync localEnableGemini to enableGemini
-	$effect(() => {
-		if (localEnableGemini) {
-			if (localStatusGemini.type === 'success') {
-				enableGemini = true;
-			} else {
-				enableGemini = false;
-			}
-		} else {
-			enableGemini = false;
 		}
 	});
 
