@@ -255,14 +255,19 @@
 
 	$effect(() => {
 		if (typeof window !== 'undefined') {
-			const stored = localStorage.getItem('pinned_models');
-			if (stored) {
-				try {
-					pinnedModelNames = JSON.parse(stored);
-				} catch (e) {
-					console.error(e);
+			const loadPinned = () => {
+				const stored = localStorage.getItem('pinned_models');
+				if (stored) {
+					try {
+						pinnedModelNames = JSON.parse(stored);
+					} catch (e) {
+						pinnedModelNames = [];
+					}
 				}
-			}
+			};
+			loadPinned();
+			window.addEventListener('pinned_models_updated', loadPinned);
+			return () => window.removeEventListener('pinned_models_updated', loadPinned);
 		}
 	});
 
@@ -274,6 +279,7 @@
 			pinnedModelNames = [...pinnedModelNames, modelName];
 		}
 		localStorage.setItem('pinned_models', JSON.stringify(pinnedModelNames));
+		window.dispatchEvent(new Event('pinned_models_updated'));
 	}
 
 	let filteredDropdownModels = $derived(

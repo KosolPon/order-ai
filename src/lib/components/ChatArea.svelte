@@ -2174,8 +2174,31 @@
 
 	@media (max-width: 768px) {
 		.message-wrapper, .message-wrapper.user {
-			flex-direction: column;
-			gap: 8px;
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 8px 12px;
+			align-items: flex-start;
+		}
+
+		.message-body {
+			display: contents;
+		}
+
+		.message-avatar {
+			grid-column: 1;
+			grid-row: 1;
+		}
+
+		.message-info {
+			grid-column: 2;
+			grid-row: 1;
+			margin-bottom: 0;
+			align-self: center;
+		}
+
+		.message-content {
+			grid-column: 1 / -1;
+			grid-row: 2;
 		}
 	}
 
