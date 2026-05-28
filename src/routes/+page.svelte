@@ -476,11 +476,12 @@
 				const availableModels = models;
 				if (availableModels.length > 0) {
 					const modelNames = availableModels.map((m) => m.name);
-					if (!selectedModel || !modelNames.includes(selectedModel)) {
+					const storedModel = localStorage.getItem('ollama_selected_model');
+					if (storedModel && modelNames.includes(storedModel)) {
+						selectedModel = storedModel;
+					} else if (!selectedModel || !modelNames.includes(selectedModel)) {
 						selectedModel = availableModels[0].name;
 					}
-				} else {
-					selectedModel = '';
 				}
 			});
 		}
@@ -673,11 +674,12 @@
 		const availableModels = models;
 		if (availableModels.length > 0) {
 			const modelNames = availableModels.map((m) => m.name);
-			if (!selectedModel || !modelNames.includes(selectedModel)) {
+			const storedModel = localStorage.getItem('ollama_selected_model');
+			if (storedModel && modelNames.includes(storedModel)) {
+				selectedModel = storedModel;
+			} else if (!selectedModel || !modelNames.includes(selectedModel)) {
 				selectedModel = availableModels[0].name;
 			}
-		} else {
-			selectedModel = '';
 		}
 	}
 
@@ -923,6 +925,7 @@
 	) {
 		const chainLength = activeModels.length;
 		let currentPrompt = initialMessages[initialMessages.length - 1]?.content || '';
+		let runningModel = activeModels[0] || selectedModel;
 
 		const appendToAssistantMessage = (text: string) => {
 			conversations = conversations.map((conv) => {
@@ -965,6 +968,8 @@
 		};
 
 		const setAssistantMessageModel = (modelName: string) => {
+			const parts = modelName.split(' ➔ ');
+			runningModel = parts[parts.length - 1].trim();
 			conversations = conversations.map((conv) => {
 				if (conv.id === activeConvId) {
 					return {
@@ -1295,7 +1300,7 @@
 							if (m.id === assistantMsgId) {
 								return {
 									...m,
-									content: m.content + `\n\n**Error during model execution:** _${error.message}_`
+									content: m.content + formatErrorMessage(error.message || String(error), runningModel)
 								};
 							}
 							return m;
@@ -1307,6 +1312,33 @@
 			isGenerating = false;
 			abortController = null;
 		}
+	}
+
+	function formatErrorMessage(message: string, model: string): string {
+		const lower = message.toLowerCase();
+		let friendly = '';
+		
+		if (model.startsWith('gemini')) {
+			if (lower.includes('api key') || lower.includes('key not valid') || lower.includes('unauthorized')) {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาด: Google Gemini API Key ไม่ถูกต้อง หรือไม่ได้รับอนุญาต (API Key Invalid)**\n\n**คำแนะนำ:**\n1. ไปที่ปุ่มตั้งค่า (ฟันเฟือง) หรือเมนูตั้งค่าด้านบน\n2. ตรวจสอบและแก้ไข Gemini API Key ของคุณให้ถูกต้องในแท็บ Google Gemini (Cloud) และลองอีกครั้ง`;
+			} else if (lower.includes('quota') || lower.includes('rate limit') || lower.includes('429')) {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาด: โควต้า Gemini API เกินขีดจำกัด (Quota Exceeded / Rate Limit)**\n\n**คำแนะนำ:**\nกรุณารอสักครู่แล้วลองใหม่อีกครั้ง หรือสลับไปใช้โมเดล Ollama ตัวอื่น`;
+			} else if (lower.includes('region') || lower.includes('not supported')) {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาด: พื้นที่ใช้งานไม่รองรับ (Region Not Supported)**\n\n**คำแนะนำ:**\nโมเดล Gemini หรือ API Key นี้อาจไม่มีสิทธิ์เข้าถึงในภูมิภาคของคุณ`;
+			} else {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาดจาก Gemini API:**\n_${message}_`;
+			}
+		} else {
+			// Ollama error
+			if (lower.includes('failed to fetch') || lower.includes('connection') || lower.includes('502') || lower.includes('failed to connect')) {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับบริการโมเดลได้ (Connection Failed)**\n\n**สาเหตุและคำแนะนำ:**\n1. **Ollama ปิดอยู่:** กรุณาตรวจสอบว่าโปรแกรม Ollama เปิดทำงานอยู่บนเครื่องของคุณ\n2. **URL ผิดพลาด:** ตรวจสอบว่า URL ตั้งค่าไว้ถูกต้อง (เช่น \`http://localhost:11434\`)\n3. **ปัญหา CORS:** หากใช้ผ่านเว็บที่ Deploy คุณต้องเปิดใช้ CORS ใน Ollama ก่อน (ดูคู่มือตั้งค่า CORS ได้ในหน้า Settings > Connections > Ollama Local)`;
+			} else if (lower.includes('not found') || lower.includes('404')) {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาด: ไม่พบโมเดล "${model}" บนระบบ (Model Not Found)**\n\n**คำแนะนำ:**\nกรุณาดึง (pull) โมเดลนี้ใน Ollama ก่อนใช้งาน (รัน \`ollama pull ${model}\` ใน Terminal) หรือตรวจสอบว่าพิมพ์ชื่อโมเดลถูกต้อง`;
+			} else {
+				friendly = `\n\n⚠️ **เกิดข้อผิดพลาดจากการประมวลผลโมเดล (${model}):**\n_${message}_`;
+			}
+		}
+		return friendly;
 	}
 
 	// Send message to assistant
@@ -1627,6 +1659,13 @@
 			bind:useCanvas
 			onSend={() => handleSendPrompt()}
 			onStop={handleStopGeneration}
+			onOpenSettings={() => {
+				isSettingsOpen = true;
+			}}
+			onRefreshModels={async () => {
+				await loadModels();
+				await loadCloudModels();
+			}}
 		/>
 	</main>
 

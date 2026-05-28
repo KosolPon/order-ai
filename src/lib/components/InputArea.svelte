@@ -13,7 +13,9 @@
 		isBusy = false,
 		useCanvas = $bindable(false),
 		onSend,
-		onStop
+		onStop,
+		onOpenSettings,
+		onRefreshModels
 	} = $props<{
 		input: string;
 		models: (OllamaModel & { source?: 'local' | 'cloud' | 'gemini' })[];
@@ -26,7 +28,12 @@
 		useCanvas: boolean;
 		onSend: () => void;
 		onStop: () => void;
+		onOpenSettings?: () => void;
+		onRefreshModels?: () => void;
 	}>();
+
+	let currentModelObj = $derived(models.find(m => m.name === selectedModel));
+	let currentModelSource = $derived(currentModelObj?.source || (selectedModel.startsWith('gemini-') ? 'gemini' : 'local'));
 
 	let textareaElement = $state<HTMLTextAreaElement | null>(null);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
@@ -437,16 +444,27 @@
 							{activeModels.map((m: string) => m.split(':')[0] || 'Unknown').join(' + ')}
 						</span>
 					{:else}
-						<svg class="model-icon" viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-						</svg>
+						{#if currentModelSource === 'gemini'}
+							<svg class="model-icon gemini-icon" viewBox="0 0 24 24" width="16" height="16">
+								<path fill="currentColor" d="M12 2L9.5 8.5 3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2zM12 5.8l1.6 4.2 4.2 1.6-4.2 1.6L12 17.4l-1.6-4.2-4.2-1.6 4.2-1.6L12 5.8zm-7 11.2l-1 2.5-2.5 1 2.5 1 1 2.5 1-2.5 2.5-1-2.5-1-1-2.5zm15.5-2.5l-1 2.5-2.5 1 2.5 1 1 2.5 1-2.5 2.5-1-2.5-1-1-2.5z"/>
+							</svg>
+						{:else}
+							{#if currentModelSource === 'cloud'}
+								<svg class="model-icon cloud-icon" viewBox="0 0 24 24" width="16" height="16">
+									<path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+								</svg>
+							{:else}
+								<svg class="model-icon local-icon" viewBox="0 0 24 24" width="16" height="16">
+									<path fill="currentColor" d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v10c0 1.1.89 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+								</svg>
+							{/if}
+						{/if}
 						<span class="model-selected-text">
 							{selectedModel || (models.length === 0 ? "No models found" : "Select model")}
 						</span>
 						<svg class="chevron-down" viewBox="0 0 24 24" width="12" height="12">
 							<path fill="currentColor" d="M7 10l5 5 5-5z"/>
 						</svg>
-
 						{#if showModelPopup}
 							<!-- Custom Popup -->
 							<div 
@@ -478,6 +496,32 @@
 											</button>
 										{/if}
 									</div>
+
+									{#if onRefreshModels}
+										<button 
+											type="button"
+											class="popup-header-icon-btn" 
+											onclick={(e) => { e.stopPropagation(); onRefreshModels(); }}
+											title="รีเฟรชรายชื่อโมเดล"
+										>
+											<svg viewBox="0 0 24 24" width="16" height="16">
+												<path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+											</svg>
+										</button>
+									{/if}
+
+									{#if onOpenSettings}
+										<button 
+											type="button"
+											class="popup-header-icon-btn" 
+											onclick={(e) => { e.stopPropagation(); showModelPopup = false; onOpenSettings(); }}
+											title="ตั้งค่าโมเดล/API"
+										>
+											<svg viewBox="0 0 24 24" width="16" height="16">
+												<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+											</svg>
+										</button>
+									{/if}
 								</div>
 
 								<!-- Tabs Header -->
@@ -1091,7 +1135,7 @@
 	.model-selected-text {
 		font-size: 0.85rem;
 		font-weight: 500;
-		max-width: 150px;
+		max-width: 220px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1137,6 +1181,25 @@
 		align-items: center;
 		gap: 8px;
 		background-color: var(--bg-primary);
+	}
+
+	.popup-header-icon-btn {
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		padding: 6px;
+		border-radius: 6px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color var(--transition-fast), background-color var(--transition-fast);
+		flex-shrink: 0;
+	}
+
+	.popup-header-icon-btn:hover {
+		color: var(--text-primary);
+		background-color: var(--bg-hover);
 	}
 
 	.search-input-wrapper {

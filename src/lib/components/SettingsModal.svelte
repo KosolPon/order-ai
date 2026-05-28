@@ -77,26 +77,32 @@
 		localEnableGemini = enableGemini;
 	});
 
+	function isValidUrl(urlString: string): boolean {
+		try {
+			const url = new URL(urlString);
+			return url.protocol === 'http:' || url.protocol === 'https:';
+		} catch (e) {
+			return false;
+		}
+	}
+
 	function handleLocalToggle(service: 'local' | 'cloud' | 'gemini', checked: boolean) {
 		if (service === 'local') {
 			localEnableOllamaLocal = checked;
 			if (!checked) {
 				enableOllamaLocal = false;
-				localStatusLocal = { type: 'idle', message: '' };
 				onRefreshModels();
 			}
 		} else if (service === 'cloud') {
 			localEnableOllamaCloud = checked;
 			if (!checked) {
 				enableOllamaCloud = false;
-				localStatusCloud = { type: 'idle', message: '' };
 				onRefreshModels();
 			}
 		} else if (service === 'gemini') {
 			localEnableGemini = checked;
 			if (!checked) {
 				enableGemini = false;
-				localStatusGemini = { type: 'idle', message: '' };
 				onRefreshModels();
 			}
 		}
@@ -104,19 +110,28 @@
 
 	// Auto-validate Ollama Local in background
 	$effect(() => {
-		if (localEnableOllamaLocal && ollamaUrl) {
-			const url = ollamaUrl;
+		const url = ollamaUrl;
+		if (url) {
+			if (!isValidUrl(url)) {
+				enableOllamaLocal = false;
+				localEnableOllamaLocal = false;
+				localStatusLocal = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น http://localhost:11434)' };
+				return;
+			}
 			const timer = setTimeout(async () => {
 				testingLocal = true;
 				localStatusLocal = { type: 'idle', message: 'กำลังตรวจสอบการเชื่อมต่อ... (Verifying...)' };
 				try {
 					const fetched = await fetchModels(url);
-					enableOllamaLocal = true;
 					const count = fetched.filter(m => !m.name.includes('gemini') && !m.name.includes('cloud')).length;
 					localStatusLocal = { type: 'success', message: `เชื่อมต่อสำเร็จ! โหลดโมเดลทั้งหมด ${count} ตัว` };
-					onRefreshModels();
+					if (localEnableOllamaLocal) {
+						enableOllamaLocal = true;
+						onRefreshModels();
+					}
 				} catch (error: any) {
 					enableOllamaLocal = false;
+					localEnableOllamaLocal = false;
 					const errMsg = error?.message || 'เชื่อมต่อล้มเหลว ตรวจสอบว่าเปิด Ollama หรือยัง และตั้งค่า CORS ถูกต้องหรือไม่';
 					localStatusLocal = { type: 'error', message: errMsg };
 				} finally {
@@ -126,26 +141,48 @@
 			return () => clearTimeout(timer);
 		} else {
 			enableOllamaLocal = false;
+			localEnableOllamaLocal = false;
 			localStatusLocal = { type: 'idle', message: '' };
+		}
+	});
+
+	// Sync localEnableOllamaLocal to enableOllamaLocal
+	$effect(() => {
+		if (localEnableOllamaLocal) {
+			if (localStatusLocal.type === 'success') {
+				enableOllamaLocal = true;
+			} else {
+				enableOllamaLocal = false;
+			}
+		} else {
+			enableOllamaLocal = false;
 		}
 	});
 
 	// Auto-validate Ollama Cloud in background
 	$effect(() => {
-		if (localEnableOllamaCloud && ollamaCloudUrl && ollamaCloudApiKey) {
-			const url = ollamaCloudUrl;
-			const key = ollamaCloudApiKey;
+		const url = ollamaCloudUrl;
+		const key = ollamaCloudApiKey;
+		if (url && key) {
+			if (!isValidUrl(url)) {
+				enableOllamaCloud = false;
+				localEnableOllamaCloud = false;
+				localStatusCloud = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น https://api.ollama.com)' };
+				return;
+			}
 			const timer = setTimeout(async () => {
 				testingCloud = true;
 				localStatusCloud = { type: 'idle', message: 'กำลังทดสอบการเชื่อมต่อ... (Verifying...)' };
 				try {
 					const fetched = await fetchModels(url, key);
-					enableOllamaCloud = true;
-					const count = fetched.length;
-					localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${count} ตัว` };
-					onRefreshModels();
+					localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${fetched.length} ตัว` };
+					if (localEnableOllamaCloud) {
+						enableOllamaCloud = true;
+						onRefreshModels();
+					}
 				} catch (error: any) {
 					enableOllamaCloud = false;
+					localEnableOllamaCloud = false;
 					const errMsg = error?.message || 'เชื่อมต่อ Ollama Cloud ล้มเหลว ตรวจสอบ URL และ API Key';
 					localStatusCloud = { type: 'error', message: errMsg };
 				} finally {
@@ -155,14 +192,28 @@
 			return () => clearTimeout(timer);
 		} else {
 			enableOllamaCloud = false;
+			localEnableOllamaCloud = false;
 			localStatusCloud = { type: 'idle', message: '' };
+		}
+	});
+
+	// Sync localEnableOllamaCloud to enableOllamaCloud
+	$effect(() => {
+		if (localEnableOllamaCloud) {
+			if (localStatusCloud.type === 'success') {
+				enableOllamaCloud = true;
+			} else {
+				enableOllamaCloud = false;
+			}
+		} else {
+			enableOllamaCloud = false;
 		}
 	});
 
 	// Auto-validate Gemini Key in background
 	$effect(() => {
-		if (localEnableGemini && geminiApiKey) {
-			const key = geminiApiKey;
+		const key = geminiApiKey;
+		if (key) {
 			const timer = setTimeout(async () => {
 				testingGemini = true;
 				localStatusGemini = { type: 'idle', message: 'กำลังตรวจสอบ API Key... (Verifying...)' };
@@ -172,11 +223,14 @@
 						const errData = await res.json().catch(() => ({}));
 						throw new Error(errData.error?.message || `HTTP error ${res.status}`);
 					}
-					enableGemini = true;
 					localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ!' };
-					onRefreshModels();
+					if (localEnableGemini) {
+						enableGemini = true;
+						onRefreshModels();
+					}
 				} catch (error: any) {
 					enableGemini = false;
+					localEnableGemini = false;
 					const errMsg = error?.message || 'ตรวจสอบ API Key ล้มเหลว กรุณาเช็คความถูกต้องของ API Key';
 					localStatusGemini = { type: 'error', message: errMsg };
 				} finally {
@@ -186,7 +240,21 @@
 			return () => clearTimeout(timer);
 		} else {
 			enableGemini = false;
+			localEnableGemini = false;
 			localStatusGemini = { type: 'idle', message: '' };
+		}
+	});
+
+	// Sync localEnableGemini to enableGemini
+	$effect(() => {
+		if (localEnableGemini) {
+			if (localStatusGemini.type === 'success') {
+				enableGemini = true;
+			} else {
+				enableGemini = false;
+			}
+		} else {
+			enableGemini = false;
 		}
 	});
 
@@ -443,43 +511,41 @@
 												<p>Execute open-source LLMs locally on your machine</p>
 											</div>
 											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableOllamaLocal} onchange={(e) => handleLocalToggle('local', e.currentTarget.checked)} />
+												<input type="checkbox" checked={localEnableOllamaLocal} disabled={localStatusLocal.type !== 'success'} onchange={(e) => handleLocalToggle('local', e.currentTarget.checked)} />
 												<span class="toggle-slider"></span>
 											</label>
 										</div>
-										{#if localEnableOllamaLocal}
-											<div class="api-service-body animate-fade-in">
-												<div class="setting-item-block">
-													<label for="modal-ollama-url">Ollama Server URL</label>
-													<div class="modal-input-group">
-														<input 
-															id="modal-ollama-url"
-															type="text" 
-															placeholder="http://localhost:11434" 
-															bind:value={ollamaUrl}
-														/>
-													</div>
-													<div class="status-alert" class:success={enableOllamaLocal} class:error={!enableOllamaLocal}>
-														<span class="status-alert-dot"></span>
-														<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่อสำเร็จ (Connected).` : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-													</div>
+										<div class="api-service-body">
+											<div class="setting-item-block">
+												<label for="modal-ollama-url">Ollama Server URL</label>
+												<div class="modal-input-group">
+													<input 
+														id="modal-ollama-url"
+														type="text" 
+														placeholder="http://localhost:11434" 
+														bind:value={ollamaUrl}
+													/>
 												</div>
-
-												{#if !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
-													<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
-														<h4>CORS Configuration Guide</h4>
-														<p>To connect local Ollama from a deployed site, you need to enable CORS origins:</p>
-														<ol>
-															<li>Close the Ollama application.</li>
-															<li>Run in Terminal to allow CORS:
-																<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
-															</li>
-															<li>Restart Ollama.</li>
-														</ol>
-													</div>
-												{/if}
+												<div class="status-alert" class:success={localStatusLocal.type === 'success'} class:error={localStatusLocal.type === 'error'}>
+													<span class="status-alert-dot"></span>
+													<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่อสำเร็จ (Connected).` : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+												</div>
 											</div>
-										{/if}
+
+											{#if !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
+												<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
+													<h4>CORS Configuration Guide</h4>
+													<p>To connect local Ollama from a deployed site, you need to enable CORS origins:</p>
+													<ol>
+														<li>Close the Ollama application.</li>
+														<li>Run in Terminal to allow CORS:
+															<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
+														</li>
+														<li>Restart Ollama.</li>
+													</ol>
+												</div>
+											{/if}
+										</div>
 									</div>
 								{:else if selectedConnectionTab === 'cloud'}
 									<!-- Ollama Cloud -->
@@ -490,51 +556,49 @@
 												<p>Connect to a hosted/remote Ollama endpoint</p>
 											</div>
 											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableOllamaCloud} onchange={(e) => handleLocalToggle('cloud', e.currentTarget.checked)} />
+												<input type="checkbox" checked={localEnableOllamaCloud} disabled={localStatusCloud.type !== 'success'} onchange={(e) => handleLocalToggle('cloud', e.currentTarget.checked)} />
 												<span class="toggle-slider"></span>
 											</label>
 										</div>
-										{#if localEnableOllamaCloud}
-											<div class="api-service-body animate-fade-in">
-												<div class="setting-item-block">
-													<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
-													<input 
-														id="modal-ollama-cloud-url"
-														type="text" 
-														class="modal-text-input"
-														placeholder="https://ollama.com" 
-														bind:value={ollamaCloudUrl}
-													/>
-												</div>
+										<div class="api-service-body">
+											<div class="setting-item-block">
+												<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
+												<input 
+													id="modal-ollama-cloud-url"
+													type="text" 
+													class="modal-text-input"
+													placeholder="https://ollama.com" 
+													bind:value={ollamaCloudUrl}
+												/>
+											</div>
 
-												<div class="setting-item-block" style="margin-top: 10px;">
-													<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
-													<div class="modal-input-group">
-														<input 
-															id="modal-ollama-cloud-key"
-															type={showOllamaCloudKey ? 'text' : 'password'} 
-															placeholder="Ollama Cloud API Key..." 
-															bind:value={ollamaCloudApiKey}
-														/>
-														<button 
-															class="modal-eye-btn" 
-															onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
-															title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
-														>
-															{#if showOllamaCloudKey}
-																<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-															{:else}
-																<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-															{/if}
-														</button>
-													</div>
-													<div class="status-alert" class:success={enableOllamaCloud} class:error={!enableOllamaCloud}>
-														<span class="status-alert-dot"></span>
-														<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud สำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-													</div>
+											<div class="setting-item-block" style="margin-top: 10px;">
+												<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
+												<div class="modal-input-group">
+													<input 
+														id="modal-ollama-cloud-key"
+														type={showOllamaCloudKey ? 'text' : 'password'} 
+														placeholder="Ollama Cloud API Key..." 
+														bind:value={ollamaCloudApiKey}
+													/>
+													<button 
+														class="modal-eye-btn" 
+														onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
+														title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
+													>
+														{#if showOllamaCloudKey}
+															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+														{:else}
+															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+														{/if}
+													</button>
+												</div>
+												<div class="status-alert" class:success={localStatusCloud.type === 'success'} class:error={localStatusCloud.type === 'error'}>
+													<span class="status-alert-dot"></span>
+													<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud สำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
 												</div>
 											</div>
-										{/if}
+										</div>
 									</div>
 								{:else if selectedConnectionTab === 'gemini'}
 									<!-- Gemini Cloud -->
@@ -545,40 +609,38 @@
 												<p>Connect directly to official Gemini API Studio models</p>
 											</div>
 											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableGemini} onchange={(e) => handleLocalToggle('gemini', e.currentTarget.checked)} />
+												<input type="checkbox" checked={localEnableGemini} disabled={localStatusGemini.type !== 'success'} onchange={(e) => handleLocalToggle('gemini', e.currentTarget.checked)} />
 												<span class="toggle-slider"></span>
 											</label>
 										</div>
-										{#if localEnableGemini}
-											<div class="api-service-body animate-fade-in">
-												<div class="setting-item-block">
-													<label for="modal-gemini-key">Google Gemini API Key</label>
-													<div class="modal-input-group">
-														<input 
-															id="modal-gemini-key"
-															type={showGeminiKey ? 'text' : 'password'} 
-															placeholder="AI Studio Gemini API Key..." 
-															bind:value={geminiApiKey}
-														/>
-														<button 
-															class="modal-eye-btn" 
-															onclick={() => showGeminiKey = !showGeminiKey} 
-															title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
-														>
-															{#if showGeminiKey}
-																<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-															{:else}
-																<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-															{/if}
-														</button>
-													</div>
-													<div class="status-alert" class:success={enableGemini} class:error={!enableGemini}>
-														<span class="status-alert-dot"></span>
-														<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ไม่ได้เปิดใช้งาน หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-													</div>
+										<div class="api-service-body">
+											<div class="setting-item-block">
+												<label for="modal-gemini-key">Google Gemini API Key</label>
+												<div class="modal-input-group">
+													<input 
+														id="modal-gemini-key"
+														type={showGeminiKey ? 'text' : 'password'} 
+														placeholder="AI Studio Gemini API Key..." 
+														bind:value={geminiApiKey}
+													/>
+													<button 
+														class="modal-eye-btn" 
+														onclick={() => showGeminiKey = !showGeminiKey} 
+														title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
+													>
+														{#if showGeminiKey}
+															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+														{:else}
+															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+														{/if}
+													</button>
+												</div>
+												<div class="status-alert" class:success={localStatusGemini.type === 'success'} class:error={localStatusGemini.type === 'error'}>
+													<span class="status-alert-dot"></span>
+													<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ไม่ได้เปิดใช้งาน หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
 												</div>
 											</div>
-										{/if}
+										</div>
 									</div>
 								{/if}
 							</div>
