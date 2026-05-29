@@ -69,11 +69,13 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 		// Create a custom ReadableStream to relay the response body chunk-by-chunk.
 		// This avoids piping bugs in Node/Bun fetch implementation when handling network streams.
 		let heartbeatInterval: any;
+		let isControllerClosed = false;
 		const stream = new ReadableStream({
 			async start(controller) {
 				const reader = response.body?.getReader();
 				if (!reader) {
 					controller.close();
+					isControllerClosed = true;
 					return;
 				}
 
@@ -83,7 +85,9 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 				// to prevent Cloudflare, Nginx, or Vite dev server timeouts over network routes.
 				heartbeatInterval = setInterval(() => {
 					try {
-						controller.enqueue(encoder.encode('\n'));
+						if (!isControllerClosed) {
+							controller.enqueue(encoder.encode('\n'));
+						}
 					} catch (e) {
 						clearInterval(heartbeatInterval);
 					}
@@ -95,19 +99,31 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 						if (done) {
 							break;
 						}
-						controller.enqueue(value);
+						if (!isControllerClosed) {
+							controller.enqueue(value);
+						}
 					}
 				} catch (err) {
-					console.error('Error proxying Ollama stream chunk:', err);
-					controller.error(err);
+					if (!isControllerClosed) {
+						console.error('Error proxying Ollama stream chunk:', err);
+						try {
+							controller.error(err);
+						} catch (e) {}
+					}
 				} finally {
 					if (heartbeatInterval) {
 						clearInterval(heartbeatInterval);
 					}
-					controller.close();
+					if (!isControllerClosed) {
+						try {
+							controller.close();
+						} catch (e) {}
+						isControllerClosed = true;
+					}
 				}
 			},
 			cancel() {
+				isControllerClosed = true;
 				if (heartbeatInterval) {
 					clearInterval(heartbeatInterval);
 				}
