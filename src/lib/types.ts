@@ -44,9 +44,9 @@ export interface Conversation {
 	projectId?: string; // Links chat to a project
 	context?: string; // Chat-specific system context
 	agentRole?: 'auto' | string; // Active routing setting
-	outputTone?: 'precise' | 'creative';
-	outputLength?: 'summary' | 'detailed' | 'article';
-	thinkingDepth?: 'fast' | 'normal' | 'thinking' | 'reflecting';
+	outputTone?: 'auto' | 'precise' | 'creative';
+	outputLength?: 'auto' | 'summary' | 'detailed' | 'article';
+	thinkingDepth?: 'auto' | 'fast' | 'thinking' | 'reflecting';
 }
 
 export interface OllamaModel {

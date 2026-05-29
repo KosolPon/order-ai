@@ -896,15 +896,15 @@
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, agentRole: role } : c));
 	}
 
-	function handleUpdateChatOutputTone(chatId: string, tone: 'precise' | 'creative') {
+	function handleUpdateChatOutputTone(chatId: string, tone: 'auto' | 'precise' | 'creative') {
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, outputTone: tone } : c));
 	}
 
-	function handleUpdateChatOutputLength(chatId: string, length: 'summary' | 'detailed' | 'article') {
+	function handleUpdateChatOutputLength(chatId: string, length: 'auto' | 'summary' | 'detailed' | 'article') {
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, outputLength: length } : c));
 	}
 
-	function handleUpdateChatThinkingDepth(chatId: string, depth: 'fast' | 'normal' | 'thinking' | 'reflecting') {
+	function handleUpdateChatThinkingDepth(chatId: string, depth: 'auto' | 'fast' | 'thinking' | 'reflecting') {
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, thinkingDepth: depth } : c));
 	}
 
@@ -1011,13 +1011,13 @@
 		}
 
 		// Inject Response Style directives
-		const tone = conv.outputTone || 'precise';
-		const length = conv.outputLength || 'detailed';
-		const thinking = conv.thinkingDepth || 'normal';
+		const tone = conv.outputTone || 'auto';
+		const length = conv.outputLength || 'auto';
+		const thinking = conv.thinkingDepth || 'auto';
 
 		if (tone === 'creative') {
 			parts.push(`[TONE DIRECTIVE]: Be creative, innovative, and expressive. Feel free to explore novel suggestions and expressive formatting.`);
-		} else {
+		} else if (tone === 'precise') {
 			parts.push(`[TONE DIRECTIVE]: Be extremely precise, accurate, objective, and factual. Avoid speculation, assumptions, or fluffy language.`);
 		}
 
@@ -1025,7 +1025,7 @@
 			parts.push(`[LENGTH DIRECTIVE]: Provide a very concise summary. Keep your output short, direct, and to the point.`);
 		} else if (length === 'article') {
 			parts.push(`[LENGTH DIRECTIVE]: Provide a long, comprehensive, in-depth article or report style response with thorough, detailed explanations.`);
-		} else {
+		} else if (length === 'detailed') {
 			parts.push(`[LENGTH DIRECTIVE]: Provide a detailed, clear, and step-by-step response with standard length.`);
 		}
 
@@ -1053,7 +1053,7 @@
 		systemPrompt: string
 	) {
 		const activeConvObj = conversations.find(c => c.id === activeConvId);
-		const tone = activeConvObj?.outputTone || 'precise';
+		const tone = activeConvObj?.outputTone || 'auto';
 
 		const getEffectiveTemp = (configuredTemp: number) => {
 			if (tone === 'precise') return 0.15;

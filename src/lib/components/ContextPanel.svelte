@@ -38,9 +38,9 @@ import type { Conversation, Project } from '$lib/types';
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
 		onUpdateChatAgentRole: (id: string, role: 'auto' | string) => void;
-		onUpdateChatOutputTone: (id: string, tone: 'precise' | 'creative') => void;
-		onUpdateChatOutputLength: (id: string, length: 'summary' | 'detailed' | 'article') => void;
-		onUpdateChatThinkingDepth: (id: string, depth: 'fast' | 'normal' | 'thinking' | 'reflecting') => void;
+		onUpdateChatOutputTone: (id: string, tone: 'auto' | 'precise' | 'creative') => void;
+		onUpdateChatOutputLength: (id: string, length: 'auto' | 'summary' | 'detailed' | 'article') => void;
+		onUpdateChatThinkingDepth: (id: string, depth: 'auto' | 'fast' | 'thinking' | 'reflecting') => void;
 		onEditProjectSettings: (projectId: string) => void;
 		onClose: () => void;
 	}>();
@@ -310,7 +310,16 @@ import type { Conversation, Project } from '$lib/types';
 							<button 
 								type="button" 
 								class="control-btn" 
-								class:active={(conversation.outputTone || 'precise') === 'precise'}
+								class:active={(conversation.outputTone || 'auto') === 'auto'}
+								onclick={() => onUpdateChatOutputTone(conversation.id, 'auto')}
+								title="ไม่ส่งการตั้งค่านี้ (ใช้ค่าเริ่มต้นตามโมเดล)"
+							>
+								🤖 อัตโนมัติ
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.outputTone === 'precise'}
 								onclick={() => onUpdateChatOutputTone(conversation.id, 'precise')}
 								title="เน้นถูกต้องเชิงวิชาการ/โค้ด (Accurate & Precise)"
 							>
@@ -335,6 +344,15 @@ import type { Conversation, Project } from '$lib/types';
 							<button 
 								type="button" 
 								class="control-btn" 
+								class:active={(conversation.outputLength || 'auto') === 'auto'}
+								onclick={() => onUpdateChatOutputLength(conversation.id, 'auto')}
+								title="ไม่ส่งการตั้งค่านี้ (ใช้ค่าเริ่มต้นตามโมเดล)"
+							>
+								🤖 อัตโนมัติ
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
 								class:active={conversation.outputLength === 'summary'}
 								onclick={() => onUpdateChatOutputLength(conversation.id, 'summary')}
 								title="ย่อสรุปเนื้อหาให้สั้นกระชับที่สุด"
@@ -344,7 +362,7 @@ import type { Conversation, Project } from '$lib/types';
 							<button 
 								type="button" 
 								class="control-btn" 
-								class:active={(conversation.outputLength || 'detailed') === 'detailed'}
+								class:active={conversation.outputLength === 'detailed'}
 								onclick={() => onUpdateChatOutputLength(conversation.id, 'detailed')}
 								title="ตอบแบบมีรายละเอียดขั้นตอนปกติ"
 							>
@@ -369,20 +387,20 @@ import type { Conversation, Project } from '$lib/types';
 							<button 
 								type="button" 
 								class="control-btn" 
+								class:active={(conversation.thinkingDepth || 'auto') === 'auto'}
+								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'auto')}
+								title="ไม่ส่งการตั้งค่านี้ (ใช้ค่าเริ่มต้นตามโมเดล)"
+							>
+								🤖 อัตโนมัติ
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
 								class:active={conversation.thinkingDepth === 'fast'}
 								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'fast')}
 								title="ตอบทันทีรวดเร็ว ไม่แสดงขั้นตอนการคิด"
 							>
 								⚡ เร็ว
-							</button>
-							<button 
-								type="button" 
-								class="control-btn" 
-								class:active={(conversation.thinkingDepth || 'normal') === 'normal'}
-								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'normal')}
-								title="การตอบตามมาตรฐาน"
-							>
-								🧠 ปกติ
 							</button>
 							<button 
 								type="button" 
