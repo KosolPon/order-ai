@@ -66,7 +66,34 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 		responseHeaders.set('Cache-Control', 'no-cache, no-transform');
 		responseHeaders.set('X-Accel-Buffering', 'no');
 
-		return new Response(response.body, {
+		// Create a custom ReadableStream to relay the response body chunk-by-chunk.
+		// This avoids piping bugs in Node/Bun fetch implementation when handling network streams.
+		const stream = new ReadableStream({
+			async start(controller) {
+				const reader = response.body?.getReader();
+				if (!reader) {
+					controller.close();
+					return;
+				}
+
+				try {
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) {
+							break;
+						}
+						controller.enqueue(value);
+					}
+				} catch (err) {
+					console.error('Error proxying Ollama stream chunk:', err);
+					controller.error(err);
+				} finally {
+					controller.close();
+				}
+			}
+		});
+
+		return new Response(stream, {
 			status: response.status,
 			headers: responseHeaders
 		});
