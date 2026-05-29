@@ -1037,6 +1037,13 @@ pre[class*="language-"] {
 	color: var(--text-secondary);
 }
 
+.markdown-body hr {
+	margin: 1.5rem 0;
+	border: 0;
+	border-top: 1px solid var(--border-color);
+	opacity: 0.7;
+}
+
 /* Table block wrapper & modern design */
 .table-block-wrapper {
 	margin: 1.25rem 0;
