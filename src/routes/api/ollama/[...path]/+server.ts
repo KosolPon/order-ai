@@ -68,6 +68,7 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 
 		// Create a custom ReadableStream to relay the response body chunk-by-chunk.
 		// This avoids piping bugs in Node/Bun fetch implementation when handling network streams.
+		let heartbeatInterval: any;
 		const stream = new ReadableStream({
 			async start(controller) {
 				const reader = response.body?.getReader();
@@ -75,6 +76,18 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 					controller.close();
 					return;
 				}
+
+				const encoder = new TextEncoder();
+
+				// Start a keep-alive heartbeat interval (every 15 seconds)
+				// to prevent Cloudflare, Nginx, or Vite dev server timeouts over network routes.
+				heartbeatInterval = setInterval(() => {
+					try {
+						controller.enqueue(encoder.encode('\n'));
+					} catch (e) {
+						clearInterval(heartbeatInterval);
+					}
+				}, 15000);
 
 				try {
 					while (true) {
@@ -88,7 +101,15 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 					console.error('Error proxying Ollama stream chunk:', err);
 					controller.error(err);
 				} finally {
+					if (heartbeatInterval) {
+						clearInterval(heartbeatInterval);
+					}
 					controller.close();
+				}
+			},
+			cancel() {
+				if (heartbeatInterval) {
+					clearInterval(heartbeatInterval);
 				}
 			}
 		});
