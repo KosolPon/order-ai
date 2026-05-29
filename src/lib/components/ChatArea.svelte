@@ -767,6 +767,37 @@
 		return `${diffDays}d ago`;
 	}
 
+	function formatDateTime(timestamp: number, showSeconds = false): string {
+		if (!timestamp) return '';
+		const date = new Date(timestamp);
+		const now = new Date();
+		
+		const isToday = date.toDateString() === now.toDateString();
+		
+		const yesterday = new Date();
+		yesterday.setDate(now.getDate() - 1);
+		const isYesterday = date.toDateString() === yesterday.toDateString();
+		
+		const timeStr = date.toLocaleTimeString([], { 
+			hour: '2-digit', 
+			minute: '2-digit',
+			...(showSeconds ? { second: '2-digit' } : {})
+		});
+		
+		if (isToday) {
+			return `วันนี้, ${timeStr}`;
+		} else if (isYesterday) {
+			return `เมื่อวาน, ${timeStr}`;
+		} else {
+			const dateStr = date.toLocaleDateString([], {
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit'
+			});
+			return `${dateStr} ${timeStr}`;
+		}
+	}
+
 	function getChatLastMessageSnippet(conv: Conversation): string {
 		if (!conv.messages || conv.messages.length === 0) return '';
 		// Find the last user message or last assistant message to show snippet
@@ -1281,7 +1312,7 @@
 									{/if}
 								</span>
 								<span class="timestamp">
-									{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+									{formatDateTime(msg.timestamp)}
 								</span>
 							</div>
 
