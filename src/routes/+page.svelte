@@ -1618,6 +1618,28 @@
 		await db.conversations.put(updatedConv);
 	}
 
+	async function handleResendPrompt(messageId: string) {
+		const activeConvId = currentConversationId;
+		if (!activeConvId || !currentConversation) return;
+
+		const msgIndex = currentConversation.messages.findIndex((m) => m.id === messageId);
+		if (msgIndex === -1) return;
+
+		const slicedMessages = currentConversation.messages.slice(0, msgIndex + 1);
+
+		conversations = conversations.map((conv) => {
+			if (conv.id === activeConvId) {
+				return {
+					...conv,
+					messages: slicedMessages
+				};
+			}
+			return conv;
+		});
+
+		await handleResubmit(activeConvId);
+	}
+
 	async function handleEditPrompt(messageId: string, newContent: string) {
 		const activeConvId = currentConversationId;
 		if (!activeConvId || !currentConversation) return;
@@ -1778,6 +1800,7 @@
 			onStopGeneration={handleStopGeneration}
 			onToggleContextPanel={() => showContextPanel = !showContextPanel}
 			onToggleMessageFeedback={handleToggleMessageFeedback}
+			onResendPrompt={handleResendPrompt}
 			onOpenThinking={() => {
 				showContextPanel = true;
 				rightPaneTab = 'thinking';

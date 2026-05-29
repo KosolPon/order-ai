@@ -30,7 +30,8 @@
 		onToggleTheme,
 		onSelectColor,
 		onSelectConversation,
-		onToggleMessageFeedback
+		onToggleMessageFeedback,
+		onResendPrompt
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
@@ -56,6 +57,7 @@
 		onSelectColor: (color: string) => void;
 		onSelectConversation?: (id: string) => void;
 		onToggleMessageFeedback?: (messageId: string, feedback: 'up' | 'down') => void;
+		onResendPrompt?: (messageId: string) => void;
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
@@ -64,6 +66,19 @@
 	let lastScrollHeight = 0;
 	let editingMessageId = $state<string | null>(null);
 	let editingMessageContent = $state('');
+	let copiedMessageId = $state<string | null>(null);
+
+	function handleCopyMessage(msg: Message) {
+		if (typeof navigator !== 'undefined' && navigator.clipboard) {
+			navigator.clipboard.writeText(msg.content);
+			copiedMessageId = msg.id;
+			setTimeout(() => {
+				if (copiedMessageId === msg.id) {
+					copiedMessageId = null;
+				}
+			}, 2000);
+		}
+	}
 
 	function getModelGroup(modelName: string | undefined): 'local' | 'cloud' | 'gemini' {
 		if (!modelName) return 'local';
@@ -1305,28 +1320,52 @@
 												{#if msg.content}
 													<div class="user-text-container-with-edit">
 														<pre class="user-text-pre">{msg.content}</pre>
-														<button 
-															class="message-edit-trigger" 
-															onclick={() => startEditPrompt(msg)}
-															title="Edit prompt"
-														>
-															<svg viewBox="0 0 24 24" width="14" height="14">
-																<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-															</svg>
-														</button>
+														<div class="user-actions-wrapper">
+															<button 
+																class="message-edit-trigger" 
+																onclick={() => startEditPrompt(msg)}
+																title="แก้ไขคำถาม"
+															>
+																<svg viewBox="0 0 24 24" width="14" height="14">
+																	<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+																</svg>
+															</button>
+															<button 
+																class="message-resend-trigger" 
+																onclick={() => onResendPrompt?.(msg.id)}
+																title="ส่งคำถามนี้ซ้ำ"
+																disabled={isGenerating || isBusy}
+															>
+																<svg viewBox="0 0 24 24" width="14" height="14">
+																	<path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+																</svg>
+															</button>
+														</div>
 													</div>
 												{/if}
 											</div>
 											{#if !msg.content}
-												<button 
-													class="message-edit-trigger" 
-													onclick={() => startEditPrompt(msg)}
-													title="Edit prompt"
-												>
-													<svg viewBox="0 0 24 24" width="14" height="14">
-														<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-													</svg>
-												</button>
+												<div class="user-actions-wrapper borderless">
+													<button 
+														class="message-edit-trigger" 
+														onclick={() => startEditPrompt(msg)}
+														title="แก้ไขคำถาม"
+													>
+														<svg viewBox="0 0 24 24" width="14" height="14">
+															<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+														</svg>
+													</button>
+													<button 
+														class="message-resend-trigger" 
+														onclick={() => onResendPrompt?.(msg.id)}
+														title="ส่งคำถามนี้ซ้ำ"
+														disabled={isGenerating || isBusy}
+													>
+														<svg viewBox="0 0 24 24" width="14" height="14">
+															<path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+														</svg>
+													</button>
+												</div>
 											{/if}
 										</div>
 									{/if}
@@ -1393,6 +1432,26 @@
 											<path fill="currentColor" d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/>
 										</svg>
 										<span>Remember</span>
+									{/if}
+								</button>
+
+								<button 
+									type="button" 
+									class="msg-action-btn copy-btn"
+									class:copied={copiedMessageId === msg.id}
+									onclick={() => handleCopyMessage(msg)}
+									title="คัดลอกคำตอบ (Copy response)"
+								>
+									{#if copiedMessageId === msg.id}
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+										</svg>
+										<span>คัดลอกแล้ว!</span>
+									{:else}
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+										</svg>
+										<span>คัดลอก</span>
 									{/if}
 								</button>
 
@@ -2467,14 +2526,28 @@
 	}
 
 	.user-text-container-with-edit .user-text-pre {
-		max-width: calc(100% - 40px);
+		max-width: calc(100% - 76px);
 	}
 
-	.user-message-container:hover .message-edit-trigger {
+	.user-actions-wrapper {
+		display: flex;
+		flex-direction: row;
+		gap: 6px;
+		align-items: center;
+		margin-top: 8px;
+		flex-shrink: 0;
+	}
+
+	.user-actions-wrapper.borderless {
+		margin-top: 0;
+	}
+
+	.user-message-container:hover .message-edit-trigger,
+	.user-message-container:hover .message-resend-trigger {
 		opacity: 1;
 	}
 
-	.message-edit-trigger {
+	.message-edit-trigger, .message-resend-trigger {
 		opacity: 0;
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-color);
@@ -2486,13 +2559,18 @@
 		align-items: center;
 		justify-content: center;
 		transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
-		margin-top: 8px;
 		flex-shrink: 0;
+		cursor: pointer;
 	}
 
-	.message-edit-trigger:hover {
+	.message-edit-trigger:hover, .message-resend-trigger:hover:not(:disabled) {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
+	}
+
+	.message-resend-trigger:disabled {
+		opacity: 0.3 !important;
+		cursor: not-allowed;
 	}
 
 	.edit-prompt-wrapper {
@@ -2875,6 +2953,12 @@
 		color: #e2a54b;
 		border-color: rgba(226, 165, 75, 0.4);
 		background-color: rgba(226, 165, 75, 0.05);
+	}
+
+	.msg-action-btn.copy-btn.copied {
+		color: #4caf50;
+		border-color: rgba(76, 175, 80, 0.4);
+		background-color: rgba(76, 175, 80, 0.05);
 	}
 
 	.msg-action-btn.feedback-btn {
