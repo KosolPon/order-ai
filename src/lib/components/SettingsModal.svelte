@@ -365,7 +365,9 @@
 		chatsCount: 0,
 		projectsCount: 0,
 		canvasFilesCount: 0,
-		memoriesCount: 0
+		memoriesCount: 0,
+		upvotesCount: 0,
+		downvotesCount: 0
 	});
 
 	async function updateStats() {
@@ -374,6 +376,24 @@
 			stats.projectsCount = await db.projects.count();
 			stats.canvasFilesCount = await db.canvasFiles.count();
 			stats.memoriesCount = await db.aiMemories.count();
+
+			// Count positive/negative feedbacks in conversations
+			let up = 0;
+			let down = 0;
+			const convs = await db.conversations.toArray();
+			for (const c of convs) {
+				if (c.messages) {
+					for (const m of c.messages) {
+						if (m.feedback === 'up') {
+							up++;
+						} else if (m.feedback === 'down') {
+							down++;
+						}
+					}
+				}
+			}
+			stats.upvotesCount = up;
+			stats.downvotesCount = down;
 		} catch (e) {
 			console.error('Failed to get database stats:', e);
 		}
@@ -1540,6 +1560,14 @@
 									<div class="stat-card">
 										<span class="stat-num">{stats.memoriesCount}</span>
 										<span class="stat-label">ความจำระบบ (Memories)</span>
+									</div>
+									<div class="stat-card upvote-card">
+										<span class="stat-num">{stats.upvotesCount}</span>
+										<span class="stat-label">คำตอบดี 👍</span>
+									</div>
+									<div class="stat-card downvote-card">
+										<span class="stat-num">{stats.downvotesCount}</span>
+										<span class="stat-label">คำตอบไม่ตรงประเด็น 👎</span>
 									</div>
 								</div>
 							</div>
@@ -2831,7 +2859,7 @@
 
 	@media (min-width: 600px) {
 		.stats-grid {
-			grid-template-columns: repeat(4, 1fr);
+			grid-template-columns: repeat(3, 1fr);
 		}
 	}
 
@@ -2845,6 +2873,14 @@
 		align-items: center;
 		text-align: center;
 		gap: 6px;
+	}
+
+	.stat-card.upvote-card .stat-num {
+		color: #4caf50;
+	}
+
+	.stat-card.downvote-card .stat-num {
+		color: #f44336;
 	}
 
 	.stat-num {

@@ -29,7 +29,8 @@
 		onToggleSidebar,
 		onToggleTheme,
 		onSelectColor,
-		onSelectConversation
+		onSelectConversation,
+		onToggleMessageFeedback
 	} = $props<{
 		conversation: Conversation | null;
 		isGenerating: boolean;
@@ -54,6 +55,7 @@
 		onToggleTheme: () => void;
 		onSelectColor: (color: string) => void;
 		onSelectConversation?: (id: string) => void;
+		onToggleMessageFeedback?: (messageId: string, feedback: 'up' | 'down') => void;
 	}>();
 
 	let chatContainer = $state<HTMLDivElement | null>(null);
@@ -1393,6 +1395,31 @@
 										<span>Remember</span>
 									{/if}
 								</button>
+
+								{#if msg.role === 'assistant'}
+									<button 
+										type="button" 
+										class="msg-action-btn feedback-btn thumbs-up"
+										class:active={msg.feedback === 'up'}
+										onclick={() => onToggleMessageFeedback?.(msg.id, 'up')}
+										title="คำตอบดี (Good response)"
+									>
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M1 21h4V9H1v12zm22-10c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
+										</svg>
+									</button>
+									<button 
+										type="button" 
+										class="msg-action-btn feedback-btn thumbs-down"
+										class:active={msg.feedback === 'down'}
+										onclick={() => onToggleMessageFeedback?.(msg.id, 'down')}
+										title="คำตอบไม่ตรงประเด็น/ไม่ดี (Bad response)"
+									>
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M19 15h4V3h-4v12zm-3-3c0-.26-.05-.5-.14-.73l-3.02-7.05C12.54 3.5 11.83 3 11 3H2c-1.1 0-2 .9-2 2v10c0 .55.22 1.05.59 1.41L7.17 23l.94-.94c.27-.27.44-.65.44-1.06l-.03-.32L7.57 15H14c1.1 0 2-.9 2-2v-1z"/>
+										</svg>
+									</button>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -2848,6 +2875,41 @@
 		color: #e2a54b;
 		border-color: rgba(226, 165, 75, 0.4);
 		background-color: rgba(226, 165, 75, 0.05);
+	}
+
+	.msg-action-btn.feedback-btn {
+		padding: 4px;
+		border-radius: 50%;
+		width: 24px;
+		height: 24px;
+		justify-content: center;
+		transition: transform 0.1s ease, color 0.15s ease, background-color 0.15s ease;
+	}
+	
+	.msg-action-btn.feedback-btn:active {
+		transform: scale(0.9);
+	}
+
+	.msg-action-btn.thumbs-up.active {
+		color: #4caf50;
+		border-color: rgba(76, 175, 80, 0.4);
+		background-color: rgba(76, 175, 80, 0.08);
+	}
+	
+	.msg-action-btn.thumbs-up:hover:not(.active) {
+		color: #4caf50;
+		border-color: rgba(76, 175, 80, 0.2);
+	}
+
+	.msg-action-btn.thumbs-down.active {
+		color: #f44336;
+		border-color: rgba(244, 67, 54, 0.4);
+		background-color: rgba(244, 67, 54, 0.08);
+	}
+	
+	.msg-action-btn.thumbs-down:hover:not(.active) {
+		color: #f44336;
+		border-color: rgba(244, 67, 54, 0.2);
 	}
 
 	.role-badge {

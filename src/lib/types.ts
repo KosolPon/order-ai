@@ -17,6 +17,7 @@ export interface Message {
 	images?: string[]; // base64 strings for Ollama API
 	attachments?: Attachment[]; // full attachment details for history rendering
 	agentRole?: string; // Stored triggered agent role (e.g. 'ui_ux')
+	feedback?: 'up' | 'down';
 }
 
 export interface ProjectFile {

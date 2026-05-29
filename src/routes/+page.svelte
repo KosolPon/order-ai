@@ -1588,6 +1588,36 @@
 		);
 	}
 
+	async function handleToggleMessageFeedback(messageId: string, feedback: 'up' | 'down') {
+		const activeConvId = currentConversationId;
+		if (!activeConvId || !currentConversation) return;
+
+		const updatedMessages = currentConversation.messages.map((m) => {
+			if (m.id === messageId) {
+				const currentFeedback = m.feedback;
+				return {
+					...m,
+					feedback: currentFeedback === feedback ? undefined : feedback
+				};
+			}
+			return m;
+		});
+
+		const updatedConv = {
+			...currentConversation,
+			messages: updatedMessages
+		};
+
+		conversations = conversations.map((conv) => {
+			if (conv.id === activeConvId) {
+				return updatedConv;
+			}
+			return conv;
+		});
+
+		await db.conversations.put(updatedConv);
+	}
+
 	async function handleEditPrompt(messageId: string, newContent: string) {
 		const activeConvId = currentConversationId;
 		if (!activeConvId || !currentConversation) return;
@@ -1747,6 +1777,7 @@
 			onEditPrompt={handleEditPrompt}
 			onStopGeneration={handleStopGeneration}
 			onToggleContextPanel={() => showContextPanel = !showContextPanel}
+			onToggleMessageFeedback={handleToggleMessageFeedback}
 			onOpenThinking={() => {
 				showContextPanel = true;
 				rightPaneTab = 'thinking';
