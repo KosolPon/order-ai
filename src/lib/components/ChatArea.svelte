@@ -1433,6 +1433,27 @@
 								{/if}
 							</div>
 
+							{#if msg.role === 'assistant' && (msg.completedAt || msg.duration)}
+								<div class="generation-metadata animate-fade-in">
+									{#if msg.completedAt}
+										<span class="meta-item completed-time">
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/>
+											</svg>
+											สิ้นสุด: {new Date(msg.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+										</span>
+									{/if}
+									{#if msg.duration}
+										<span class="meta-item duration-time">
+											<svg viewBox="0 0 24 24" width="12" height="12">
+												<path fill="currentColor" d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+											</svg>
+											ใช้เวลา: {(msg.duration / 1000).toFixed(2)} วินาที
+										</span>
+									{/if}
+								</div>
+							{/if}
+
 							<div class="message-actions-row">
 								<button 
 									type="button" 
@@ -2978,6 +2999,27 @@
 		fill: currentColor;
 	}
 
+	.generation-metadata {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin-top: 10px;
+		font-size: 0.72rem;
+		color: var(--text-muted);
+		border-top: 1px dashed var(--border-color);
+		padding-top: 8px;
+		width: 100%;
+	}
+
+	.generation-metadata .meta-item {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.generation-metadata svg {
+		opacity: 0.7;
+	}
 
 	.message-actions-row {
 		display: flex;

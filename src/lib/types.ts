@@ -18,6 +18,8 @@ export interface Message {
 	attachments?: Attachment[]; // full attachment details for history rendering
 	agentRole?: string; // Stored triggered agent role (e.g. 'ui_ux')
 	feedback?: 'up' | 'down';
+	completedAt?: number;
+	duration?: number;
 }
 
 export interface ProjectFile {

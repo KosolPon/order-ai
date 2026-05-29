@@ -1052,6 +1052,7 @@
 		initialMessages: Message[],
 		systemPrompt: string
 	) {
+		const startTime = Date.now();
 		const activeConvObj = conversations.find(c => c.id === activeConvId);
 		const tone = activeConvObj?.outputTone || 'auto';
 
@@ -1411,6 +1412,26 @@
 					abortController?.signal
 				);
 			}
+
+			const endTime = Date.now();
+			const duration = endTime - startTime;
+
+			conversations = conversations.map((conv) => {
+				if (conv.id === activeConvId) {
+					const updatedMessages = conv.messages.map((m) => {
+						if (m.id === assistantMsgId) {
+							return {
+								...m,
+								completedAt: endTime,
+								duration: duration
+							};
+						}
+						return m;
+					});
+					return { ...conv, messages: updatedMessages };
+				}
+				return conv;
+			});
 
 			// After finishing execution chain, extract and save canvas files
 			const activeConv = conversations.find(c => c.id === activeConvId);
