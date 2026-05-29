@@ -48,6 +48,41 @@
 		return () => subscription.unsubscribe();
 	});
 
+	// AI Memories state and handlers
+	let newMemoryText = $state('');
+	let memories = $state<any[]>([]);
+
+	$effect(() => {
+		if (!conversation) {
+			memories = [];
+			return;
+		}
+		const sub = liveQuery(() =>
+			db.aiMemories
+				.where('chatId').equals(conversation.id)
+				.or('projectId').equals(conversation.projectId || '')
+				.toArray()
+		).subscribe((list) => {
+			memories = list.sort((a, b) => b.createdAt - a.createdAt);
+		});
+		return () => sub.unsubscribe();
+	});
+
+	async function handleAddMemory() {
+		if (!newMemoryText.trim() || !conversation) return;
+		await db.aiMemories.add({
+			chatId: conversation.id,
+			projectId: conversation.projectId || undefined,
+			content: newMemoryText.trim(),
+			createdAt: Date.now()
+		});
+		newMemoryText = '';
+	}
+
+	async function handleDeleteMemory(id: number) {
+		await db.aiMemories.delete(id);
+	}
+
 	// Active project derived from current conversation's projectId
 	const activeProject = $derived(
 		conversation?.projectId ? projects.find((p: Project) => p.id === conversation.projectId) : null
@@ -276,6 +311,56 @@
 						<div class="preview-text">
 							{globalContext.trim() ? globalContext : 'No global context configured. Configure it in the Settings Drawer at the bottom left.'}
 						</div>
+					</div>
+				</div>
+
+				<!-- AI Memories Section -->
+				<div class="panel-section">
+					<div class="section-header-row">
+						<span class="section-label">AI Memories / Key Facts</span>
+						<span class="badge badge-memory">Memory</span>
+					</div>
+					<div class="memory-input-group">
+						<textarea
+							value={newMemoryText}
+							oninput={(e) => newMemoryText = (e.target as HTMLTextAreaElement).value}
+							placeholder="Add a key fact for AI to remember (e.g. 'Uses Tailwind version 3')"
+							class="panel-textarea memory-textarea"
+							rows="2"
+						></textarea>
+						<button 
+							type="button" 
+							class="add-memory-btn" 
+							onclick={handleAddMemory}
+							disabled={!newMemoryText.trim()}
+						>
+							Remember
+						</button>
+					</div>
+					<div class="memories-list-box">
+						{#if memories.length === 0}
+							<div class="empty-memories text-muted">
+								No key facts remembered yet. Type a fact above or click the "Remember" icon in chat messages to add context.
+							</div>
+						{:else}
+							<div class="memories-items">
+								{#each memories as mem}
+									<div class="memory-item animate-fade-in">
+										<div class="memory-content-text">{mem.content}</div>
+										<button 
+											type="button" 
+											class="delete-memory-btn" 
+											onclick={() => mem.id && handleDeleteMemory(mem.id)}
+											title="Forget fact"
+										>
+											<svg viewBox="0 0 24 24" width="14" height="14">
+												<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				</div>
 
@@ -886,5 +971,102 @@
 		margin-left: 4px;
 		min-width: 16px;
 		text-align: center;
+	}
+
+	.badge-memory {
+		background-color: rgba(226, 165, 75, 0.15);
+		color: #e2a54b;
+		border: 1px solid rgba(226, 165, 75, 0.25);
+	}
+
+	.memory-input-group {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.memory-textarea {
+		font-size: 0.82rem;
+		padding: 8px 10px;
+	}
+
+	.add-memory-btn {
+		background-color: var(--accent-blue);
+		color: white;
+		border: none;
+		border-radius: 6px;
+		padding: 6px 12px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), opacity var(--transition-fast);
+	}
+
+	.add-memory-btn:hover:not(:disabled) {
+		background-color: #5aa1f0;
+	}
+
+	.add-memory-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.memories-list-box {
+		max-height: 180px;
+		overflow-y: auto;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 8px;
+	}
+
+	.empty-memories {
+		font-size: 0.78rem;
+		text-align: center;
+		padding: 12px;
+		line-height: 1.4;
+	}
+
+	.memories-items {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.memory-item {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 8px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-light);
+		border-radius: 6px;
+		padding: 6px 8px;
+		font-size: 0.8rem;
+		line-height: 1.35;
+	}
+
+	.memory-content-text {
+		color: var(--text-secondary);
+		word-break: break-word;
+		flex: 1;
+	}
+
+	.delete-memory-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 2px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color var(--transition-fast), background-color var(--transition-fast);
+	}
+
+	.delete-memory-btn:hover {
+		color: #d96570;
+		background-color: rgba(217, 101, 112, 0.1);
 	}
 </style>

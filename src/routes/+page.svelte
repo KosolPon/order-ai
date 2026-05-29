@@ -216,14 +216,39 @@
 				if (storedGemini !== null) enableGemini = storedGemini === 'true';
 			}
 
+			// Migrate legacy chats and projects from localStorage if they exist
 			const storedChats = localStorage.getItem('ollama_conversations');
-			if (storedChats) {
-				try {
-					conversations = JSON.parse(storedChats);
-				} catch (e) {
-					console.error('Failed to parse conversations from localStorage:', e);
+			const storedProjects = localStorage.getItem('ollama_projects');
+			
+			if (storedChats || storedProjects) {
+				console.log('Migrating legacy data from LocalStorage to IndexedDB...');
+				if (storedChats) {
+					try {
+						const parsedChats = JSON.parse(storedChats);
+						if (Array.isArray(parsedChats) && parsedChats.length > 0) {
+							await db.conversations.bulkAdd(parsedChats);
+						}
+					} catch (e) {
+						console.error('Failed to migrate conversations:', e);
+					}
+					localStorage.removeItem('ollama_conversations');
+				}
+				if (storedProjects) {
+					try {
+						const parsedProjects = JSON.parse(storedProjects);
+						if (Array.isArray(parsedProjects) && parsedProjects.length > 0) {
+							await db.projects.bulkAdd(parsedProjects);
+						}
+					} catch (e) {
+						console.error('Failed to migrate projects:', e);
+					}
+					localStorage.removeItem('ollama_projects');
 				}
 			}
+
+			// Load from IndexedDB
+			conversations = await db.conversations.orderBy('createdAt').reverse().toArray();
+			projects = await db.projects.orderBy('createdAt').toArray();
 
 			const storedActiveId = localStorage.getItem('ollama_active_id');
 			if (storedActiveId && conversations.some(c => c.id === storedActiveId)) {
@@ -283,16 +308,6 @@
 					drafts = JSON.parse(storedDrafts);
 				} catch (e) {
 					console.error('Failed to parse drafts from localStorage:', e);
-				}
-			}
-			
-			// Load projects
-			const storedProjects = localStorage.getItem('ollama_projects');
-			if (storedProjects) {
-				try {
-					projects = JSON.parse(storedProjects);
-				} catch (e) {
-					console.error('Failed to parse projects from localStorage:', e);
 				}
 			}
 
@@ -524,7 +539,11 @@
 	$effect(() => {
 		if (!isInitialized) return;
 		if (!isGenerating) {
-			localStorage.setItem('ollama_conversations', JSON.stringify(conversations));
+			db.conversations.clear().then(() => {
+				db.conversations.bulkAdd($state.snapshot(conversations));
+			}).catch(err => {
+				console.error('Failed to save conversations to IndexedDB:', err);
+			});
 		}
 	});
 
@@ -612,18 +631,14 @@
 		return () => clearTimeout(timeout);
 	});
 
-	// Save projects to localStorage with quota protection
+	// Save projects to IndexedDB
 	$effect(() => {
 		if (!isInitialized) return;
-		try {
-			localStorage.setItem('ollama_projects', JSON.stringify(projects));
-		} catch (error: any) {
-			if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-				alert(`Storage Limit Exceeded!\n\nThe attached reference files are too large to fit in browser LocalStorage (limit is 5MB). Your latest project changes could not be saved.\n\nPlease open project settings and delete some files or use smaller files.`);
-			} else {
-				console.error('Failed to save projects to localStorage:', error);
-			}
-		}
+		db.projects.clear().then(() => {
+			db.projects.bulkAdd($state.snapshot(projects));
+		}).catch(error => {
+			console.error('Failed to save projects to IndexedDB:', error);
+		});
 	});
 
 	// Save global context to localStorage
@@ -921,6 +936,23 @@
 
 		if (conv.context?.trim()) {
 			parts.push(`[Chat Context]:\n${conv.context.trim()}`);
+		}
+
+		// Inject AI Memories from IndexedDB
+		try {
+			const memories = await db.aiMemories
+				.where('chatId').equals(conv.id)
+				.or('projectId').equals(conv.projectId || '')
+				.toArray();
+			if (memories.length > 0) {
+				let memoryPrompt = `[AI Memories / Key Facts to Remember]:\n`;
+				memories.forEach((mem, index) => {
+					memoryPrompt += `${index + 1}. ${mem.content}\n`;
+				});
+				parts.push(memoryPrompt);
+			}
+		} catch (e) {
+			console.error('Failed to load AI memories for prompt injection:', e);
 		}
 
 		// Inject Canvas Files (Artifacts) from IndexedDB
@@ -1754,6 +1786,8 @@
 		bind:repeatPenalty
 		bind:customizeSettings
 		bind:globalContext
+		bind:conversations
+		bind:projects
 		{isConnected}
 		{isOllamaCloudConnected}
 		{models}

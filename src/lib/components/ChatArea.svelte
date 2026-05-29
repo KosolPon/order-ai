@@ -3,6 +3,7 @@
 	import { renderMarkdown, parseThinking } from '$lib/markdown';
 	import { tick, untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
+	import { db } from '$lib/db';
 
 	let {
 		conversation = null,
@@ -862,6 +863,33 @@
 			}
 		}
 	}
+
+	// AI Memories / Remember message
+	let messageSavedIndicator = $state<string | null>(null);
+	async function handleRememberMessage(msg: Message) {
+		if (!msg.content || !conversation) return;
+		
+		const parsed = parseThinking(msg.content);
+		const cleanText = (parsed.response || msg.content).trim();
+		if (!cleanText) return;
+		
+		try {
+			await db.aiMemories.add({
+				chatId: conversation.id,
+				projectId: conversation.projectId || undefined,
+				content: cleanText,
+				createdAt: Date.now()
+			});
+			messageSavedIndicator = msg.id;
+			setTimeout(() => {
+				if (messageSavedIndicator === msg.id) {
+					messageSavedIndicator = null;
+				}
+			}, 2000);
+		} catch (e) {
+			console.error('Failed to save to memory:', e);
+		}
+	}
 </script>
 
 <div class="chat-area">
@@ -1337,6 +1365,28 @@
 										</div>
 									{/if}
 								{/if}
+							</div>
+
+							<div class="message-actions-row">
+								<button 
+									type="button" 
+									class="msg-action-btn"
+									class:saved={messageSavedIndicator === msg.id}
+									onclick={() => handleRememberMessage(msg)}
+									title="Save message to AI Memories / Key Facts"
+								>
+									{#if messageSavedIndicator === msg.id}
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+										</svg>
+										<span>Remembered!</span>
+									{:else}
+										<svg viewBox="0 0 24 24" width="12" height="12">
+											<path fill="currentColor" d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/>
+										</svg>
+										<span>Remember</span>
+									{/if}
+								</button>
 							</div>
 						</div>
 					</div>
@@ -2756,4 +2806,41 @@
 	}
 
 
+	.message-actions-row {
+		display: flex;
+		gap: 8px;
+		margin-top: 8px;
+		opacity: 0.15;
+		transition: opacity var(--transition-fast);
+	}
+
+	.message-wrapper:hover .message-actions-row {
+		opacity: 1.0;
+	}
+
+	.msg-action-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		background: none;
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 4px 8px;
+		color: var(--text-muted);
+		font-size: 0.75rem;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.msg-action-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--border-light);
+	}
+
+	.msg-action-btn.saved {
+		color: #e2a54b;
+		border-color: rgba(226, 165, 75, 0.4);
+		background-color: rgba(226, 165, 75, 0.05);
+	}
 </style>

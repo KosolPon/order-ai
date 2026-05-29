@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { OllamaModel } from '$lib/types';
+	import type { OllamaModel, Conversation, Project } from '$lib/types';
 	import { fade, scale } from 'svelte/transition';
+	import { db } from '$lib/db';
 
 	let {
 		isSettingsOpen = $bindable(false),
@@ -20,6 +21,8 @@
 		repeatPenalty = $bindable(),
 		customizeSettings = $bindable(),
 		globalContext = $bindable(),
+		conversations = $bindable([]),
+		projects = $bindable([]),
 		isConnected = false,
 		isOllamaCloudConnected = false,
 		models = [],
@@ -42,6 +45,8 @@
 		repeatPenalty: number;
 		customizeSettings: boolean;
 		globalContext: string;
+		conversations: Conversation[];
+		projects: Project[];
 		isConnected: boolean;
 		isOllamaCloudConnected: boolean;
 		models: (OllamaModel & { source?: 'local' | 'cloud' | 'gemini' })[];
@@ -50,7 +55,7 @@
 
 	import { fetchModels } from '$lib/ollama';
 
-	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context'>('connections');
+	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage'>('connections');
 	let selectedConnectionTab = $state<'local' | 'cloud' | 'gemini'>('local');
 	let showOllamaCloudKey = $state(false);
 	let showGeminiKey = $state(false);
@@ -324,24 +329,195 @@
 	}
 
 	let filteredDropdownModels = $derived(
-		models.filter(m => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+		models.filter((m: any) => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
 	);
 
 	let pinnedDropdownModels = $derived(
-		filteredDropdownModels.filter(m => pinnedModelNames.includes(m.name))
+		filteredDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
 	);
 
 	let localDropdownModels = $derived(
-		filteredDropdownModels.filter(m => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+		filteredDropdownModels.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
 	);
 
 	let cloudDropdownModels = $derived(
-		filteredDropdownModels.filter(m => m.source === 'cloud')
+		filteredDropdownModels.filter((m: any) => m.source === 'cloud')
 	);
 
 	let geminiDropdownModels = $derived(
-		filteredDropdownModels.filter(m => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+		filteredDropdownModels.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
 	);
+
+	let pinnedLocalModels = $derived(
+		localDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	);
+
+	let pinnedCloudModels = $derived(
+		cloudDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	);
+
+	let pinnedGeminiModels = $derived(
+		geminiDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	);
+
+	// Storage Management States & Handlers
+	let stats = $state({
+		chatsCount: 0,
+		projectsCount: 0,
+		canvasFilesCount: 0,
+		memoriesCount: 0
+	});
+
+	async function updateStats() {
+		try {
+			stats.chatsCount = await db.conversations.count();
+			stats.projectsCount = await db.projects.count();
+			stats.canvasFilesCount = await db.canvasFiles.count();
+			stats.memoriesCount = await db.aiMemories.count();
+		} catch (e) {
+			console.error('Failed to get database stats:', e);
+		}
+	}
+
+	$effect(() => {
+		if (isSettingsOpen && activeTab === 'storage') {
+			updateStats();
+		}
+	});
+
+	async function exportStorageData() {
+		try {
+			const exportObj = {
+				version: 1,
+				timestamp: Date.now(),
+				localStorage: {
+					ollama_url: localStorage.getItem('ollama_url') || '',
+					gemini_api_key: localStorage.getItem('gemini_api_key') || '',
+					ollama_cloud_api_key: localStorage.getItem('ollama_cloud_api_key') || '',
+					ollama_cloud_url: localStorage.getItem('ollama_cloud_url') || '',
+					ollama_active_models: localStorage.getItem('ollama_active_models') || '',
+					ollama_selected_model: localStorage.getItem('ollama_selected_model') || '',
+					ollama_model_temperatures: localStorage.getItem('ollama_model_temperatures') || '',
+					ollama_topp: localStorage.getItem('ollama_topp') || '',
+					ollama_topk: localStorage.getItem('ollama_topk') || '',
+					ollama_numctx: localStorage.getItem('ollama_numctx') || '',
+					ollama_numpredict: localStorage.getItem('ollama_numpredict') || '',
+					ollama_repeatpenalty: localStorage.getItem('ollama_repeatpenalty') || '',
+					ollama_customize_settings: localStorage.getItem('ollama_customize_settings') || '',
+					ollama_global_context: localStorage.getItem('ollama_global_context') || '',
+					chat_font_size: localStorage.getItem('chat_font_size') || '',
+					chat_font_family: localStorage.getItem('chat_font_family') || '',
+					pinned_models: localStorage.getItem('pinned_models') || ''
+				},
+				indexedDB: {
+					conversations: await db.conversations.toArray(),
+					projects: await db.projects.toArray(),
+					canvasFiles: await db.canvasFiles.toArray(),
+					aiMemories: await db.aiMemories.toArray()
+				}
+			};
+
+			const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+			const downloadAnchor = document.createElement('a');
+			downloadAnchor.setAttribute("href", dataStr);
+			downloadAnchor.setAttribute("download", `order-ai-backup-${new Date().toISOString().slice(0, 10)}.json`);
+			document.body.appendChild(downloadAnchor);
+			downloadAnchor.click();
+			downloadAnchor.remove();
+		} catch (error) {
+			console.error('Failed to export data:', error);
+			alert('เกิดข้อผิดพลาดในการส่งออกข้อมูล');
+		}
+	}
+
+	let importFileInput = $state<HTMLInputElement | null>(null);
+
+	async function handleRestoreData(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = async (e) => {
+			try {
+				const data = JSON.parse(e.target?.result as string);
+				if (!data || typeof data !== 'object' || !data.indexedDB) {
+					throw new Error('Invalid backup file format');
+				}
+
+				if (!confirm('การคืนค่าข้อมูลจะทับข้อมูลปัจจุบันทั้งหมดรวมถึงแชทและโปรเจกต์ หน้าเว็บจะรีโหลดใหม่เพื่อแสดงผล คุณต้องการดำเนินการต่อหรือไม่?')) {
+					return;
+				}
+
+				// Restore localStorage
+				if (data.localStorage) {
+					Object.entries(data.localStorage).forEach(([key, val]) => {
+						if (val) {
+							localStorage.setItem(key, val as string);
+						} else {
+							localStorage.removeItem(key);
+						}
+					});
+				}
+
+				// Restore IndexedDB
+				await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories], async () => {
+					await db.conversations.clear();
+					await db.projects.clear();
+					await db.canvasFiles.clear();
+					await db.aiMemories.clear();
+
+					if (Array.isArray(data.indexedDB.conversations)) {
+						await db.conversations.bulkAdd(data.indexedDB.conversations);
+					}
+					if (Array.isArray(data.indexedDB.projects)) {
+						await db.projects.bulkAdd(data.indexedDB.projects);
+					}
+					if (Array.isArray(data.indexedDB.canvasFiles)) {
+						await db.canvasFiles.bulkAdd(data.indexedDB.canvasFiles);
+					}
+					if (Array.isArray(data.indexedDB.aiMemories)) {
+						await db.aiMemories.bulkAdd(data.indexedDB.aiMemories);
+					}
+				});
+
+				// Update bound arrays
+				conversations = await db.conversations.orderBy('createdAt').reverse().toArray();
+				projects = await db.projects.orderBy('createdAt').toArray();
+
+				alert('คืนค่าข้อมูลสำเร็จแล้ว! ระบบกำลังรีโหลดหน้าเว็บ');
+				window.location.reload();
+			} catch (error) {
+				console.error('Failed to restore backup:', error);
+				alert('การคืนค่าข้อมูลล้มเหลว ไฟล์อาจชำรุดหรือไม่ถูกต้อง');
+			}
+		};
+		reader.readAsText(file);
+	}
+
+	async function handleClearData() {
+		if (!confirm('คำเตือน! ข้อมูลการสนทนา โปรเจกต์ ไฟล์บน Canvas และความจำทั้งหมดจะถูกลบอย่างถาวรและไม่สามารถกู้คืนได้ คุณต้องการลบข้อมูลทั้งหมดใช่หรือไม่?')) {
+			return;
+		}
+
+		try {
+			await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories], async () => {
+				await db.conversations.clear();
+				await db.projects.clear();
+				await db.canvasFiles.clear();
+				await db.aiMemories.clear();
+			});
+
+			conversations = [];
+			projects = [];
+
+			alert('ลบข้อมูลทั้งหมดเรียบร้อยแล้ว!');
+			window.location.reload();
+		} catch (error) {
+			console.error('Failed to clear database:', error);
+			alert('เกิดข้อผิดพลาดในการลบข้อมูล');
+		}
+	}
 </script>
 
 {#if isSettingsOpen}
@@ -416,6 +592,18 @@
 						</svg>
 						<span>Global Context</span>
 					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'storage'} 
+						onclick={() => activeTab = 'storage'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<!-- database icon -->
+							<path fill="currentColor" d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5S7.59 4 12 4s8 1.57 8 3.5S16.41 9 12 9z"/>
+						</svg>
+						<span>Storage & Backup</span>
+					</button>
 				</nav>
 			</div>
 
@@ -431,6 +619,8 @@
 							Advanced Parameters
 						{:else if activeTab === 'context'}
 							Global System Context
+						{:else if activeTab === 'storage'}
+							Storage & Backup Management
 						{/if}
 					</h2>
 					<button class="settings-close-btn" onclick={closeSettings} aria-label="Close settings">
@@ -884,10 +1074,10 @@
 																{#if activeDropdownTab === 'local'}
 																	{#if localDropdownModels.length > 0}
 																		<!-- Pinned Local Section -->
-																		{#if localDropdownModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+																		{#if pinnedLocalModels.length > 0}
 																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
 																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each localDropdownModels.filter(m => pinnedModelNames.includes(m.name)) as m}
+																				{#each pinnedLocalModels as m}
 																					<div 
 																						class="dropdown-model-card" 
 																						class:selected={model === m.name}
@@ -950,10 +1140,10 @@
 																{:else if activeDropdownTab === 'cloud'}
 																	{#if cloudDropdownModels.length > 0}
 																		<!-- Pinned Cloud Section -->
-																		{#if cloudDropdownModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+																		{#if pinnedCloudModels.length > 0}
 																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
 																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each cloudDropdownModels.filter(m => pinnedModelNames.includes(m.name)) as m}
+																				{#each pinnedCloudModels as m}
 																					<div 
 																						class="dropdown-model-card" 
 																						class:selected={model === m.name}
@@ -1016,10 +1206,10 @@
 																{:else if activeDropdownTab === 'gemini'}
 																	{#if geminiDropdownModels.length > 0}
 																		<!-- Pinned Gemini Section -->
-																		{#if geminiDropdownModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+																		{#if pinnedGeminiModels.length > 0}
 																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
 																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each geminiDropdownModels.filter(m => pinnedModelNames.includes(m.name)) as m}
+																				{#each pinnedGeminiModels as m}
 																					<div 
 																						class="dropdown-model-card" 
 																						class:selected={model === m.name}
@@ -1326,6 +1516,72 @@
 									rows="10"
 									class="modal-textarea scrollbar-custom"
 								></textarea>
+							</div>
+						</div>
+					{:else if activeTab === 'storage'}
+						<div class="settings-section">
+							<div class="storage-stats-container">
+								<h3>การใช้งานพื้นที่จัดเก็บข้อมูล (Storage Stats)</h3>
+								<p class="modal-help-subtext">ข้อมูลทั้งหมดถูกเก็บไว้ภายในเว็บเบราว์เซอร์เครื่องของคุณเอง (Client-side IndexedDB)</p>
+								
+								<div class="stats-grid">
+									<div class="stat-card">
+										<span class="stat-num">{stats.chatsCount}</span>
+										<span class="stat-label">ห้องสนทนา (Chats)</span>
+									</div>
+									<div class="stat-card">
+										<span class="stat-num">{stats.projectsCount}</span>
+										<span class="stat-label">โปรเจกต์ (Projects)</span>
+									</div>
+									<div class="stat-card">
+										<span class="stat-num">{stats.canvasFilesCount}</span>
+										<span class="stat-label">ไฟล์กระดาน Canvas</span>
+									</div>
+									<div class="stat-card">
+										<span class="stat-num">{stats.memoriesCount}</span>
+										<span class="stat-label">ความจำระบบ (Memories)</span>
+									</div>
+								</div>
+							</div>
+
+							<div class="storage-actions-card">
+								<h3>การสำรองและกู้คืนข้อมูล (Backup & Restore)</h3>
+								<p class="modal-help-subtext">เพื่อป้องกันข้อมูลสูญหายเมื่อล้างประวัติเบราว์เซอร์ คุณสามารถส่งออก (Export) ข้อมูลแชทและค่ากำหนดทั้งหมด และนำเข้ากลับมาใช้งานได้ในภายหลัง</p>
+								
+								<div class="actions-buttons-row">
+									<button type="button" class="storage-action-btn export-btn" onclick={exportStorageData}>
+										<svg viewBox="0 0 24 24" width="16" height="16">
+											<path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+										</svg>
+										ส่งออกข้อมูลทั้งหมด (Export JSON)
+									</button>
+
+									<button type="button" class="storage-action-btn import-btn" onclick={() => importFileInput?.click()}>
+										<svg viewBox="0 0 24 24" width="16" height="16">
+											<path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
+										</svg>
+										กู้คืนข้อมูลสำรอง (Restore Backup)
+									</button>
+									<input 
+										type="file" 
+										accept=".json" 
+										bind:this={importFileInput}
+										onchange={handleRestoreData} 
+										style="display: none;" 
+									/>
+								</div>
+							</div>
+
+							<div class="storage-danger-zone">
+								<h3 class="danger-title">พื้นที่อันตราย (Danger Zone)</h3>
+								<p class="modal-help-subtext">ลบข้อมูลทั้งหมดที่เก็บอยู่ในเบราว์เซอร์ รวมถึงแชท โปรเจกต์ ไฟล์ Canvas และ API keys ทั้งหมดอย่างถาวร</p>
+								
+								<button type="button" class="clear-data-btn" onclick={handleClearData}>
+									<svg viewBox="0 0 24 24" width="16" height="16">
+										<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+									</svg>
+									ล้างข้อมูลระบบทั้งหมด (Clear All Data)
+								</button>
 							</div>
 						</div>
 					{/if}
@@ -2557,5 +2813,136 @@
 		.custom-select-dropdown {
 			width: 290px;
 		}
+	}
+
+	/* Storage section styles */
+	.storage-stats-container {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-bottom: 24px;
+	}
+
+	.stats-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 12px;
+	}
+
+	@media (min-width: 600px) {
+		.stats-grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+
+	.stat-card {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 16px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 6px;
+	}
+
+	.stat-num {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--accent-blue);
+	}
+
+	.stat-label {
+		font-size: 0.78rem;
+		color: var(--text-muted);
+	}
+
+	.storage-actions-card, .storage-danger-zone {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 16px;
+		margin-bottom: 24px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.actions-buttons-row {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	@media (min-width: 600px) {
+		.actions-buttons-row {
+			flex-direction: row;
+		}
+	}
+
+	.storage-action-btn {
+		flex: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 10px 16px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.storage-action-btn.export-btn {
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		color: var(--text-primary);
+	}
+
+	.storage-action-btn.export-btn:hover {
+		background-color: var(--bg-hover);
+		border-color: var(--border-light);
+	}
+
+	.storage-action-btn.import-btn {
+		background-color: var(--accent-blue);
+		border: none;
+		color: white;
+	}
+
+	.storage-action-btn.import-btn:hover {
+		background-color: #5aa1f0;
+	}
+
+	.storage-danger-zone {
+		border-color: rgba(217, 101, 112, 0.4);
+		background-color: rgba(217, 101, 112, 0.02);
+	}
+
+	.danger-title {
+		color: #d96570 !important;
+	}
+
+	.clear-data-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		background-color: #d96570;
+		border: none;
+		color: white;
+		border-radius: 6px;
+		padding: 10px 16px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		align-self: flex-start;
+		transition: background-color var(--transition-fast);
+	}
+
+	.clear-data-btn:hover {
+		background-color: #e5737d;
 	}
 </style>
