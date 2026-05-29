@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { Conversation, Project } from '$lib/types';
+import type { Conversation, Project } from '$lib/types';
 	import { renderMarkdown, type ParsedThinking } from '$lib/markdown';
 	import { db } from '$lib/db';
 	import { liveQuery } from 'dexie';
 	import CanvasPanel from './CanvasPanel.svelte';
+	import { ROLE_PROMPTS, type AgentRole } from '$lib/agents';
 
 	let {
 		conversation = null,
@@ -17,6 +18,7 @@
 		onChangeTab,
 		onUpdateChatContext,
 		onUpdateChatProject,
+		onUpdateChatAgentRole,
 		onEditProjectSettings,
 		onClose
 	} = $props<{
@@ -31,6 +33,7 @@
 		onChangeTab: (tab: 'context' | 'thinking' | 'canvas') => void;
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
+		onUpdateChatAgentRole: (id: string, role: 'auto' | AgentRole) => void;
 		onEditProjectSettings: (projectId: string) => void;
 		onClose: () => void;
 	}>();
@@ -126,6 +129,13 @@
 		const target = e.target as HTMLSelectElement;
 		const val = target.value;
 		onUpdateChatProject(conversation.id, val ? val : undefined);
+	}
+
+	function handleAgentRoleChange(e: Event) {
+		if (!conversation) return;
+		const target = e.target as HTMLSelectElement;
+		const val = target.value;
+		onUpdateChatAgentRole(conversation.id, val as any);
 	}
 
 	function handleContextChange(e: Event) {
@@ -252,6 +262,36 @@
 						</svg>
 					</div>
 					<p class="section-desc">Assigning this chat to a project links it to the project's context rules.</p>
+				</div>
+
+				<!-- Agent Role Selection -->
+				<div class="panel-section">
+					<label for="chat-agent-role-select" class="section-label">Agent Role (บทบาทโมเดล)</label>
+					<div class="select-wrapper">
+						<select 
+							id="chat-agent-role-select"
+							value={conversation.agentRole || 'auto'} 
+							onchange={handleAgentRoleChange}
+							class="panel-select"
+						>
+							<option value="auto">🤖 Auto (สลับบทบาทอัตโนมัติ)</option>
+							<option value="developer">💻 Senior Developer (เน้นเขียนโค้ด)</option>
+							<option value="db_architect">🗄️ Database Architect (เน้นโครงสร้างข้อมูล)</option>
+							<option value="ui_ux">🎨 UI/UX Designer (เน้นแต่งสไตล์/CSS)</option>
+							<option value="writer">✍️ Technical Writer (เน้นสรุป/อธิบายเอกสาร)</option>
+							<option value="general">🤖 General Assistant (คุยทั่วไปแบบสุภาพ)</option>
+						</select>
+						<svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+						</svg>
+					</div>
+					<p class="section-desc">
+						{#if conversation.agentRole === 'auto' || !conversation.agentRole}
+							ระบบจะจัดสรรบทบาทผู้เชี่ยวชาญให้ AI ตามคีย์เวิร์ดของคำถามทันที
+						{:else}
+							ล็อคบทบาทโมเดลไว้ที่: <strong>{ROLE_PROMPTS[conversation.agentRole as AgentRole].name}</strong>
+						{/if}
+					</p>
 				</div>
 
 				<!-- Chat Context Textarea -->

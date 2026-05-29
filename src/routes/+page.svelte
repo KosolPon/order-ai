@@ -12,6 +12,7 @@
 	import { db } from '$lib/db';
 	import { parseCanvasTags } from '$lib/canvasParser';
 	import { encryptData, decryptData } from '$lib/crypto';
+	import { classifyPrompt, ROLE_PROMPTS, type AgentRole } from '$lib/agents';
 
 	// Reactive States
 	let conversations = $state<Conversation[]>([]);
@@ -885,6 +886,11 @@
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, projectId } : c));
 	}
 
+	// Update chat-level agent role assignment
+	function handleUpdateChatAgentRole(chatId: string, role: any) {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, agentRole: role } : c));
+	}
+
 	// Extract files from message and save them to IndexedDB
 	async function saveCanvasFilesFromMessage(chatId: string, content: string) {
 		const extracted = parseCanvasTags(content);
@@ -908,6 +914,23 @@
 
 		if (globalContext?.trim()) {
 			parts.push(`[Global Context]:\n${globalContext.trim()}`);
+		}
+
+		// Inject Active Agent Role system prompt based on conversation setting or auto-classification
+		const routingSetting = conv.agentRole || 'auto';
+		let activeRole: AgentRole = 'general';
+
+		if (routingSetting === 'auto') {
+			const userMessages = conv.messages.filter(m => m.role === 'user');
+			const latestPrompt = userMessages[userMessages.length - 1]?.content || '';
+			activeRole = classifyPrompt(latestPrompt);
+		} else {
+			activeRole = routingSetting;
+		}
+
+		const roleConfig = ROLE_PROMPTS[activeRole];
+		if (roleConfig) {
+			parts.push(`[Active Agent Role - ${roleConfig.name}]:\n${roleConfig.prompt}`);
 		}
 
 		if (conv.projectId) {
@@ -1472,13 +1495,23 @@
 		abortController = new AbortController();
 
 		// Create placeholder for assistant response
+		const activeConvObj = conversations.find(c => c.id === activeConvId);
+		const routingSetting = activeConvObj?.agentRole || 'auto';
+		let activeRole: AgentRole = 'general';
+		if (routingSetting === 'auto') {
+			activeRole = classifyPrompt(cleanPrompt);
+		} else {
+			activeRole = routingSetting;
+		}
+
 		const assistantMsgId = `msg-${Date.now()}-assistant`;
 		const assistantMessage: Message = {
 			id: assistantMsgId,
 			role: 'assistant',
 			content: '',
 			timestamp: Date.now(),
-			model: selectedModel
+			model: selectedModel,
+			agentRole: activeRole
 		};
 
 		conversations = conversations.map((conv) => {
@@ -1512,13 +1545,26 @@
 		abortController = new AbortController();
 
 		// Create placeholder for assistant response
+		const activeConvObj = conversations.find(c => c.id === activeConvId);
+		const userMessages = activeConvObj?.messages.filter(m => m.role === 'user') || [];
+		const lastUserPrompt = userMessages[userMessages.length - 1]?.content || '';
+		
+		const routingSetting = activeConvObj?.agentRole || 'auto';
+		let activeRole: AgentRole = 'general';
+		if (routingSetting === 'auto') {
+			activeRole = classifyPrompt(lastUserPrompt);
+		} else {
+			activeRole = routingSetting;
+		}
+
 		const assistantMsgId = `msg-${Date.now()}-assistant`;
 		const assistantMessage: Message = {
 			id: assistantMsgId,
 			role: 'assistant',
 			content: '',
 			timestamp: Date.now(),
-			model: selectedModel
+			model: selectedModel,
+			agentRole: activeRole
 		};
 
 		conversations = conversations.map((conv) => {
@@ -1761,6 +1807,7 @@
 			onChangeTab={(tab) => rightPaneTab = tab}
 			onUpdateChatContext={handleUpdateChatContext}
 			onUpdateChatProject={handleUpdateChatProject}
+			onUpdateChatAgentRole={handleUpdateChatAgentRole}
 			onEditProjectSettings={(projectId) => {
 				projectSettingsToOpenId = projectId;
 			}}

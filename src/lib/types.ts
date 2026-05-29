@@ -1,3 +1,5 @@
+import type { AgentRole } from './agents';
+
 export interface Attachment {
 	id: string;
 	type: 'image' | 'file' | 'link';
@@ -14,6 +16,7 @@ export interface Message {
 	model?: string;
 	images?: string[]; // base64 strings for Ollama API
 	attachments?: Attachment[]; // full attachment details for history rendering
+	agentRole?: string; // Stored triggered agent role (e.g. 'ui_ux')
 }
 
 export interface ProjectFile {
@@ -39,6 +42,7 @@ export interface Conversation {
 	model: string;
 	projectId?: string; // Links chat to a project
 	context?: string; // Chat-specific system context
+	agentRole?: 'auto' | AgentRole; // Active routing setting
 }
 
 export interface OllamaModel {

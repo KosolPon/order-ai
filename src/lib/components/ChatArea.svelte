@@ -4,6 +4,7 @@
 	import { tick, untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { db } from '$lib/db';
+	import { ROLE_PROMPTS, type AgentRole } from '$lib/agents';
 
 	let {
 		conversation = null,
@@ -1237,6 +1238,11 @@
 							<div class="message-info">
 								<span class="sender-name">
 									{msg.role === 'user' ? 'You' : (msg.model || 'Assistant')}
+									{#if msg.role === 'assistant' && msg.agentRole && ROLE_PROMPTS[msg.agentRole as AgentRole]}
+										<span class="role-badge" title={ROLE_PROMPTS[msg.agentRole as AgentRole].desc}>
+											{ROLE_PROMPTS[msg.agentRole as AgentRole].icon} {ROLE_PROMPTS[msg.agentRole as AgentRole].name}
+										</span>
+									{/if}
 								</span>
 								<span class="timestamp">
 									{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2842,5 +2848,20 @@
 		color: #e2a54b;
 		border-color: rgba(226, 165, 75, 0.4);
 		background-color: rgba(226, 165, 75, 0.05);
+	}
+
+	.role-badge {
+		font-size: 0.72rem;
+		font-weight: 600;
+		background-color: var(--bg-secondary);
+		color: var(--text-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 4px;
+		padding: 1px 6px;
+		margin-left: 8px;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		vertical-align: middle;
 	}
 </style>

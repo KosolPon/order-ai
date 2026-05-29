@@ -32,7 +32,7 @@
 		onRefreshModels?: () => void;
 	}>();
 
-	let currentModelObj = $derived(models.find(m => m.name === selectedModel));
+	let currentModelObj = $derived(models.find((m: any) => m.name === selectedModel));
 	let currentModelSource = $derived(currentModelObj?.source || (selectedModel.startsWith('gemini-') ? 'gemini' : 'local'));
 
 	let textareaElement = $state<HTMLTextAreaElement | null>(null);
@@ -99,23 +99,35 @@
 	}
 
 	let filteredModels = $derived(
-		models.filter(m => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+		models.filter((m: any) => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
 	);
 
 	let pinnedModels = $derived(
-		filteredModels.filter(m => pinnedModelNames.includes(m.name))
+		filteredModels.filter((m: any) => pinnedModelNames.includes(m.name))
 	);
 
 	let localModels = $derived(
-		filteredModels.filter(m => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+		filteredModels.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
 	);
 
 	let cloudModels = $derived(
-		filteredModels.filter(m => m.source === 'cloud')
+		filteredModels.filter((m: any) => m.source === 'cloud')
 	);
 
 	let geminiModels = $derived(
-		filteredModels.filter(m => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+		filteredModels.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+	);
+
+	let pinnedLocalModels = $derived(
+		localModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	);
+
+	let pinnedCloudModels = $derived(
+		cloudModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	);
+
+	let pinnedGeminiModels = $derived(
+		geminiModels.filter((m: any) => pinnedModelNames.includes(m.name))
 	);
 
 	function initSpeechRecognition() {
@@ -685,10 +697,10 @@
 										{#if activeTab === 'local'}
 											{#if localModels.length > 0}
 												<!-- Pinned Local Section -->
-												{#if localModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+												{#if pinnedLocalModels.length > 0}
 													<div class="model-group-title">ที่ปักหมุดไว้</div>
 													<div class="model-grid" style="margin-bottom: 8px;">
-														{#each localModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+														{#each pinnedLocalModels as model}
 															<div 
 																class="model-item-card" 
 																class:selected={selectedModel === model.name}
@@ -743,10 +755,10 @@
 										{:else if activeTab === 'cloud'}
 											{#if cloudModels.length > 0}
 												<!-- Pinned Cloud Section -->
-												{#if cloudModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+												{#if pinnedCloudModels.length > 0}
 													<div class="model-group-title">ที่ปักหมุดไว้</div>
 													<div class="model-grid" style="margin-bottom: 8px;">
-														{#each cloudModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+														{#each pinnedCloudModels as model}
 															<div 
 																class="model-item-card" 
 																class:selected={selectedModel === model.name}
@@ -801,10 +813,10 @@
 										{:else if activeTab === 'gemini'}
 											{#if geminiModels.length > 0}
 												<!-- Pinned Gemini Section -->
-												{#if geminiModels.filter(m => pinnedModelNames.includes(m.name)).length > 0}
+												{#if pinnedGeminiModels.length > 0}
 													<div class="model-group-title">ที่ปักหมุดไว้</div>
 													<div class="model-grid" style="margin-bottom: 8px;">
-														{#each geminiModels.filter(m => pinnedModelNames.includes(m.name)) as model}
+														{#each pinnedGeminiModels as model}
 															<div 
 																class="model-item-card" 
 																class:selected={selectedModel === model.name}
