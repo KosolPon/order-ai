@@ -539,9 +539,10 @@
 
 	$effect(() => {
 		if (!isInitialized) return;
+		const snapshot = $state.snapshot(conversations);
 		if (!isGenerating) {
 			db.conversations.clear().then(() => {
-				db.conversations.bulkAdd($state.snapshot(conversations));
+				db.conversations.bulkAdd(snapshot);
 			}).catch(err => {
 				console.error('Failed to save conversations to IndexedDB:', err);
 			});
@@ -635,8 +636,9 @@
 	// Save projects to IndexedDB
 	$effect(() => {
 		if (!isInitialized) return;
+		const snapshot = $state.snapshot(projects);
 		db.projects.clear().then(() => {
-			db.projects.bulkAdd($state.snapshot(projects));
+			db.projects.bulkAdd(snapshot);
 		}).catch(error => {
 			console.error('Failed to save projects to IndexedDB:', error);
 		});
