@@ -620,10 +620,11 @@ export function parseThinking(content: string): ParsedThinking {
 	}
 
 	const trimmed = content.trim();
-	// Check if the content starts with '<think>' or is a prefix of '<think>' (to support streaming start)
-	const isThinkBlock = trimmed.startsWith('<think>') || ('<think>'.startsWith(trimmed) && trimmed.length > 0);
+	// Check if content has a think block anywhere inside, or if it is streaming a think block prefix
+	const hasThinkTag = content.includes('<think>') || content.includes('</think>');
+	const isStreamingPrefix = '<think>'.startsWith(trimmed) && trimmed.length > 0;
 
-	if (!isThinkBlock) {
+	if (!hasThinkTag && !isStreamingPrefix) {
 		return { thinking: '', response: content, isThinking: false };
 	}
 
@@ -655,9 +656,12 @@ export function parseThinking(content: string): ParsedThinking {
 		remaining = remaining.slice(thinkEnd + 8);
 	}
 
+	const thinking = thinkingParts.join('\n\n');
+	const response = responseParts.join('');
+
 	return {
-		thinking: thinkingParts.filter(p => p.trim()).join('\n\n'),
-		response: responseParts.join(''),
+		thinking: thinking.trim(),
+		response: response,
 		isThinking
 	};
 }
