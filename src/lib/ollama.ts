@@ -87,6 +87,16 @@ function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy:
 	const isPageLocal = isBrowser && 
 		(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+	// If the Ollama URL is HTTPS, the browser can fetch it directly without Mixed Content blocks.
+	// This also bypasses the Netlify serverless proxy to avoid the 10-second timeout on stream responses.
+	const isHttps = ollamaUrl.startsWith('https://');
+	if (isBrowser && isHttps) {
+		return {
+			url: `${ollamaUrl}/${path}`,
+			useProxy: false
+		};
+	}
+
 	let isTargetLocal = false;
 	try {
 		const parsed = new URL(ollamaUrl);
