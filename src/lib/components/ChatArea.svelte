@@ -4,7 +4,7 @@
 	import { tick, untrack } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { db } from '$lib/db';
-	import { ROLE_PROMPTS, type AgentRole } from '$lib/agents';
+	import { roleStore } from '$lib/roleStore.svelte';
 
 	let {
 		conversation = null,
@@ -1274,9 +1274,9 @@
 							<div class="message-info">
 								<span class="sender-name">
 									{msg.role === 'user' ? 'You' : (msg.model || 'Assistant')}
-									{#if msg.role === 'assistant' && msg.agentRole && ROLE_PROMPTS[msg.agentRole as AgentRole]}
-										<span class="role-badge" title={ROLE_PROMPTS[msg.agentRole as AgentRole].desc}>
-											{ROLE_PROMPTS[msg.agentRole as AgentRole].icon} {ROLE_PROMPTS[msg.agentRole as AgentRole].name}
+									{#if msg.role === 'assistant' && msg.agentRole && roleStore.getRole(msg.agentRole)}
+										<span class="role-badge" title={roleStore.getRole(msg.agentRole)?.desc}>
+											{roleStore.getRole(msg.agentRole)?.icon} {roleStore.getRole(msg.agentRole)?.name}
 										</span>
 									{/if}
 								</span>

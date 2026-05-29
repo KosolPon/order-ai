@@ -54,10 +54,78 @@
 	}>();
 
 	import { fetchModels } from '$lib/ollama';
+	import { roleStore } from '$lib/roleStore.svelte';
 
-	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage'>('connections');
+	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage' | 'roles'>('connections');
 	let selectedConnectionTab = $state<'local' | 'cloud' | 'gemini'>('local');
 	let showOllamaCloudKey = $state(false);
+
+	// Custom Role States
+	let editingRoleId = $state<string | null>(null); // 'new', role.id, or null
+	let roleFormName = $state('');
+	let roleFormIcon = $state('🤖');
+	let roleFormDesc = $state('');
+	let roleFormPrompt = $state('');
+	let roleFormKeywords = $state('');
+
+	function openNewRoleForm() {
+		editingRoleId = 'new';
+		roleFormName = '';
+		roleFormIcon = '🤖';
+		roleFormDesc = '';
+		roleFormPrompt = '';
+		roleFormKeywords = '';
+	}
+
+	function handleEditRole(role: any) {
+		editingRoleId = role.id;
+		roleFormName = role.name;
+		roleFormIcon = role.icon || '🤖';
+		roleFormDesc = role.desc || '';
+		roleFormPrompt = role.prompt || '';
+		roleFormKeywords = role.keywords || '';
+	}
+
+	function handleDuplicateRole(role: any) {
+		editingRoleId = 'new';
+		roleFormName = `${role.name} Copy`;
+		roleFormIcon = role.icon || '🤖';
+		roleFormDesc = role.desc || '';
+		roleFormPrompt = role.prompt || '';
+		roleFormKeywords = role.keywords || '';
+	}
+
+	async function saveRole() {
+		if (!roleFormName.trim() || !roleFormPrompt.trim()) {
+			alert('กรุณากรอกชื่อบทบาทและ System Prompt');
+			return;
+		}
+
+		const roleId = editingRoleId === 'new' 
+			? `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+			: editingRoleId!;
+
+		await db.customRoles.put({
+			id: roleId,
+			name: roleFormName.trim(),
+			prompt: roleFormPrompt.trim(),
+			icon: roleFormIcon.trim(),
+			desc: roleFormDesc.trim(),
+			keywords: roleFormKeywords.trim(),
+			createdAt: Date.now()
+		});
+
+		editingRoleId = null;
+	}
+
+	async function handleDeleteRole(id: string) {
+		if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบบทบาทนี้?')) {
+			await db.customRoles.delete(id);
+			if (editingRoleId === id) {
+				editingRoleId = null;
+			}
+		}
+	}
 	let showGeminiKey = $state(false);
 
 	let localEnableOllamaLocal = $state(enableOllamaLocal);
@@ -406,7 +474,8 @@
 					conversations: await db.conversations.toArray(),
 					projects: await db.projects.toArray(),
 					canvasFiles: await db.canvasFiles.toArray(),
-					aiMemories: await db.aiMemories.toArray()
+					aiMemories: await db.aiMemories.toArray(),
+					customRoles: await db.customRoles.toArray()
 				}
 			};
 
@@ -454,11 +523,12 @@
 				}
 
 				// Restore IndexedDB
-				await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories], async () => {
+				await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories, db.customRoles], async () => {
 					await db.conversations.clear();
 					await db.projects.clear();
 					await db.canvasFiles.clear();
 					await db.aiMemories.clear();
+					await db.customRoles.clear();
 
 					if (Array.isArray(data.indexedDB.conversations)) {
 						await db.conversations.bulkAdd(data.indexedDB.conversations);
@@ -471,6 +541,9 @@
 					}
 					if (Array.isArray(data.indexedDB.aiMemories)) {
 						await db.aiMemories.bulkAdd(data.indexedDB.aiMemories);
+					}
+					if (Array.isArray(data.indexedDB.customRoles)) {
+						await db.customRoles.bulkAdd(data.indexedDB.customRoles);
 					}
 				});
 
@@ -494,11 +567,12 @@
 		}
 
 		try {
-			await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories], async () => {
+			await db.transaction('rw', [db.conversations, db.projects, db.canvasFiles, db.aiMemories, db.customRoles], async () => {
 				await db.conversations.clear();
 				await db.projects.clear();
 				await db.canvasFiles.clear();
 				await db.aiMemories.clear();
+				await db.customRoles.clear();
 			});
 
 			conversations = [];
@@ -597,6 +671,17 @@
 						</svg>
 						<span>Storage & Backup</span>
 					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'roles'} 
+						onclick={() => activeTab = 'roles'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+						</svg>
+						<span>Agent Roles</span>
+					</button>
 				</nav>
 			</div>
 
@@ -614,6 +699,8 @@
 							Global System Context
 						{:else if activeTab === 'storage'}
 							Storage & Backup Management
+						{:else if activeTab === 'roles'}
+							Agent Roles Configuration (บทบาทโมเดล)
 						{/if}
 					</h2>
 					<button class="settings-close-btn" onclick={closeSettings} aria-label="Close settings">
@@ -1646,6 +1733,129 @@
 									ล้างข้อมูลระบบทั้งหมด (Clear All Data)
 								</button>
 							</div>
+						</div>
+					{:else if activeTab === 'roles'}
+						<div class="settings-section">
+							{#if editingRoleId === null}
+								<!-- List View -->
+								<div class="section-header-action-row">
+									<div>
+										<h3 class="section-title-alt">จัดการบทบาทโมเดล (Agent Roles)</h3>
+										<p class="modal-help-subtext">กำหนดและปรับแต่ง Prompt ของผู้เชี่ยวชาญในด้านต่าง ๆ เพื่อสลับสไตล์คำตอบของบอท</p>
+									</div>
+									<button type="button" class="modal-action-btn add-role-btn" onclick={openNewRoleForm}>
+										+ เพิ่มบทบาทใหม่
+									</button>
+								</div>
+
+								<div class="roles-grid animate-fade-in">
+									{#each roleStore.allRoles as role}
+										<div class="role-card" class:custom-role-card={role.isCustom}>
+											<div class="role-card-header">
+												<div class="role-card-identity">
+													<span class="role-card-icon">{role.icon || '🤖'}</span>
+													<div>
+														<h4 class="role-card-name">{role.name}</h4>
+														{#if role.isCustom}
+															<span class="badge badge-custom">Custom</span>
+														{:else}
+															<span class="badge badge-system">System</span>
+														{/if}
+													</div>
+												</div>
+												<div class="role-card-actions">
+													<button type="button" class="role-action-icon-btn" onclick={() => handleDuplicateRole(role)} title="Duplicate / Copy">
+														<svg viewBox="0 0 24 24" width="14" height="14">
+															<path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+														</svg>
+													</button>
+													{#if role.isCustom}
+														<button type="button" class="role-action-icon-btn" onclick={() => handleEditRole(role)} title="Edit">
+															<svg viewBox="0 0 24 24" width="14" height="14">
+																<path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+															</svg>
+														</button>
+														<button type="button" class="role-action-icon-btn delete-btn" onclick={() => handleDeleteRole(role.id)} title="Delete">
+															<svg viewBox="0 0 24 24" width="14" height="14">
+																<path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+															</svg>
+														</button>
+													{/if}
+												</div>
+											</div>
+											<p class="role-card-desc">{role.desc || 'ไม่มีคำอธิบาย'}</p>
+											{#if role.keywords}
+												<div class="role-card-keywords">
+													<span class="keywords-label">Keywords:</span>
+													{#each role.keywords.split(',') as kw}
+														{#if kw.trim()}
+															<span class="keyword-tag">{kw.trim()}</span>
+														{/if}
+													{/each}
+												</div>
+											{/if}
+											<details class="role-card-prompt-details">
+												<summary>ดู System Prompt</summary>
+												<div class="prompt-text-preview">{role.prompt}</div>
+											</details>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<!-- Edit/Add Form View -->
+								<div class="role-form-container animate-zoom-in">
+									<div class="form-header-row">
+										<h3>
+											{#if editingRoleId === 'new'}
+												สร้างบทบาทใหม่ (Create Agent Role)
+											{:else}
+												แก้ไขบทบาท (Edit Agent Role)
+											{/if}
+										</h3>
+										<button type="button" class="role-back-btn" onclick={() => editingRoleId = null}>
+											← ย้อนกลับ
+										</button>
+									</div>
+
+									<div class="role-form-grid">
+										<div class="form-group-row">
+											<div class="form-item-block role-icon-input-block">
+												<label for="role-icon">Emoji ไอคอน</label>
+												<input id="role-icon" type="text" class="modal-text-input" placeholder="🤖" bind:value={roleFormIcon} maxlength="5" />
+											</div>
+											<div class="form-item-block role-name-input-block">
+												<label for="role-name">ชื่อบทบาท (Name)</label>
+												<input id="role-name" type="text" class="modal-text-input" placeholder="เช่น Senior Python Engineer" bind:value={roleFormName} />
+											</div>
+										</div>
+
+										<div class="setting-item-block">
+											<label for="role-desc">คำอธิบายโดยย่อ (Description)</label>
+											<input id="role-desc" type="text" class="modal-text-input" placeholder="เช่น ผู้เชี่ยวชาญสคริปต์และการคำนวณ" bind:value={roleFormDesc} />
+										</div>
+
+										<div class="setting-item-block">
+											<label for="role-keywords">คำสำคัญสำหรับจัดสรรบทบาทอัตโนมัติ (Keywords - แยกด้วยเครื่องหมายจุลภาค ,)</label>
+											<input id="role-keywords" type="text" class="modal-text-input" placeholder="เช่น python, django, pandas, numpy" bind:value={roleFormKeywords} />
+											<p class="modal-help-subtext" style="margin-top: 4px;">เมื่อตรวจพบคำเหล่านี้ในคำถาม ระบบจะเรียกใช้ Prompt นี้อัตโนมัติ</p>
+										</div>
+
+										<div class="setting-item-block">
+											<label for="role-prompt">คำสั่งระบบ (System Prompt / Instructions)</label>
+											<textarea id="role-prompt" class="modal-textarea-input scrollbar-custom" placeholder="You are an expert technical assistant. Focus on..." bind:value={roleFormPrompt} rows="8"></textarea>
+										</div>
+									</div>
+
+									<div class="form-actions-row">
+										<button type="button" class="modal-secondary-btn" onclick={() => editingRoleId = null}>
+											ยกเลิก
+										</button>
+										<button type="button" class="modal-action-btn" onclick={saveRole}>
+											บันทึกข้อมูล
+										</button>
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -3015,5 +3225,323 @@
 
 	.clear-data-btn:hover {
 		background-color: #e5737d;
+	}
+
+	/* Agent Roles Styles */
+	.section-header-action-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 20px;
+		gap: 16px;
+	}
+
+	.section-title-alt {
+		font-family: var(--font-title);
+		font-weight: 600;
+		font-size: 1.2rem;
+		color: var(--text-primary);
+		margin: 0 0 4px 0;
+	}
+
+	.add-role-btn {
+		white-space: nowrap;
+		padding: 8px 16px !important;
+		font-size: 0.85rem !important;
+	}
+
+	.roles-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 16px;
+		margin-bottom: 24px;
+	}
+
+	.role-card {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		padding: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+	}
+
+	.role-card:hover {
+		border-color: var(--border-light);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.role-card.custom-role-card {
+		border-color: rgba(168, 199, 250, 0.25);
+		background: linear-gradient(145deg, var(--bg-secondary) 0%, rgba(168, 199, 250, 0.02) 100%);
+	}
+
+	.role-card.custom-role-card:hover {
+		border-color: var(--accent-blue);
+		box-shadow: 0 4px 16px rgba(168, 199, 250, 0.08);
+	}
+
+	.role-card-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 12px;
+	}
+
+	.role-card-identity {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.role-card-icon {
+		font-size: 1.8rem;
+		min-width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: var(--bg-tertiary);
+		border-radius: 8px;
+		border: 1px solid var(--border-color);
+	}
+
+	.role-card-name {
+		font-family: var(--font-title);
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 2px 0;
+	}
+
+	.badge-system, .badge-custom {
+		font-size: 0.65rem;
+		font-weight: 600;
+		padding: 1px 6px;
+		border-radius: 4px;
+		text-transform: uppercase;
+		display: inline-block;
+	}
+
+	.badge-system {
+		background-color: rgba(107, 114, 128, 0.15);
+		color: var(--text-secondary);
+		border: 1px solid rgba(107, 114, 128, 0.25);
+	}
+
+	.badge-custom {
+		background-color: rgba(168, 199, 250, 0.15);
+		color: var(--accent-blue);
+		border: 1px solid rgba(168, 199, 250, 0.25);
+	}
+
+	.role-card-actions {
+		display: flex;
+		gap: 4px;
+	}
+
+	.role-action-icon-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		padding: 6px;
+		border-radius: 6px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.role-action-icon-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.role-action-icon-btn.delete-btn:hover {
+		background-color: rgba(217, 101, 112, 0.15);
+		color: #d96570;
+	}
+
+	.role-card-desc {
+		font-size: 0.8rem;
+		color: var(--text-secondary);
+		line-height: 1.4;
+		margin: 0;
+		flex-grow: 1;
+	}
+
+	.role-card-keywords {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		align-items: center;
+		margin-top: 4px;
+	}
+
+	.keywords-label {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		margin-right: 2px;
+	}
+
+	.keyword-tag {
+		font-size: 0.7rem;
+		background-color: var(--bg-tertiary);
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		padding: 2px 6px;
+		border-radius: 4px;
+	}
+
+	.role-card-prompt-details {
+		border-top: 1px solid var(--border-color);
+		padding-top: 8px;
+		margin-top: 4px;
+	}
+
+	.role-card-prompt-details summary {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--accent-blue);
+		cursor: pointer;
+		user-select: none;
+		outline: none;
+	}
+
+	.role-card-prompt-details summary:hover {
+		text-decoration: underline;
+	}
+
+	.prompt-text-preview {
+		margin-top: 8px;
+		background-color: var(--bg-tertiary);
+		border: 1px solid var(--border-color);
+		border-radius: 6px;
+		padding: 8px 10px;
+		font-size: 0.75rem;
+		font-family: var(--font-mono, monospace);
+		color: var(--text-secondary);
+		white-space: pre-wrap;
+		max-height: 120px;
+		overflow-y: auto;
+		line-height: 1.4;
+	}
+
+	/* Role Form Styles */
+	.role-form-container {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+	}
+
+	.form-header-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		border-bottom: 1px solid var(--border-color);
+		padding-bottom: 12px;
+	}
+
+	.form-header-row h3 {
+		font-family: var(--font-title);
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	.role-back-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		cursor: pointer;
+		padding: 4px 8px;
+		border-radius: 4px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.role-back-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.role-form-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.form-group-row {
+		display: flex;
+		gap: 12px;
+	}
+
+	.role-icon-input-block {
+		width: 100px;
+	}
+
+	.role-name-input-block {
+		flex: 1;
+	}
+
+	.form-item-block {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.modal-textarea-input {
+		width: 100%;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 12px;
+		color: var(--text-primary);
+		font-size: 0.88rem;
+		outline: none;
+		resize: vertical;
+		font-family: inherit;
+		line-height: 1.45;
+		transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+	}
+
+	.modal-textarea-input:focus {
+		border-color: var(--accent-blue);
+		box-shadow: 0 0 0 2px rgba(168, 199, 250, 0.15);
+	}
+
+	.form-actions-row {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+		border-top: 1px solid var(--border-color);
+		padding-top: 16px;
+	}
+
+	.modal-secondary-btn {
+		background-color: transparent;
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		padding: 8px 16px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.modal-secondary-btn:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
 	}
 </style>

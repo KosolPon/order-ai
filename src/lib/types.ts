@@ -43,7 +43,7 @@ export interface Conversation {
 	model: string;
 	projectId?: string; // Links chat to a project
 	context?: string; // Chat-specific system context
-	agentRole?: 'auto' | AgentRole; // Active routing setting
+	agentRole?: 'auto' | string; // Active routing setting
 }
 
 export interface OllamaModel {

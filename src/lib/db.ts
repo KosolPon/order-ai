@@ -18,11 +18,22 @@ export interface AIMemory {
 	createdAt: number;
 }
 
+export interface CustomRole {
+	id: string;
+	name: string;
+	prompt: string;
+	icon: string;
+	desc: string;
+	keywords: string;
+	createdAt: number;
+}
+
 class OrderAIDatabase extends Dexie {
 	canvasFiles!: Table<CanvasFile, [string, string]>; // Composite key: [chatId, name]
 	aiMemories!: Table<AIMemory, number>;
 	conversations!: Table<Conversation, string>;
 	projects!: Table<Project, string>;
+	customRoles!: Table<CustomRole, string>;
 
 	constructor() {
 		super('OrderAIDatabase');
@@ -32,6 +43,13 @@ class OrderAIDatabase extends Dexie {
 			aiMemories: '++id, chatId, projectId, createdAt',
 			conversations: 'id, projectId, createdAt',
 			projects: 'id, createdAt'
+		});
+		this.version(3).stores({
+			canvasFiles: '[chatId+name], chatId, name, type, updatedAt',
+			aiMemories: '++id, chatId, projectId, createdAt',
+			conversations: 'id, projectId, createdAt',
+			projects: 'id, createdAt',
+			customRoles: 'id, createdAt'
 		});
 	}
 }

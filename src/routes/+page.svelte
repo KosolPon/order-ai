@@ -12,7 +12,8 @@
 	import { db } from '$lib/db';
 	import { parseCanvasTags } from '$lib/canvasParser';
 	import { encryptData, decryptData } from '$lib/crypto';
-	import { classifyPrompt, ROLE_PROMPTS, type AgentRole } from '$lib/agents';
+	import { classifyPrompt, classifyPromptDynamic, type AgentRole } from '$lib/agents';
+	import { roleStore } from '$lib/roleStore.svelte';
 
 	// Reactive States
 	let conversations = $state<Conversation[]>([]);
@@ -922,17 +923,17 @@
 
 		// Inject Active Agent Role system prompt based on conversation setting or auto-classification
 		const routingSetting = conv.agentRole || 'auto';
-		let activeRole: AgentRole = 'general';
+		let activeRoleId = 'general';
 
 		if (routingSetting === 'auto') {
 			const userMessages = conv.messages.filter(m => m.role === 'user');
 			const latestPrompt = userMessages[userMessages.length - 1]?.content || '';
-			activeRole = classifyPrompt(latestPrompt);
+			activeRoleId = classifyPromptDynamic(latestPrompt, roleStore.customRoles);
 		} else {
-			activeRole = routingSetting;
+			activeRoleId = routingSetting;
 		}
 
-		const roleConfig = ROLE_PROMPTS[activeRole];
+		const roleConfig = roleStore.getRole(activeRoleId);
 		if (roleConfig) {
 			parts.push(`[Active Agent Role - ${roleConfig.name}]:\n${roleConfig.prompt}`);
 		}
@@ -1506,9 +1507,9 @@
 		// Create placeholder for assistant response
 		const activeConvObj = conversations.find(c => c.id === activeConvId);
 		const routingSetting = activeConvObj?.agentRole || 'auto';
-		let activeRole: AgentRole = 'general';
+		let activeRole = 'general';
 		if (routingSetting === 'auto') {
-			activeRole = classifyPrompt(cleanPrompt);
+			activeRole = classifyPromptDynamic(cleanPrompt, roleStore.customRoles);
 		} else {
 			activeRole = routingSetting;
 		}
@@ -1561,9 +1562,9 @@
 		const lastUserPrompt = userMessages[userMessages.length - 1]?.content || '';
 		
 		const routingSetting = activeConvObj?.agentRole || 'auto';
-		let activeRole: AgentRole = 'general';
+		let activeRole = 'general';
 		if (routingSetting === 'auto') {
-			activeRole = classifyPrompt(lastUserPrompt);
+			activeRole = classifyPromptDynamic(lastUserPrompt, roleStore.customRoles);
 		} else {
 			activeRole = routingSetting;
 		}

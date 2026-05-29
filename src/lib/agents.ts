@@ -142,3 +142,28 @@ export function classifyPrompt(prompt: string): AgentRole {
 
 	return 'general';
 }
+
+/**
+ * Classifies a prompt using both custom roles (by keywords) and standard roles.
+ */
+export function classifyPromptDynamic(prompt: string, customRoles: { id: string; keywords?: string }[]): string {
+	const text = prompt.toLowerCase();
+
+	// 1. Check custom roles first (if they have keywords)
+	for (const role of customRoles) {
+		if (role.keywords) {
+			const keywordsList = role.keywords
+				.split(',')
+				.map((k) => k.trim().toLowerCase())
+				.filter(Boolean);
+			for (const keyword of keywordsList) {
+				if (text.includes(keyword)) {
+					return role.id;
+				}
+			}
+		}
+	}
+
+	// 2. Fall back to standard classifyPrompt
+	return classifyPrompt(prompt);
+}

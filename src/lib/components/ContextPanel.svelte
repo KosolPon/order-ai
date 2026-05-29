@@ -4,7 +4,8 @@ import type { Conversation, Project } from '$lib/types';
 	import { db } from '$lib/db';
 	import { liveQuery } from 'dexie';
 	import CanvasPanel from './CanvasPanel.svelte';
-	import { ROLE_PROMPTS, type AgentRole } from '$lib/agents';
+	import { roleStore } from '$lib/roleStore.svelte';
+	import type { AgentRole } from '$lib/agents';
 
 	let {
 		conversation = null,
@@ -33,7 +34,7 @@ import type { Conversation, Project } from '$lib/types';
 		onChangeTab: (tab: 'context' | 'thinking' | 'canvas') => void;
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
-		onUpdateChatAgentRole: (id: string, role: 'auto' | AgentRole) => void;
+		onUpdateChatAgentRole: (id: string, role: 'auto' | string) => void;
 		onEditProjectSettings: (projectId: string) => void;
 		onClose: () => void;
 	}>();
@@ -275,11 +276,9 @@ import type { Conversation, Project } from '$lib/types';
 							class="panel-select"
 						>
 							<option value="auto">🤖 Auto (สลับบทบาทอัตโนมัติ)</option>
-							<option value="developer">💻 Senior Developer (เน้นเขียนโค้ด)</option>
-							<option value="db_architect">🗄️ Database Architect (เน้นโครงสร้างข้อมูล)</option>
-							<option value="ui_ux">🎨 UI/UX Designer (เน้นแต่งสไตล์/CSS)</option>
-							<option value="writer">✍️ Technical Writer (เน้นสรุป/อธิบายเอกสาร)</option>
-							<option value="general">🤖 General Assistant (คุยทั่วไปแบบสุภาพ)</option>
+							{#each roleStore.allRoles as r}
+								<option value={r.id}>{r.icon} {r.name} ({r.desc})</option>
+							{/each}
 						</select>
 						<svg class="select-chevron" viewBox="0 0 24 24" width="16" height="16">
 							<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
@@ -289,7 +288,7 @@ import type { Conversation, Project } from '$lib/types';
 						{#if conversation.agentRole === 'auto' || !conversation.agentRole}
 							ระบบจะจัดสรรบทบาทผู้เชี่ยวชาญให้ AI ตามคีย์เวิร์ดของคำถามทันที
 						{:else}
-							ล็อคบทบาทโมเดลไว้ที่: <strong>{ROLE_PROMPTS[conversation.agentRole as AgentRole].name}</strong>
+							ล็อคบทบาทโมเดลไว้ที่: <strong>{roleStore.getRole(conversation.agentRole)?.name || conversation.agentRole}</strong>
 						{/if}
 					</p>
 				</div>
