@@ -2538,9 +2538,16 @@
 		margin-top: 0;
 	}
 
-	.user-message-container:hover .message-edit-trigger,
+	.user-message-container:hover .message-edit-trigger {
+		opacity: 1;
+	}
+
 	.user-message-container:hover .message-resend-trigger {
 		opacity: 1;
+	}
+
+	.user-message-container:hover .message-resend-trigger:disabled {
+		opacity: 0.3;
 	}
 
 	.message-edit-trigger, .message-resend-trigger {
@@ -2565,7 +2572,6 @@
 	}
 
 	.message-resend-trigger:disabled {
-		opacity: 0.3 !important;
 		cursor: not-allowed;
 	}
 
