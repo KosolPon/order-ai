@@ -1563,7 +1563,6 @@
 	{/if}
 
 	{#if rawDiagnosticMsg}
-		{@const parsed = parseThinking(rawDiagnosticMsg.content)}
 		<div 
 			class="lightbox-overlay raw-diagnostic-overlay" 
 			onclick={closeRawDiagnostic} 
@@ -1579,34 +1578,16 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="raw-diagnostic-card" onclick={(e) => e.stopPropagation()}>
 				<div class="raw-diagnostic-header">
-					<h3>ข้อมูลดิบจาก AI (Raw Output Details)</h3>
-					<span class="diagnostic-model-badge">{rawDiagnosticMsg.model || 'Unknown Model'}</span>
+					<h3>ข้อมูลดิบจาก AI (Raw Output)</h3>
+					<div class="raw-diagnostic-header-actions">
+						<span class="diagnostic-model-badge">{rawDiagnosticMsg.model || 'Unknown Model'}</span>
+						<button class="copy-raw-btn" onclick={() => {
+							navigator.clipboard.writeText(rawDiagnosticMsg?.content || '');
+						}}>คัดลอกดิบ</button>
+					</div>
 				</div>
-				<div class="raw-diagnostic-body">
-					<div class="diagnostic-section">
-						<div class="diagnostic-section-header">
-							<span>1. ข้อความดิบทั้งหมด (Raw Unparsed Output)</span>
-							<button class="copy-raw-btn" onclick={() => {
-								navigator.clipboard.writeText(rawDiagnosticMsg?.content || '');
-							}}>คัดลอกดิบ</button>
-						</div>
-						<pre class="diagnostic-code">{rawDiagnosticMsg.content || '(Empty)'}</pre>
-					</div>
-
-					<div class="diagnostic-sections-grid">
-						<div class="diagnostic-section">
-							<div class="diagnostic-section-header">
-								<span>2. ส่วนความคิด (Parsed Thinking Stream)</span>
-							</div>
-							<pre class="diagnostic-code thinking">{parsed.thinking || '(ไม่มี / Empty)'}</pre>
-						</div>
-						<div class="diagnostic-section">
-							<div class="diagnostic-section-header">
-								<span>3. ส่วนคำตอบหลัก (Parsed Chat Response)</span>
-							</div>
-							<pre class="diagnostic-code response">{parsed.response || '(ไม่มี / Empty)'}</pre>
-						</div>
-					</div>
+				<div class="raw-diagnostic-body-single">
+					<textarea readonly class="diagnostic-textarea-raw">{rawDiagnosticMsg.content || ''}</textarea>
 				</div>
 			</div>
 		</div>
@@ -3140,80 +3121,57 @@
 		border-radius: 20px;
 	}
 
-	.raw-diagnostic-body {
+	.raw-diagnostic-header-actions {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-right: 48px; /* Give room for close button */
+	}
+
+	.raw-diagnostic-body-single {
 		flex: 1;
 		padding: 24px;
-		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 20px;
 	}
 
-	.diagnostic-section {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.diagnostic-section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--text-secondary);
+	.diagnostic-textarea-raw {
+		flex: 1;
+		width: 100%;
+		height: 100%;
+		resize: none;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 16px;
+		font-family: 'Courier New', Courier, monospace;
+		font-size: 0.88rem;
+		line-height: 1.5;
+		color: var(--text-primary);
+		outline: none;
+		white-space: pre;
+		overflow: auto;
 	}
 
 	.copy-raw-btn {
 		background: none;
 		border: 1px solid var(--border-color);
 		color: var(--text-secondary);
-		padding: 3px 8px;
-		border-radius: 4px;
-		font-size: 0.75rem;
+		padding: 4px 12px;
+		border-radius: 6px;
+		font-size: 0.8rem;
+		font-weight: 500;
 		cursor: pointer;
-		transition: background-color var(--transition-fast), color var(--transition-fast);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 	}
 
 	.copy-raw-btn:hover {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
-	}
-
-	.diagnostic-code {
-		margin: 0;
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: 8px;
-		padding: 12px;
-		font-family: 'Courier New', Courier, monospace;
-		font-size: 0.82rem;
-		line-height: 1.4;
-		color: var(--text-primary);
-		white-space: pre-wrap;
-		word-break: break-all;
-		max-height: 250px;
-		overflow-y: auto;
-	}
-
-	.diagnostic-code.thinking {
-		border-left: 3px solid #e2a54b;
-	}
-
-	.diagnostic-code.response {
-		border-left: 3px solid #4285f4;
-	}
-
-	.diagnostic-sections-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16px;
+		border-color: var(--border-light);
 	}
 
 	@media (max-width: 768px) {
-		.diagnostic-sections-grid {
-			grid-template-columns: 1fr;
-		}
 		.raw-diagnostic-card {
 			height: 90vh;
 			width: 95vw;

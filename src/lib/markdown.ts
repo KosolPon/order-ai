@@ -647,8 +647,17 @@ export function parseThinking(content: string): ParsedThinking {
 		
 		const thinkEnd = remaining.indexOf('</think>', thinkStart);
 		if (thinkEnd === -1) {
-			thinkingParts.push(remaining.slice(thinkStart + 7));
-			isThinking = true;
+			// If we have a <think> tag but no </think> tag,
+			// we only treat it as thinking if it's at the very beginning of the content
+			// (i.e. we are actively streaming the thinking block).
+			// If it appears later in the response without being closed, it's safer to treat it as response content.
+			const contentBeforeThis = content.slice(0, content.indexOf(remaining) + thinkStart).trim();
+			if (contentBeforeThis.length === 0) {
+				thinkingParts.push(remaining.slice(thinkStart + 7));
+				isThinking = true;
+			} else {
+				responseParts.push(remaining);
+			}
 			break;
 		}
 		
