@@ -1417,21 +1417,19 @@
 							<div class="message-actions-row">
 								<button 
 									type="button" 
-									class="msg-action-btn"
+									class="msg-action-btn remember-btn"
 									class:saved={messageSavedIndicator === msg.id}
 									onclick={() => handleRememberMessage(msg)}
-									title="Save message to AI Memories / Key Facts"
+									title={messageSavedIndicator === msg.id ? "จำข้อความนี้แล้ว" : "จำข้อความนี้ (Save key fact)"}
 								>
 									{#if messageSavedIndicator === msg.id}
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
 										</svg>
-										<span>Remembered!</span>
 									{:else}
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/>
 										</svg>
-										<span>Remember</span>
 									{/if}
 								</button>
 
@@ -1440,18 +1438,16 @@
 									class="msg-action-btn copy-btn"
 									class:copied={copiedMessageId === msg.id}
 									onclick={() => handleCopyMessage(msg)}
-									title="คัดลอกคำตอบ (Copy response)"
+									title={copiedMessageId === msg.id ? "คัดลอกสำเร็จแล้ว!" : "คัดลอกคำตอบ (Copy response)"}
 								>
 									{#if copiedMessageId === msg.id}
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
 										</svg>
-										<span>คัดลอกแล้ว!</span>
 									{:else}
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
 										</svg>
-										<span>คัดลอก</span>
 									{/if}
 								</button>
 
@@ -1463,7 +1459,7 @@
 										onclick={() => onToggleMessageFeedback?.(msg.id, 'up')}
 										title="คำตอบดี (Good response)"
 									>
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M1 21h4V9H1v12zm22-10c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/>
 										</svg>
 									</button>
@@ -1474,7 +1470,7 @@
 										onclick={() => onToggleMessageFeedback?.(msg.id, 'down')}
 										title="คำตอบไม่ตรงประเด็น/ไม่ดี (Bad response)"
 									>
-										<svg viewBox="0 0 24 24" width="12" height="12">
+										<svg viewBox="0 0 24 24" width="14" height="14">
 											<path fill="currentColor" d="M19 15h4V3h-4v12zm-3-3c0-.26-.05-.5-.14-.73l-3.02-7.05C12.54 3.5 11.83 3 11 3H2c-1.1 0-2 .9-2 2v10c0 .55.22 1.05.59 1.41L7.17 23l.94-.94c.27-.27.44-.65.44-1.06l-.03-.32L7.57 15H14c1.1 0 2-.9 2-2v-1z"/>
 										</svg>
 									</button>
@@ -2526,12 +2522,12 @@
 	}
 
 	.user-text-container-with-edit .user-text-pre {
-		max-width: calc(100% - 76px);
+		max-width: calc(100% - 40px);
 	}
 
 	.user-actions-wrapper {
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
 		gap: 6px;
 		align-items: center;
 		margin-top: 8px;
@@ -2921,7 +2917,7 @@
 		display: flex;
 		gap: 8px;
 		margin-top: 8px;
-		opacity: 0.15;
+		opacity: 0;
 		transition: opacity var(--transition-fast);
 	}
 
@@ -2932,21 +2928,25 @@
 	.msg-action-btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		justify-content: center;
 		background: none;
 		border: 1px solid var(--border-color);
-		border-radius: 6px;
-		padding: 4px 8px;
+		border-radius: 50%;
+		width: 28px;
+		height: 28px;
 		color: var(--text-muted);
-		font-size: 0.75rem;
 		cursor: pointer;
-		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+		transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 	}
 
 	.msg-action-btn:hover {
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
 		border-color: var(--border-light);
+	}
+
+	.msg-action-btn:active {
+		transform: scale(0.9);
 	}
 
 	.msg-action-btn.saved {
@@ -2962,16 +2962,7 @@
 	}
 
 	.msg-action-btn.feedback-btn {
-		padding: 4px;
-		border-radius: 50%;
-		width: 24px;
-		height: 24px;
-		justify-content: center;
 		transition: transform 0.1s ease, color 0.15s ease, background-color 0.15s ease;
-	}
-	
-	.msg-action-btn.feedback-btn:active {
-		transform: scale(0.9);
 	}
 
 	.msg-action-btn.thumbs-up.active {
