@@ -896,6 +896,18 @@
 		conversations = conversations.map((c) => (c.id === chatId ? { ...c, agentRole: role } : c));
 	}
 
+	function handleUpdateChatOutputTone(chatId: string, tone: 'precise' | 'creative') {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, outputTone: tone } : c));
+	}
+
+	function handleUpdateChatOutputLength(chatId: string, length: 'summary' | 'detailed' | 'article') {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, outputLength: length } : c));
+	}
+
+	function handleUpdateChatThinkingDepth(chatId: string, depth: 'fast' | 'normal' | 'thinking' | 'reflecting') {
+		conversations = conversations.map((c) => (c.id === chatId ? { ...c, thinkingDepth: depth } : c));
+	}
+
 	// Extract files from message and save them to IndexedDB
 	async function saveCanvasFilesFromMessage(chatId: string, content: string) {
 		const extracted = parseCanvasTags(content);
@@ -998,6 +1010,33 @@
 			parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
 		}
 
+		// Inject Response Style directives
+		const tone = conv.outputTone || 'precise';
+		const length = conv.outputLength || 'detailed';
+		const thinking = conv.thinkingDepth || 'normal';
+
+		if (tone === 'creative') {
+			parts.push(`[TONE DIRECTIVE]: Be creative, innovative, and expressive. Feel free to explore novel suggestions and expressive formatting.`);
+		} else {
+			parts.push(`[TONE DIRECTIVE]: Be extremely precise, accurate, objective, and factual. Avoid speculation, assumptions, or fluffy language.`);
+		}
+
+		if (length === 'summary') {
+			parts.push(`[LENGTH DIRECTIVE]: Provide a very concise summary. Keep your output short, direct, and to the point.`);
+		} else if (length === 'article') {
+			parts.push(`[LENGTH DIRECTIVE]: Provide a long, comprehensive, in-depth article or report style response with thorough, detailed explanations.`);
+		} else {
+			parts.push(`[LENGTH DIRECTIVE]: Provide a detailed, clear, and step-by-step response with standard length.`);
+		}
+
+		if (thinking === 'fast') {
+			parts.push(`[THINKING DIRECTIVE]: Answer directly and fast. Do not explain your steps or reason aloud.`);
+		} else if (thinking === 'thinking') {
+			parts.push(`[THINKING DIRECTIVE]: Think carefully and outline your logical step-by-step reasoning process before giving the final answer.`);
+		} else if (thinking === 'reflecting') {
+			parts.push(`[THINKING DIRECTIVE]: Think step-by-step. Before rendering the final output, reflect on your answer, cross-examine it for potential errors, edge cases, or bugs, and output the polished, corrected result.`);
+		}
+
 		// Enforce language alignment to match the user's language (specifically Thai if the user asks in Thai)
 		parts.push(`[LANGUAGE INSTRUCTION]: Always respond in the language used by the user. If the user prompts in Thai (ภาษาไทย), you must write all your responses, explanations, and code comments in Thai. Do not output in other languages such as Korean or English unless referencing technical keywords.`);
 
@@ -1013,6 +1052,15 @@
 		initialMessages: Message[],
 		systemPrompt: string
 	) {
+		const activeConvObj = conversations.find(c => c.id === activeConvId);
+		const tone = activeConvObj?.outputTone || 'precise';
+
+		const getEffectiveTemp = (configuredTemp: number) => {
+			if (tone === 'precise') return 0.15;
+			if (tone === 'creative') return 0.85;
+			return configuredTemp;
+		};
+
 		const chainLength = activeModels.length;
 		let currentPrompt = initialMessages[initialMessages.length - 1]?.content || '';
 		let runningModel = activeModels[0] || selectedModel;
@@ -1094,7 +1142,7 @@
 						systemPrompt,
 						ollamaUrl: targetUrl,
 						ollamaApiKey: targetApiKey,
-						temperature: temp,
+						temperature: getEffectiveTemp(temp),
 						topP,
 						topK,
 						numCtx,
@@ -1192,7 +1240,7 @@
 						systemPrompt,
 						ollamaUrl: targetUrlM2,
 						ollamaApiKey: targetApiKeyM2,
-						temperature: temp2,
+						temperature: getEffectiveTemp(temp2),
 						topP,
 						topK,
 						numCtx,
@@ -1295,7 +1343,7 @@
 						systemPrompt,
 						ollamaUrl: targetUrlM2,
 						ollamaApiKey: targetApiKeyM2,
-						temperature: temp2,
+						temperature: getEffectiveTemp(temp2),
 						topP,
 						topK,
 						numCtx,
@@ -1876,6 +1924,9 @@
 			onUpdateChatContext={handleUpdateChatContext}
 			onUpdateChatProject={handleUpdateChatProject}
 			onUpdateChatAgentRole={handleUpdateChatAgentRole}
+			onUpdateChatOutputTone={handleUpdateChatOutputTone}
+			onUpdateChatOutputLength={handleUpdateChatOutputLength}
+			onUpdateChatThinkingDepth={handleUpdateChatThinkingDepth}
 			onEditProjectSettings={(projectId) => {
 				projectSettingsToOpenId = projectId;
 			}}

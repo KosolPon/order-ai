@@ -51,6 +51,13 @@ class OrderAIDatabase extends Dexie {
 			projects: 'id, createdAt',
 			customRoles: 'id, createdAt'
 		});
+		this.version(4).stores({
+			canvasFiles: '[chatId+name], chatId, name, type, updatedAt',
+			aiMemories: '++id, chatId, projectId, createdAt',
+			conversations: 'id, projectId, createdAt',
+			projects: 'id, createdAt',
+			customRoles: 'id, createdAt'
+		});
 	}
 }
 

@@ -20,6 +20,9 @@ import type { Conversation, Project } from '$lib/types';
 		onUpdateChatContext,
 		onUpdateChatProject,
 		onUpdateChatAgentRole,
+		onUpdateChatOutputTone,
+		onUpdateChatOutputLength,
+		onUpdateChatThinkingDepth,
 		onEditProjectSettings,
 		onClose
 	} = $props<{
@@ -35,6 +38,9 @@ import type { Conversation, Project } from '$lib/types';
 		onUpdateChatContext: (id: string, context: string) => void;
 		onUpdateChatProject: (id: string, projectId: string | undefined) => void;
 		onUpdateChatAgentRole: (id: string, role: 'auto' | string) => void;
+		onUpdateChatOutputTone: (id: string, tone: 'precise' | 'creative') => void;
+		onUpdateChatOutputLength: (id: string, length: 'summary' | 'detailed' | 'article') => void;
+		onUpdateChatThinkingDepth: (id: string, depth: 'fast' | 'normal' | 'thinking' | 'reflecting') => void;
 		onEditProjectSettings: (projectId: string) => void;
 		onClose: () => void;
 	}>();
@@ -291,6 +297,113 @@ import type { Conversation, Project } from '$lib/types';
 							ล็อคบทบาทโมเดลไว้ที่: <strong>{roleStore.getRole(conversation.agentRole)?.name || conversation.agentRole}</strong>
 						{/if}
 					</p>
+				</div>
+
+				<!-- Response Style Selection -->
+				<div class="panel-section">
+					<label class="section-label">Response Style (รูปแบบผลลัพธ์)</label>
+					
+					<!-- Tone Select -->
+					<div class="style-control-row">
+						<span class="style-row-label">โทนความคิด:</span>
+						<div class="segmented-control">
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={(conversation.outputTone || 'precise') === 'precise'}
+								onclick={() => onUpdateChatOutputTone(conversation.id, 'precise')}
+								title="เน้นถูกต้องเชิงวิชาการ/โค้ด (Accurate & Precise)"
+							>
+								🎯 ถูกต้อง
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.outputTone === 'creative'}
+								onclick={() => onUpdateChatOutputTone(conversation.id, 'creative')}
+								title="เน้นจินตนาการและงานเขียน (Creative & Innovative)"
+							>
+								🎨 สร้างสรรค์
+							</button>
+						</div>
+					</div>
+
+					<!-- Length Select -->
+					<div class="style-control-row">
+						<span class="style-row-label">ขนาดคำตอบ:</span>
+						<div class="segmented-control">
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.outputLength === 'summary'}
+								onclick={() => onUpdateChatOutputLength(conversation.id, 'summary')}
+								title="ย่อสรุปเนื้อหาให้สั้นกระชับที่สุด"
+							>
+								📝 ย่อ
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={(conversation.outputLength || 'detailed') === 'detailed'}
+								onclick={() => onUpdateChatOutputLength(conversation.id, 'detailed')}
+								title="ตอบแบบมีรายละเอียดขั้นตอนปกติ"
+							>
+								📖 ละเอียด
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.outputLength === 'article'}
+								onclick={() => onUpdateChatOutputLength(conversation.id, 'article')}
+								title="เขียนตอบยาวในรูปแบบของรายงานหรือบทความเจาะลึก"
+							>
+								📚 ยาว
+							</button>
+						</div>
+					</div>
+
+					<!-- Thinking Select -->
+					<div class="style-control-row">
+						<span class="style-row-label">ความลึกซึ้ง:</span>
+						<div class="segmented-control">
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.thinkingDepth === 'fast'}
+								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'fast')}
+								title="ตอบทันทีรวดเร็ว ไม่แสดงขั้นตอนการคิด"
+							>
+								⚡ เร็ว
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={(conversation.thinkingDepth || 'normal') === 'normal'}
+								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'normal')}
+								title="การตอบตามมาตรฐาน"
+							>
+								🧠 ปกติ
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.thinkingDepth === 'thinking'}
+								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'thinking')}
+								title="ให้โมเดลอธิบายขั้นตอนการคิดอย่างช้า ๆ"
+							>
+								💭 คิด
+							</button>
+							<button 
+								type="button" 
+								class="control-btn" 
+								class:active={conversation.thinkingDepth === 'reflecting'}
+								onclick={() => onUpdateChatThinkingDepth(conversation.id, 'reflecting')}
+								title="คิดวิเคราะห์อย่างลึกซึ้งและทบทวนหาบั๊ก/จุดผิดพลาดก่อนแสดงผลลัพธ์"
+							>
+								🔍 ทวน
+							</button>
+						</div>
+					</div>
 				</div>
 
 				<!-- Chat Context Textarea -->
@@ -1107,5 +1220,61 @@ import type { Conversation, Project } from '$lib/types';
 	.delete-memory-btn:hover {
 		color: #d96570;
 		background-color: rgba(217, 101, 112, 0.1);
+	}
+
+	/* Response Style segment controls */
+	.style-control-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		margin-top: 8px;
+	}
+
+	.style-row-label {
+		font-size: 0.78rem;
+		color: var(--text-muted);
+		width: 72px;
+		min-width: 72px;
+	}
+
+	.segmented-control {
+		display: flex;
+		flex: 1;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		padding: 2px;
+		gap: 2px;
+		overflow: hidden;
+	}
+
+	.control-btn {
+		flex: 1;
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.75rem;
+		font-weight: 500;
+		padding: 5px 2px;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+		text-align: center;
+		white-space: nowrap;
+	}
+
+	.control-btn:hover {
+		color: var(--text-primary);
+		background-color: var(--bg-hover);
+	}
+
+	.control-btn.active {
+		color: var(--text-primary);
+		background-color: var(--bg-secondary);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+		border: 1px solid var(--border-light);
+		padding-top: 4px;
+		padding-bottom: 4px;
 	}
 </style>
