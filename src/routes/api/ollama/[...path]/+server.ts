@@ -135,8 +135,17 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 			headers: responseHeaders
 		});
 	} catch (error: any) {
-		console.error('Ollama proxy error:', error);
-		return new Response(JSON.stringify({ error: `Failed to connect to Ollama: ${error.message}` }), {
+		const cause = error.cause;
+		const errorCode = cause?.code || error.code;
+		const errorMsg = cause?.message || error.message;
+
+		if (errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED' || errorCode === 'ENOTFOUND') {
+			console.error(`[Ollama Proxy Error] Connection failed (${errorCode}) to ${targetUrl}: ${errorMsg}`);
+		} else {
+			console.error('Ollama proxy error:', error);
+		}
+
+		return new Response(JSON.stringify({ error: `Failed to connect to Ollama: ${errorMsg}` }), {
 			status: 502, // Bad Gateway
 			headers: { 
 				'Content-Type': 'application/json',
