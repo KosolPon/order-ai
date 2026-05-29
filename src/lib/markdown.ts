@@ -619,6 +619,14 @@ export function parseThinking(content: string): ParsedThinking {
 		return { thinking: '', response: '', isThinking: false };
 	}
 
+	const trimmed = content.trim();
+	// Check if the content starts with '<think>' or is a prefix of '<think>' (to support streaming start)
+	const isThinkBlock = trimmed.startsWith('<think>') || ('<think>'.startsWith(trimmed) && trimmed.length > 0);
+
+	if (!isThinkBlock) {
+		return { thinking: '', response: content, isThinking: false };
+	}
+
 	let thinkingParts: string[] = [];
 	let responseParts: string[] = [];
 	let isThinking = false;
