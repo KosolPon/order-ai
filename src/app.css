@@ -1139,14 +1139,40 @@ pre[class*="language-"] {
 	font-weight: 600;
 	color: var(--text-primary);
 	border-bottom: 2px solid var(--border-color);
+	border-right: 1px solid var(--border-color);
 	text-align: left;
+}
+
+.markdown-body th:last-child {
+	border-right: none;
 }
 
 .markdown-body td {
 	padding: 0.75rem 1rem;
 	border-bottom: 1px solid var(--border-light);
+	border-right: 1px solid var(--border-light);
 	color: var(--text-secondary);
 	transition: color var(--transition-fast);
+}
+
+.markdown-body td:last-child {
+	border-right: none;
+}
+
+/* Respect markdown alignments */
+.markdown-body th[align="left"],
+.markdown-body td[align="left"] {
+	text-align: left;
+}
+
+.markdown-body th[align="center"],
+.markdown-body td[align="center"] {
+	text-align: center;
+}
+
+.markdown-body th[align="right"],
+.markdown-body td[align="right"] {
+	text-align: right;
 }
 
 .markdown-body tr {
