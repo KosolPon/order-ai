@@ -722,7 +722,7 @@
 			return;
 		}
 		try {
-			const fetchedModels = await fetchModels(ollamaCloudUrl, ollamaCloudApiKey);
+			const fetchedModels = await fetchModels(ollamaCloudUrl, ollamaCloudApiKey, true);
 			fetchedModels.sort((a, b) => a.name.localeCompare(b.name));
 			ollamaCloudModels = fetchedModels;
 			isOllamaCloudConnected = true;
@@ -1040,7 +1040,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudModel
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},
@@ -1088,7 +1089,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudM1
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -1136,7 +1138,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudM2
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},
@@ -1187,7 +1190,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudM1
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -1237,7 +1241,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudM2
 					},
 					(chunk) => {
 						const cleanChunk = chunk.replace(/<\/?think>/g, '');
@@ -1289,7 +1294,8 @@
 						numCtx,
 						numPredict,
 						repeatPenalty,
-						customizeSettings
+						customizeSettings,
+						forceProxy: isCloudM3
 					},
 					(chunk) => appendToAssistantMessage(chunk),
 					() => {},

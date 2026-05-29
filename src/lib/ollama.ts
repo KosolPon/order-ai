@@ -82,10 +82,17 @@ export const GEMINI_MODELS: OllamaModel[] = [
  * If the site is deployed publicly and the user targets localhost, we fetch directly.
  * Otherwise, we route via SvelteKit proxy to handle CORS/local dev.
  */
-function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy: boolean } {
+function getTargetUrl(path: string, ollamaUrl: string, forceProxy?: boolean): { url: string; useProxy: boolean } {
 	const isBrowser = typeof window !== 'undefined';
 	const isPageLocal = isBrowser && 
 		(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+	if (forceProxy) {
+		return {
+			url: `/api/ollama/${path}`,
+			useProxy: true
+		};
+	}
 
 	// If the Ollama URL is HTTPS, the browser can fetch it directly without Mixed Content blocks.
 	// This also bypasses the Netlify serverless proxy to avoid the 10-second timeout on stream responses.
@@ -123,11 +130,12 @@ function getTargetUrl(path: string, ollamaUrl: string): { url: string; useProxy:
  */
 export async function fetchModels(
 	ollamaUrl: string = DEFAULT_OLLAMA_URL,
-	apiKey?: string
+	apiKey?: string,
+	forceProxy?: boolean
 ): Promise<OllamaModel[]> {
 	if (typeof window === 'undefined') return [];
 	try {
-		const target = getTargetUrl('api/tags', ollamaUrl);
+		const target = getTargetUrl('api/tags', ollamaUrl, forceProxy);
 		const headers: Record<string, string> = {};
 		if (target.useProxy) {
 			headers['x-ollama-url'] = ollamaUrl;
@@ -160,7 +168,8 @@ const systemPromptCache: Record<string, string> = {};
 export async function fetchModelSystemPrompt(
 	modelName: string,
 	ollamaUrl: string = DEFAULT_OLLAMA_URL,
-	apiKey?: string
+	apiKey?: string,
+	forceProxy?: boolean
 ): Promise<string> {
 	if (typeof window === 'undefined') return '';
 	if (!modelName || modelName.startsWith('gemini-')) return '';
@@ -171,7 +180,7 @@ export async function fetchModelSystemPrompt(
 	}
 
 	try {
-		const target = getTargetUrl('api/show', ollamaUrl);
+		const target = getTargetUrl('api/show', ollamaUrl, forceProxy);
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json'
 		};
@@ -220,6 +229,7 @@ export async function streamChat(
 		customizeSettings?: boolean;
 		geminiApiKey?: string;
 		ollamaApiKey?: string;
+		forceProxy?: boolean;
 	},
 	onChunk: (chunk: string) => void,
 	onDone: (fullResponse: string) => void,
@@ -232,7 +242,7 @@ export async function streamChat(
 		const isGemini = model.startsWith('gemini-');
 		let baseSystemPrompt = '';
 		if (!isGemini) {
-			baseSystemPrompt = await fetchModelSystemPrompt(model, ollamaUrl, options.ollamaApiKey);
+			baseSystemPrompt = await fetchModelSystemPrompt(model, ollamaUrl, options.ollamaApiKey, options.forceProxy);
 		}
 
 		let combinedSystemPrompt = systemPrompt || '';
@@ -301,7 +311,7 @@ export async function streamChat(
 
 		const target = isGemini 
 			? { url: '/api/gemini/chat', useProxy: false } 
-			: getTargetUrl('api/chat', ollamaUrl);
+			: getTargetUrl('api/chat', ollamaUrl, options.forceProxy);
 
 		const headers: Record<string, string> = {
 			'Content-Type': 'application/json'

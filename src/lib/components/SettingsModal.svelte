@@ -172,7 +172,7 @@
 				testingCloud = true;
 				localStatusCloud = { type: 'idle', message: 'กำลังทดสอบการเชื่อมต่อ... (Verifying...)' };
 				try {
-					const fetched = await fetchModels(url, key);
+					const fetched = await fetchModels(url, key, true);
 					localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${fetched.length} ตัว` };
 					if (localEnableOllamaCloud) {
 						enableOllamaCloud = true;
