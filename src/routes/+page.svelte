@@ -482,6 +482,20 @@
 					if (storedModel && modelNames.includes(storedModel)) {
 						selectedModel = storedModel;
 					} else if (!selectedModel || !modelNames.includes(selectedModel)) {
+						const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
+						const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
+						const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
+
+						if (enableGemini && isGeminiModel && !geminiApiKey) {
+							return;
+						}
+						if (enableOllamaCloud && isCloudModel && ollamaCloudModels.length === 0) {
+							return;
+						}
+						if (enableOllamaLocal && isLocalModel && ollamaModels.length === 0) {
+							return;
+						}
+
 						selectedModel = availableModels[0].name;
 					}
 				}
@@ -680,6 +694,20 @@
 			if (storedModel && modelNames.includes(storedModel)) {
 				selectedModel = storedModel;
 			} else if (!selectedModel || !modelNames.includes(selectedModel)) {
+				const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
+				const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
+				const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
+
+				if (enableGemini && isGeminiModel && !geminiApiKey) {
+					return;
+				}
+				if (enableOllamaCloud && isCloudModel && ollamaCloudModels.length === 0) {
+					return;
+				}
+				if (enableOllamaLocal && isLocalModel && ollamaModels.length === 0) {
+					return;
+				}
+
 				selectedModel = availableModels[0].name;
 			}
 		}
