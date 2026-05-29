@@ -122,119 +122,92 @@
 		}
 	});
 
-	// Auto-validate Ollama Local in background
-	$effect(() => {
-		if (!isSettingsOpen) return;
+	// Manual connection test functions
+	async function testLocalConnection() {
 		const url = ollamaUrl;
-		if (url) {
-			if (!isValidUrl(url)) {
-				enableOllamaLocal = false;
-				localEnableOllamaLocal = false;
-				localStatusLocal = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น http://localhost:11434)' };
-				return;
-			}
-			const timer = setTimeout(async () => {
-				testingLocal = true;
-				localStatusLocal = { type: 'idle', message: 'กำลังตรวจสอบการเชื่อมต่อ... (Verifying...)' };
-				try {
-					const fetched = await fetchModels(url);
-					const count = fetched.filter(m => !m.name.includes('gemini') && !m.name.includes('cloud')).length;
-					localStatusLocal = { type: 'success', message: `เชื่อมต่อสำเร็จ! โหลดโมเดลทั้งหมด ${count} ตัว` };
-					if (localEnableOllamaLocal) {
-						enableOllamaLocal = true;
-						onRefreshModels();
-					}
-				} catch (error: any) {
-					enableOllamaLocal = false;
-					localEnableOllamaLocal = false;
-					const errMsg = error?.message || 'เชื่อมต่อล้มเหลว ตรวจสอบว่าเปิด Ollama หรือยัง และตั้งค่า CORS ถูกต้องหรือไม่';
-					localStatusLocal = { type: 'error', message: errMsg };
-				} finally {
-					testingLocal = false;
-				}
-			}, 600);
-			return () => clearTimeout(timer);
-		} else {
+		if (!url) {
+			localStatusLocal = { type: 'error', message: 'กรุณากรอก URL' };
+			return;
+		}
+		if (!isValidUrl(url)) {
+			localStatusLocal = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น http://localhost:11434)' };
+			return;
+		}
+		testingLocal = true;
+		localStatusLocal = { type: 'idle', message: 'กำลังตรวจสอบการเชื่อมต่อ... (Verifying...)' };
+		try {
+			const fetched = await fetchModels(url);
+			const count = fetched.filter(m => !m.name.includes('gemini') && !m.name.includes('cloud')).length;
+			localStatusLocal = { type: 'success', message: `เชื่อมต่อสำเร็จ! โหลดโมเดลทั้งหมด ${count} ตัว` };
+			localEnableOllamaLocal = true;
+			enableOllamaLocal = true;
+			onRefreshModels();
+		} catch (error: any) {
 			enableOllamaLocal = false;
 			localEnableOllamaLocal = false;
-			localStatusLocal = { type: 'idle', message: '' };
+			const errMsg = error?.message || 'เชื่อมต่อล้มเหลว ตรวจสอบว่าเปิด Ollama หรือยัง และตั้งค่า CORS ถูกต้องหรือไม่';
+			localStatusLocal = { type: 'error', message: errMsg };
+		} finally {
+			testingLocal = false;
 		}
-	});
+	}
 
-	// Auto-validate Ollama Cloud in background
-	$effect(() => {
-		if (!isSettingsOpen) return;
+	async function testCloudConnection() {
 		const url = ollamaCloudUrl;
 		const key = ollamaCloudApiKey;
-		if (url && key) {
-			if (!isValidUrl(url)) {
-				enableOllamaCloud = false;
-				localEnableOllamaCloud = false;
-				localStatusCloud = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น https://api.ollama.com)' };
-				return;
-			}
-			const timer = setTimeout(async () => {
-				testingCloud = true;
-				localStatusCloud = { type: 'idle', message: 'กำลังทดสอบการเชื่อมต่อ... (Verifying...)' };
-				try {
-					const fetched = await fetchModels(url, key, true);
-					localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${fetched.length} ตัว` };
-					if (localEnableOllamaCloud) {
-						enableOllamaCloud = true;
-						onRefreshModels();
-					}
-				} catch (error: any) {
-					enableOllamaCloud = false;
-					localEnableOllamaCloud = false;
-					const errMsg = error?.message || 'เชื่อมต่อ Ollama Cloud ล้มเหลว ตรวจสอบ URL และ API Key';
-					localStatusCloud = { type: 'error', message: errMsg };
-				} finally {
-					testingCloud = false;
-				}
-			}, 600);
-			return () => clearTimeout(timer);
-		} else {
+		if (!url || !key) {
+			localStatusCloud = { type: 'error', message: 'กรุณากรอก URL และ API Key' };
+			return;
+		}
+		if (!isValidUrl(url)) {
+			localStatusCloud = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น https://api.ollama.com)' };
+			return;
+		}
+		testingCloud = true;
+		localStatusCloud = { type: 'idle', message: 'กำลังทดสอบการเชื่อมต่อ... (Verifying...)' };
+		try {
+			const fetched = await fetchModels(url, key, true);
+			localStatusCloud = { type: 'success', message: `เชื่อมต่อ Ollama Cloud สำเร็จ! โหลดโมเดล ${fetched.length} ตัว` };
+			localEnableOllamaCloud = true;
+			enableOllamaCloud = true;
+			onRefreshModels();
+		} catch (error: any) {
 			enableOllamaCloud = false;
 			localEnableOllamaCloud = false;
-			localStatusCloud = { type: 'idle', message: '' };
+			const errMsg = error?.message || 'เชื่อมต่อ Ollama Cloud ล้มเหลว ตรวจสอบ URL และ API Key';
+			localStatusCloud = { type: 'error', message: errMsg };
+		} finally {
+			testingCloud = false;
 		}
-	});
+	}
 
-	// Auto-validate Gemini Key in background
-	$effect(() => {
-		if (!isSettingsOpen) return;
+	async function testGeminiConnection() {
 		const key = geminiApiKey;
-		if (key) {
-			const timer = setTimeout(async () => {
-				testingGemini = true;
-				localStatusGemini = { type: 'idle', message: 'กำลังตรวจสอบ API Key... (Verifying...)' };
-				try {
-					const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-					if (!res.ok) {
-						const errData = await res.json().catch(() => ({}));
-						throw new Error(errData.error?.message || `HTTP error ${res.status}`);
-					}
-					localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ!' };
-					if (localEnableGemini) {
-						enableGemini = true;
-						onRefreshModels();
-					}
-				} catch (error: any) {
-					enableGemini = false;
-					localEnableGemini = false;
-					const errMsg = error?.message || 'ตรวจสอบ API Key ล้มเหลว กรุณาเช็คความถูกต้องของ API Key';
-					localStatusGemini = { type: 'error', message: errMsg };
-				} finally {
-					testingGemini = false;
-				}
-			}, 600);
-			return () => clearTimeout(timer);
-		} else {
+		if (!key) {
+			localStatusGemini = { type: 'error', message: 'กรุณากรอก API Key' };
+			return;
+		}
+		testingGemini = true;
+		localStatusGemini = { type: 'idle', message: 'กำลังตรวจสอบ API Key... (Verifying...)' };
+		try {
+			const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+			if (!res.ok) {
+				const errData = await res.json().catch(() => ({}));
+				throw new Error(errData.error?.message || `HTTP error ${res.status}`);
+			}
+			localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ!' };
+			localEnableGemini = true;
+			enableGemini = true;
+			onRefreshModels();
+		} catch (error: any) {
 			enableGemini = false;
 			localEnableGemini = false;
-			localStatusGemini = { type: 'idle', message: '' };
+			const errMsg = error?.message || 'ตรวจสอบ API Key ล้มเหลว กรุณาเช็คความถูกต้องของ API Key';
+			localStatusGemini = { type: 'error', message: errMsg };
+		} finally {
+			testingGemini = false;
 		}
-	});
+	}
 
 	function closeSettings() {
 		isSettingsOpen = false;
@@ -707,11 +680,30 @@
 														type="text" 
 														placeholder="http://localhost:11434" 
 														bind:value={ollamaUrl}
+														oninput={() => {
+															localStatusLocal = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+															localEnableOllamaLocal = false;
+															enableOllamaLocal = false;
+														}}
 													/>
 												</div>
 												<div class="status-alert" class:success={localStatusLocal.type === 'success'} class:error={localStatusLocal.type === 'error'}>
 													<span class="status-alert-dot"></span>
 													<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่อสำเร็จ (Connected).` : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+												</div>
+												<div class="test-btn-container">
+													<button 
+														type="button" 
+														class="modal-action-btn" 
+														onclick={testLocalConnection}
+														disabled={testingLocal}
+													>
+														{#if testingLocal}
+															กำลังทดสอบ...
+														{:else}
+															ทดสอบการเชื่อมต่อ
+														{/if}
+													</button>
 												</div>
 											</div>
 
@@ -752,6 +744,11 @@
 													class="modal-text-input"
 													placeholder="https://ollama.com" 
 													bind:value={ollamaCloudUrl}
+													oninput={() => {
+														localStatusCloud = { type: 'idle', message: 'แก้ไข Base URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+														localEnableOllamaCloud = false;
+														enableOllamaCloud = false;
+													}}
 												/>
 											</div>
 
@@ -763,6 +760,11 @@
 														type={showOllamaCloudKey ? 'text' : 'password'} 
 														placeholder="Ollama Cloud API Key..." 
 														bind:value={ollamaCloudApiKey}
+														oninput={() => {
+															localStatusCloud = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+															localEnableOllamaCloud = false;
+															enableOllamaCloud = false;
+														}}
 													/>
 													<button 
 														class="modal-eye-btn" 
@@ -779,6 +781,20 @@
 												<div class="status-alert" class:success={localStatusCloud.type === 'success'} class:error={localStatusCloud.type === 'error'}>
 													<span class="status-alert-dot"></span>
 													<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud สำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+												</div>
+												<div class="test-btn-container">
+													<button 
+														type="button" 
+														class="modal-action-btn" 
+														onclick={testCloudConnection}
+														disabled={testingCloud}
+													>
+														{#if testingCloud}
+															กำลังทดสอบ...
+														{:else}
+															ทดสอบการเชื่อมต่อ
+														{/if}
+													</button>
 												</div>
 											</div>
 										</div>
@@ -805,6 +821,11 @@
 														type={showGeminiKey ? 'text' : 'password'} 
 														placeholder="AI Studio Gemini API Key..." 
 														bind:value={geminiApiKey}
+														oninput={() => {
+															localStatusGemini = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+															localEnableGemini = false;
+															enableGemini = false;
+														}}
 													/>
 													<button 
 														class="modal-eye-btn" 
@@ -821,6 +842,20 @@
 												<div class="status-alert" class:success={localStatusGemini.type === 'success'} class:error={localStatusGemini.type === 'error'}>
 													<span class="status-alert-dot"></span>
 													<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ไม่ได้เปิดใช้งาน หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+												</div>
+												<div class="test-btn-container">
+													<button 
+														type="button" 
+														class="modal-action-btn" 
+														onclick={testGeminiConnection}
+														disabled={testingGemini}
+													>
+														{#if testingGemini}
+															กำลังทดสอบ...
+														{:else}
+															ทดสอบการเชื่อมต่อ
+														{/if}
+													</button>
 												</div>
 											</div>
 										</div>
