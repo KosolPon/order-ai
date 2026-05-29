@@ -3145,7 +3145,7 @@
 		border-radius: 8px;
 		padding: 16px;
 		font-family: 'Courier New', Courier, monospace;
-		font-size: 0.88rem;
+		font-size: calc(var(--chat-font-size, 15px) * 0.9);
 		line-height: 1.5;
 		color: var(--text-primary);
 		outline: none;
