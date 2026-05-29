@@ -1015,38 +1015,38 @@
 		const appendToAssistantMessage = (text: string) => {
 			conversations = conversations.map((conv) => {
 				if (conv.id === activeConvId) {
-					return {
-						...conv,
-						messages: conv.messages.map((m) => {
-							if (m.id === assistantMsgId) {
-								const newContent = m.content + text;
-								
-								// Asynchronously extract and save canvas files to IndexedDB as they stream
-								const extracted = parseCanvasTags(newContent);
-								if (extracted.length > 0) {
-									extracted.forEach((file) => {
-										db.canvasFiles.put({
-											chatId: activeConvId,
-											name: file.name,
-											type: file.type,
-											content: file.content,
-											updatedAt: Date.now()
-										});
+					const updatedMessages = conv.messages.map((m) => {
+						if (m.id === assistantMsgId) {
+							const newContent = m.content + text;
+							
+							// Asynchronously extract and save canvas files to IndexedDB as they stream
+							const extracted = parseCanvasTags(newContent);
+							if (extracted.length > 0) {
+								extracted.forEach((file) => {
+									db.canvasFiles.put({
+										chatId: activeConvId,
+										name: file.name,
+										type: file.type,
+										content: file.content,
+										updatedAt: Date.now()
 									});
+								});
 
-									// Automatically open and switch to Canvas if not opened yet
-									if (!activeCanvasFileName) {
-										activeCanvasFileName = extracted[0].name;
-										showContextPanel = true;
-										rightPaneTab = 'canvas';
-									}
+								// Automatically open and switch to Canvas if not opened yet
+								if (!activeCanvasFileName) {
+									activeCanvasFileName = extracted[0].name;
+									showContextPanel = true;
+									rightPaneTab = 'canvas';
 								}
-								
-								return { ...m, content: newContent };
 							}
-							return m;
-						})
-					};
+							
+							return { ...m, content: newContent };
+						}
+						return m;
+					});
+					const updatedConv = { ...conv, messages: updatedMessages };
+					db.conversations.put(updatedConv).catch(e => console.error('Failed to auto-save streamed message:', e));
+					return updatedConv;
 				}
 				return conv;
 			});
@@ -1057,15 +1057,15 @@
 			runningModel = parts[parts.length - 1].trim();
 			conversations = conversations.map((conv) => {
 				if (conv.id === activeConvId) {
-					return {
-						...conv,
-						messages: conv.messages.map((m) => {
-							if (m.id === assistantMsgId) {
-								return { ...m, model: modelName };
-							}
-							return m;
-						})
-					};
+					const updatedMessages = conv.messages.map((m) => {
+						if (m.id === assistantMsgId) {
+							return { ...m, model: modelName };
+						}
+						return m;
+					});
+					const updatedConv = { ...conv, messages: updatedMessages };
+					db.conversations.put(updatedConv).catch(e => console.error('Failed to auto-save model switch:', e));
+					return updatedConv;
 				}
 				return conv;
 			});
@@ -1374,6 +1374,11 @@
 				}
 			}
 
+			// Final push of conversation state to db
+			if (activeConv) {
+				await db.conversations.put(activeConv);
+			}
+
 			isGenerating = false;
 			abortController = null;
 		} catch (error: any) {
@@ -1385,18 +1390,18 @@
 			console.error('Error during execution chain:', error);
 			conversations = conversations.map((conv) => {
 				if (conv.id === activeConvId) {
-					return {
-						...conv,
-						messages: conv.messages.map((m) => {
-							if (m.id === assistantMsgId) {
-								return {
-									...m,
-									content: m.content + formatErrorMessage(error.message || String(error), runningModel)
-								};
-							}
-							return m;
-						})
-					};
+					const updatedMessages = conv.messages.map((m) => {
+						if (m.id === assistantMsgId) {
+							return {
+								...m,
+								content: m.content + formatErrorMessage(error.message || String(error), runningModel)
+							};
+						}
+						return m;
+					});
+					const updatedConv = { ...conv, messages: updatedMessages };
+					db.conversations.put(updatedConv).catch(e => console.error('Failed to save error status:', e));
+					return updatedConv;
 				}
 				return conv;
 			});
@@ -1516,10 +1521,12 @@
 
 		conversations = conversations.map((conv) => {
 			if (conv.id === activeConvId) {
-				return {
+				const updatedConv = {
 					...conv,
 					messages: [...conv.messages, assistantMessage]
 				};
+				db.conversations.put(updatedConv).catch(e => console.error('Failed to save chat with assistant placeholder:', e));
+				return updatedConv;
 			}
 			return conv;
 		});
@@ -1569,10 +1576,12 @@
 
 		conversations = conversations.map((conv) => {
 			if (conv.id === activeConvId) {
-				return {
+				const updatedConv = {
 					...conv,
 					messages: [...conv.messages, assistantMessage]
 				};
+				db.conversations.put(updatedConv).catch(e => console.error('Failed to save resubmitted chat placeholder:', e));
+				return updatedConv;
 			}
 			return conv;
 		});
