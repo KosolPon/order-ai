@@ -1045,7 +1045,7 @@
 						return m;
 					});
 					const updatedConv = { ...conv, messages: updatedMessages };
-					db.conversations.put(updatedConv).catch(e => console.error('Failed to auto-save streamed message:', e));
+					db.conversations.put($state.snapshot(updatedConv)).catch(e => console.error('Failed to auto-save streamed message:', e));
 					return updatedConv;
 				}
 				return conv;
@@ -1064,7 +1064,7 @@
 						return m;
 					});
 					const updatedConv = { ...conv, messages: updatedMessages };
-					db.conversations.put(updatedConv).catch(e => console.error('Failed to auto-save model switch:', e));
+					db.conversations.put($state.snapshot(updatedConv)).catch(e => console.error('Failed to auto-save model switch:', e));
 					return updatedConv;
 				}
 				return conv;
@@ -1376,7 +1376,7 @@
 
 			// Final push of conversation state to db
 			if (activeConv) {
-				await db.conversations.put(activeConv);
+				await db.conversations.put($state.snapshot(activeConv));
 			}
 
 			isGenerating = false;
@@ -1400,7 +1400,7 @@
 						return m;
 					});
 					const updatedConv = { ...conv, messages: updatedMessages };
-					db.conversations.put(updatedConv).catch(e => console.error('Failed to save error status:', e));
+					db.conversations.put($state.snapshot(updatedConv)).catch(e => console.error('Failed to save error status:', e));
 					return updatedConv;
 				}
 				return conv;
@@ -1525,7 +1525,7 @@
 					...conv,
 					messages: [...conv.messages, assistantMessage]
 				};
-				db.conversations.put(updatedConv).catch(e => console.error('Failed to save chat with assistant placeholder:', e));
+				db.conversations.put($state.snapshot(updatedConv)).catch(e => console.error('Failed to save chat with assistant placeholder:', e));
 				return updatedConv;
 			}
 			return conv;
@@ -1580,7 +1580,7 @@
 					...conv,
 					messages: [...conv.messages, assistantMessage]
 				};
-				db.conversations.put(updatedConv).catch(e => console.error('Failed to save resubmitted chat placeholder:', e));
+				db.conversations.put($state.snapshot(updatedConv)).catch(e => console.error('Failed to save resubmitted chat placeholder:', e));
 				return updatedConv;
 			}
 			return conv;
@@ -1624,7 +1624,7 @@
 			return conv;
 		});
 
-		await db.conversations.put(updatedConv);
+		await db.conversations.put($state.snapshot(updatedConv));
 	}
 
 	async function handleResendPrompt(messageId: string) {
