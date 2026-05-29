@@ -50,6 +50,22 @@
 
 	// Projects state
 	let collapsedProjects = $state<Record<string, boolean>>({});
+	let isCollapsedProjectsLoaded = false;
+	$effect(() => {
+		if (!isCollapsedProjectsLoaded) {
+			const stored = localStorage.getItem('ollama_collapsed_projects');
+			if (stored) {
+				try {
+					collapsedProjects = JSON.parse(stored);
+				} catch (e) {
+					console.error('Failed to parse collapsed projects:', e);
+				}
+			}
+			isCollapsedProjectsLoaded = true;
+		} else {
+			localStorage.setItem('ollama_collapsed_projects', JSON.stringify(collapsedProjects));
+		}
+	});
 	let isProjectSettingsOpen = $state(false);
 	let selectedProjectForSettings = $state<Project | null>(null);
 	let projectSettingsName = $state('');
