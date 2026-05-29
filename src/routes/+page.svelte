@@ -689,6 +689,7 @@
 
 	// Trigger model loading whenever URL/keys change
 	$effect(() => {
+		if (!isInitialized) return;
 		if (enableOllamaLocal && ollamaUrl) {
 			untrack(() => {
 				loadModels();
@@ -697,6 +698,7 @@
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		if (enableOllamaCloud && (ollamaCloudUrl || ollamaCloudApiKey)) {
 			untrack(() => {
 				loadCloudModels();
