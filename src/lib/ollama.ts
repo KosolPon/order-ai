@@ -367,6 +367,7 @@ export async function streamChat(
 			let hasStartedThinking = false;
 			let hasFinishedThinking = false;
 			let loopDetected = false;
+			let receivedDoneToken = false;
 
 			while (true) {
 				if (signal?.aborted) {
@@ -424,6 +425,7 @@ export async function streamChat(
 						}
 						
 						if (json.done) {
+							receivedDoneToken = true;
 							break;
 						}
 					} catch (e: any) {
@@ -479,6 +481,13 @@ export async function streamChat(
 				onChunk('</think>');
 				fullResponseText += '</think>';
 				hasFinishedThinking = true;
+			}
+
+			// Warn if connection was cut off before receiving Ollama's done token
+			if (!loopDetected && !receivedDoneToken && !signal?.aborted) {
+				const connectionWarning = '\n\n⚠️ **[Connection interrupted / การเชื่อมต่อขาดหายกลางคัน]**\n*สัญญาณการเชื่อมต่อกับโมเดล Ollama บนเครื่องอื่นขาดหาย กรุณาลองใหม่อีกครั้ง หรือตรวจสอบความเสถียรของเครือข่าย*';
+				onChunk(connectionWarning);
+				fullResponseText += connectionWarning;
 			}
 
 			onDone(fullResponseText);

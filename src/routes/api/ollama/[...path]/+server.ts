@@ -52,14 +52,19 @@ const handleProxy: RequestHandler = async ({ request, params, url }) => {
 		// Copy response headers
 		const responseHeaders = new Headers();
 		response.headers.forEach((value, key) => {
-			// Do not copy content-encoding to avoid issues with double compression
-			if (key.toLowerCase() !== 'content-encoding') {
+			const lowerKey = key.toLowerCase();
+			// Do not copy content-encoding to avoid issues with double compression.
+			// Do not copy content-length or connection to let the SvelteKit runtime handle it.
+			if (lowerKey !== 'content-encoding' && lowerKey !== 'content-length' && lowerKey !== 'connection') {
 				responseHeaders.set(key, value);
 			}
 		});
 
-		// Ensure CORS is allowed from our SvelteKit app
+		// Ensure CORS and Streaming is allowed, stable, and not buffered
 		responseHeaders.set('Access-Control-Allow-Origin', '*');
+		responseHeaders.set('Connection', 'keep-alive');
+		responseHeaders.set('Cache-Control', 'no-cache, no-transform');
+		responseHeaders.set('X-Accel-Buffering', 'no');
 
 		return new Response(response.body, {
 			status: response.status,

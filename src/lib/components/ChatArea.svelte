@@ -1834,7 +1834,7 @@
 
 	/* Welcome screen styles */
 	.welcome-container {
-		max-width: 1000px;
+		max-width: 1280px;
 		width: 100%;
 		margin: auto;
 		display: flex;
@@ -2146,7 +2146,7 @@
 
 	/* Message thread styling */
 	.messages-list {
-		max-width: 1000px;
+		max-width: 1280px;
 		width: 100%;
 		margin: 0 auto;
 		display: flex;
@@ -2280,6 +2280,10 @@
 
 	.message-content {
 		color: var(--text-primary);
+	}
+
+	.assistant-response-content {
+		width: 100%;
 	}
 
 	.user-text-pre {
