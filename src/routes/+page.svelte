@@ -1036,7 +1036,7 @@
 						await Promise.all(fileNamePatterns.map(async (name) => {
 							try {
 								const res = await fetch(`${cleanUrl}/search?q=${encodeURIComponent(name)}`, {
-									headers: { 'x-local-path': project.localPath }
+									headers: project.localPath ? { 'x-local-path': project.localPath } : {}
 								});
 								if (res.ok) {
 									const { files: found } = await res.json();
@@ -1052,7 +1052,7 @@
 						await Promise.all(quotedTerms.slice(0, 3).map(async (term) => {
 							try {
 								const res = await fetch(`${cleanUrl}/grep?q=${encodeURIComponent(term)}&max=10`, {
-									headers: { 'x-local-path': project.localPath }
+									headers: project.localPath ? { 'x-local-path': project.localPath } : {}
 								});
 								if (res.ok) {
 									const { results } = await res.json();
