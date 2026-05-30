@@ -507,14 +507,13 @@
 				const availableModels = models;
 				if (availableModels.length > 0) {
 					const modelNames = availableModels.map((m) => m.name);
-					const storedModel = localStorage.getItem('ollama_selected_model');
-					if (storedModel && modelNames.includes(storedModel)) {
-						activeModels[0] = storedModel;
-						activeModels = [...activeModels];
-					} else if (!activeModels[0] || !modelNames.includes(activeModels[0])) {
-						const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
-						const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
-						const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
+					const currentModel = activeModels[0];
+					if (currentModel && modelNames.includes(currentModel)) {
+						return;
+					} else if (!currentModel || !modelNames.includes(currentModel)) {
+						const isGeminiModel = currentModel && GEMINI_MODELS.some(m => m.name === currentModel);
+						const isCloudModel = currentModel && ollamaCloudModels.some(m => m.name === currentModel);
+						const isLocalModel = currentModel && !isGeminiModel && !isCloudModel;
 
 						if (enableGemini && isGeminiModel && !geminiApiKey) {
 							return;
@@ -696,14 +695,13 @@
 		const availableModels = models;
 		if (availableModels.length > 0) {
 			const modelNames = availableModels.map((m) => m.name);
-			const storedModel = localStorage.getItem('ollama_selected_model');
-			if (storedModel && modelNames.includes(storedModel)) {
-				activeModels[0] = storedModel;
-				activeModels = [...activeModels];
-			} else if (!activeModels[0] || !modelNames.includes(activeModels[0])) {
-				const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
-				const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
-				const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
+			const currentModel = activeModels[0];
+			if (currentModel && modelNames.includes(currentModel)) {
+				return;
+			} else if (!currentModel || !modelNames.includes(currentModel)) {
+				const isGeminiModel = currentModel && GEMINI_MODELS.some(m => m.name === currentModel);
+				const isCloudModel = currentModel && ollamaCloudModels.some(m => m.name === currentModel);
+				const isLocalModel = currentModel && !isGeminiModel && !isCloudModel;
 
 				if (enableGemini && isGeminiModel && !geminiApiKey) {
 					return;
