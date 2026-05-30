@@ -93,10 +93,21 @@ export function buildCombinedSystemPrompt({
 
 	// Append critical canvas syntax instructions for the AI
 	if (useCanvas) {
-		let canvasDirective = `[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`;
-		
+		let canvasDirective = `[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user.
+
+To CREATE a new file or make LARGE changes to an existing file, wrap the complete content inside:
+<canvas name="filename.ext" type="html|markdown|code|text">...full file content...</canvas>
+
+To make SMALL, TARGETED edits to an existing file (preferred when changing only a few lines), use the patch tag instead:
+<canvas-patch name="filename.ext">
+<search>exact string to find (must be unique in the file)</search>
+<replace>replacement string</replace>
+</canvas-patch>
+
+IMPORTANT: Always prefer <canvas-patch> over <canvas> when modifying existing files with small changes. Only use <canvas> (full rewrite) when creating new files or making extensive changes. Do not write explanations inside canvas blocks, only file content.`;
+
 		if (enableWorkspaceBridge) {
-			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Any files you write or modify using the <canvas name="..."> tag will be saved directly to the user's real project directory on their computer (e.g. 'src/routes/+page.svelte', 'scripts/test.ts'). Do not apologize or claim you cannot modify local files; instead, write them using the canvas tag and confidently inform the user that you have created/updated the files in their workspace.`;
+			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Files written via <canvas> or patched via <canvas-patch> are saved directly to the user's real project directory. Do not apologize or claim you cannot modify local files; write or patch them confidently and inform the user what was updated.`;
 		}
 		
 		parts.push(canvasDirective);

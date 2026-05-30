@@ -8,7 +8,7 @@ const WORKSPACE_DIR = resolve(join(import.meta.dir, ".."));
 // CORS headers helper
 const corsHeaders = {
 	"Access-Control-Allow-Origin": "*",
-	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+	"Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type, x-local-path",
 };
 
@@ -184,7 +184,7 @@ Bun.serve({
 				return Response.json({ path: filePathParam, content }, { headers: corsHeaders });
 			}
 
-			// POST /file - Write/create file content
+			// POST /file - Write/create file content (full overwrite)
 			if (url.pathname === "/file" && req.method === "POST") {
 				const body = await req.json();
 				const { path: filePathParam, content } = body;
@@ -204,6 +204,56 @@ Bun.serve({
 				await Bun.write(safePath, content);
 
 				console.log(`Saved file: ${filePathParam} to ${allowedPath}`);
+				return Response.json({ success: true, path: filePathParam }, { headers: corsHeaders });
+			}
+
+			// PATCH /file - Targeted search & replace within a file
+			if (url.pathname === "/file" && req.method === "PATCH") {
+				if (!allowedPath) {
+					return new Response("Access Denied: Missing 'x-local-path' header", {
+						status: 403,
+						headers: corsHeaders
+					});
+				}
+
+				const dirStat = await stat(allowedPath).catch(() => null);
+				if (!dirStat || !dirStat.isDirectory()) {
+					return new Response("Access Denied: Invalid target directory path", {
+						status: 400,
+						headers: corsHeaders
+					});
+				}
+
+				const body = await req.json();
+				const { path: filePathParam, search, replace } = body;
+
+				if (!filePathParam || typeof search !== "string" || typeof replace !== "string") {
+					return new Response("Invalid request body. 'path', 'search', and 'replace' are required.", {
+						status: 400,
+						headers: corsHeaders,
+					});
+				}
+
+				const safePath = getSafePath(filePathParam, allowedPath!);
+				const file = Bun.file(safePath);
+
+				if (!(await file.exists())) {
+					return new Response("File not found", { status: 404, headers: corsHeaders });
+				}
+
+				const originalContent = await file.text();
+
+				if (!originalContent.includes(search)) {
+					return Response.json(
+						{ success: false, error: "Search string not found in file" },
+						{ status: 422, headers: corsHeaders }
+					);
+				}
+
+				const updatedContent = originalContent.replace(search, replace);
+				await Bun.write(safePath, updatedContent);
+
+				console.log(`Patched file: ${filePathParam} in ${allowedPath}`);
 				return Response.json({ success: true, path: filePathParam }, { headers: corsHeaders });
 			}
 

@@ -10,7 +10,7 @@
 	import { fetchModels, streamChat, DEFAULT_OLLAMA_URL, GEMINI_MODELS } from '$lib/ollama';
 	import { parseThinking } from '$lib/markdown';
 	import { db } from '$lib/db';
-	import { parseCanvasTags } from '$lib/canvasParser';
+	import { parseCanvasTags, parseCanvasPatchTags } from '$lib/canvasParser';
 	import { encryptData, decryptData } from '$lib/crypto';
 	import { classifyPrompt, classifyPromptDynamic, type AgentRole } from '$lib/agents';
 	import { roleStore } from '$lib/roleStore.svelte';
@@ -904,7 +904,7 @@
 	// Extract files from message and save them to IndexedDB
 	async function saveCanvasFilesFromMessage(chatId: string, content: string) {
 		const extracted = parseCanvasTags(content);
-		if (extracted.length === 0) return;
+		const patches = parseCanvasPatchTags(content);
 
 		for (const file of extracted) {
 			await db.canvasFiles.put({
@@ -932,6 +932,58 @@
 						});
 					} catch (e) {
 						console.error('Failed to sync AI file to local workspace:', e);
+					}
+				}
+			}
+		}
+
+		// Handle canvas-patch: targeted search & replace in existing files
+		for (const patch of patches) {
+			if (enableWorkspaceBridge && workspaceBridgeUrl) {
+				const conv = conversations.find(c => c.id === chatId);
+				const project = conv?.projectId ? projects.find(p => p.id === conv.projectId) : null;
+
+				if (project && project.localPath) {
+					try {
+						const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+						const res = await fetch(`${cleanUrl}/file`, {
+							method: 'PATCH',
+							headers: {
+								'Content-Type': 'application/json',
+								'x-local-path': project.localPath
+							},
+							body: JSON.stringify({ path: patch.name, search: patch.search, replace: patch.replace })
+						});
+						if (!res.ok) {
+							const errData = await res.json().catch(() => ({}));
+							console.error(`Failed to patch ${patch.name}:`, errData.error || res.statusText);
+						} else {
+							// After patching, re-read the updated file and sync canvas state
+							try {
+								const readRes = await fetch(`${cleanUrl}/file?path=${encodeURIComponent(patch.name)}`, {
+									method: 'GET',
+									headers: { 'x-local-path': project.localPath }
+								});
+								if (readRes.ok) {
+									const { content: updatedContent } = await readRes.json();
+									const ext = patch.name.split('.').pop()?.toLowerCase() || '';
+									const type = ext === 'html' || ext === 'htm' ? 'html'
+										: ext === 'md' || ext === 'markdown' ? 'markdown'
+										: ext === 'txt' ? 'text' : 'code';
+									await db.canvasFiles.put({
+										chatId,
+										name: patch.name,
+										type,
+										content: updatedContent,
+										updatedAt: Date.now()
+									});
+								}
+							} catch (e) {
+								console.error('Failed to re-read patched file for canvas sync:', e);
+							}
+						}
+					} catch (e) {
+						console.error('Failed to send patch to local workspace:', e);
 					}
 				}
 			}

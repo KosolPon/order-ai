@@ -4,6 +4,12 @@ export interface ExtractedCanvasFile {
 	content: string;
 }
 
+export interface CanvasPatch {
+	name: string;
+	search: string;
+	replace: string;
+}
+
 /**
  * Extracts and parses <canvas name="...">...</canvas> tags from a string.
  * This runs on streaming message chunks or full completed responses.
@@ -49,6 +55,36 @@ export function parseCanvasTags(text: string): ExtractedCanvasFile[] {
 	}
 
 	return files;
+}
+
+/**
+ * Extracts and parses <canvas-patch name="..."><search>...</search><replace>...</replace></canvas-patch> tags.
+ * Used for targeted search & replace operations on existing files.
+ */
+export function parseCanvasPatchTags(text: string): CanvasPatch[] {
+	if (!text) return [];
+
+	const patches: CanvasPatch[] = [];
+	const patchRegex = /<canvas-patch\s+name="([^"]+)">([\s\S]*?)(?:<\/canvas-patch>|$)/gi;
+
+	let match;
+	while ((match = patchRegex.exec(text)) !== null) {
+		const name = match[1]?.trim();
+		const body = match[2] || '';
+		if (!name || !body) continue;
+
+		const searchMatch = /<search>([\s\S]*?)<\/search>/i.exec(body);
+		const replaceMatch = /<replace>([\s\S]*?)<\/replace>/i.exec(body);
+
+		if (!searchMatch) continue;
+
+		const search = searchMatch[1] ?? '';
+		const replace = replaceMatch ? replaceMatch[1] : '';
+
+		patches.push({ name, search, replace });
+	}
+
+	return patches;
 }
 
 /**
