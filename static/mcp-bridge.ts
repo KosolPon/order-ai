@@ -1,5 +1,5 @@
 import { join, resolve, relative } from "path";
-import { readdir, stat } from "fs/promises";
+import { readdir, stat, mkdir } from "fs/promises";
 
 const PORT = 3000;
 // Resolve the root directory of the project
@@ -200,6 +200,7 @@ Bun.serve({
 				
 				// Ensure parent directory exists
 				const parentDir = resolve(safePath, "..");
+				await mkdir(parentDir, { recursive: true });
 				await Bun.write(safePath, content);
 
 				console.log(`Saved file: ${filePathParam} to ${allowedPath}`);
