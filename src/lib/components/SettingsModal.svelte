@@ -2764,6 +2764,11 @@
 			box-sizing: border-box;
 		}
 
+		.settings-content-wrapper {
+			min-height: 0;
+			flex: 1;
+		}
+
 		.settings-sidebar {
 			width: 100%;
 			border-right: none;
@@ -3194,7 +3199,7 @@
 	}
 
 	.storage-action-btn.import-btn:hover {
-		background-color: #5aa1f0;
+		background-color: var(--accent-blue-hover);
 	}
 
 	.storage-danger-zone {

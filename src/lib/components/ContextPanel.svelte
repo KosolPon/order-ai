@@ -1171,7 +1171,7 @@ import type { Conversation, Project } from '$lib/types';
 	}
 
 	.add-memory-btn:hover:not(:disabled) {
-		background-color: #5aa1f0;
+		background-color: var(--accent-blue-hover);
 	}
 
 	.add-memory-btn:disabled {
