@@ -1253,6 +1253,23 @@
 								<p>เริ่มพิมพ์คำถามเพื่อเริ่มการสนทนาใหม่ได้ที่ด้านล่างนี้ได้เลย</p>
 							</div>
 						{/if}
+
+						<div class="dashboard-section help-section animate-fade-in" style="margin-top: 24px;">
+							<a href="/features" class="guide-banner-card" id="welcome-guide-banner">
+								<div class="banner-content">
+									<div class="banner-title">
+										<svg viewBox="0 0 24 24" width="16" height="16" class="banner-icon">
+											<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-6h2v6zm0-4h-2V7h2v2z"/>
+										</svg>
+										<span>แนะนำคุณสมบัติและการใช้งานระบบ (Features & Guide)</span>
+									</div>
+									<p class="banner-desc">เรียนรู้เกี่ยวกับระบบสลับโมเดล AI, การจัดการโครงการพร้อมบริบทและไฟล์อ้างอิง, บันทึกความจำ และคู่มือเริ่มใช้งานด่วน</p>
+								</div>
+								<div class="banner-action">
+									<span>อ่านคู่มือ ↗</span>
+								</div>
+							</a>
+						</div>
 					</div>
 
 					{#if currentProject && currentProject.files && currentProject.files.length > 0}
@@ -3298,6 +3315,95 @@
 		.raw-diagnostic-card {
 			height: 90vh;
 			width: 95vw;
+		}
+	}
+
+	/* Guide banner on dashboard styles */
+	.guide-banner-card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(168, 199, 250, 0.05) 100%);
+		border: 1px dashed var(--border-color);
+		border-radius: 16px;
+		padding: 20px 24px;
+		color: inherit;
+		text-decoration: none;
+		transition: all var(--transition-normal);
+		cursor: pointer;
+		gap: 16px;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.guide-banner-card:hover {
+		border-color: var(--accent-blue);
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md), 0 4px 20px rgba(168, 199, 250, 0.08);
+		background: linear-gradient(135deg, var(--bg-hover) 0%, rgba(168, 199, 250, 0.08) 100%);
+	}
+
+	.banner-content {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.banner-title {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-family: var(--font-title);
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--accent-blue);
+	}
+
+	.banner-icon {
+		flex-shrink: 0;
+		color: var(--accent-blue);
+	}
+
+	.banner-desc {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+		margin: 0;
+		white-space: normal;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+
+	.banner-action {
+		flex-shrink: 0;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--accent-blue);
+		background-color: rgba(168, 199, 250, 0.08);
+		padding: 6px 14px;
+		border-radius: 99px;
+		border: 1px solid rgba(168, 199, 250, 0.16);
+		transition: all var(--transition-fast);
+	}
+
+	.guide-banner-card:hover .banner-action {
+		background-color: var(--accent-blue);
+		color: var(--accent-text);
+		box-shadow: 0 2px 8px rgba(168, 199, 250, 0.2);
+	}
+
+	@media (max-width: 600px) {
+		.guide-banner-card {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 12px;
+		}
+		.banner-action {
+			align-self: flex-end;
 		}
 	}
 </style>

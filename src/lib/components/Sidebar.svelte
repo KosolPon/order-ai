@@ -478,6 +478,17 @@
 
 	<!-- Sidebar Footer -->
 	<div class="sidebar-footer">
+		<a class="footer-btn help-btn" href="/features" id="sidebar-guide-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+			<div class="status-indicator-wrapper" style="display: flex; align-items: center; gap: 8px;">
+				<svg viewBox="0 0 24 24" width="16" height="16" style="color: var(--text-muted); flex-shrink: 0;">
+					<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-6h2v6zm0-4h-2V7h2v2z"/>
+				</svg>
+				<span>Features & Guide</span>
+			</div>
+			<svg viewBox="0 0 24 24" width="14" height="14" style="margin-left: auto; color: var(--text-muted); flex-shrink: 0;">
+				<path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+			</svg>
+		</a>
 		<button class="footer-btn" onclick={() => isSettingsOpen = true}>
 			<div class="status-indicator-wrapper">
 				<span class="status-dot" class:connected={
