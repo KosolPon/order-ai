@@ -6,6 +6,7 @@ import type { Conversation, Project } from '$lib/types';
 	import CanvasPanel from './CanvasPanel.svelte';
 	import { roleStore } from '$lib/roleStore.svelte';
 	import type { AgentRole } from '$lib/agents';
+	import { buildCombinedSystemPrompt } from '$lib/promptBuilder';
 
 	let {
 		conversation = null,
@@ -14,6 +15,7 @@ import type { Conversation, Project } from '$lib/types';
 		activeThinking = null,
 		activeTab = 'context',
 		isGenerating = false,
+		useCanvas = false,
 		activeCanvasFileName = null,
 		onChangeActiveCanvasFile,
 		onChangeTab,
@@ -32,6 +34,7 @@ import type { Conversation, Project } from '$lib/types';
 		activeThinking: ParsedThinking | null;
 		activeTab: 'context' | 'thinking' | 'canvas';
 		isGenerating: boolean;
+		useCanvas: boolean;
 		activeCanvasFileName: string | null;
 		onChangeActiveCanvasFile: (name: string | null) => void;
 		onChangeTab: (tab: 'context' | 'thinking' | 'canvas') => void;
@@ -78,6 +81,21 @@ import type { Conversation, Project } from '$lib/types';
 		return () => sub.unsubscribe();
 	});
 
+	// Reactive Canvas files list for prompt building
+	let canvasFiles = $state<any[]>([]);
+	$effect(() => {
+		if (!conversation) {
+			canvasFiles = [];
+			return;
+		}
+		const sub = liveQuery(() =>
+			db.canvasFiles.where({ chatId: conversation.id }).toArray()
+		).subscribe((list) => {
+			canvasFiles = list || [];
+		});
+		return () => sub.unsubscribe();
+	});
+
 	async function handleAddMemory() {
 		if (!newMemoryText.trim() || !conversation) return;
 		await db.aiMemories.add({
@@ -101,34 +119,14 @@ import type { Conversation, Project } from '$lib/types';
 	// Combined prompt preview
 	const combinedPrompt = $derived.by(() => {
 		if (!conversation) return '';
-		const parts: string[] = [];
-		if (globalContext.trim()) {
-			parts.push(`[Global Context]:\n${globalContext.trim()}`);
-		}
-		if (activeProject) {
-			let projectPrompt = '';
-			if (activeProject.context?.trim()) {
-				projectPrompt += `[Project Context - ${activeProject.name}]:\n${activeProject.context.trim()}`;
-			}
-			
-			// Inject file contents if present in preview
-			if (activeProject.files && activeProject.files.length > 0) {
-				if (projectPrompt) projectPrompt += '\n\n';
-				projectPrompt += `[Project Reference Files - ${activeProject.name}]:\n`;
-				projectPrompt += `CRITICAL DIRECTIVE: You must use the following files as your primary reference and knowledge source for all your answers in this conversation. If there are any differences between these files and your pre-trained knowledge (e.g. Svelte 5 runes syntax vs older versions), you MUST prioritize the information and syntax described in these files:`;
-				for (const file of activeProject.files) {
-					projectPrompt += `\n\nFile "${file.name}":\n\`\`\`\n${file.content}\n\`\`\``;
-				}
-			}
-			
-			if (projectPrompt) {
-				parts.push(projectPrompt);
-			}
-		}
-		if (conversation.context?.trim()) {
-			parts.push(`[Chat Context]:\n${conversation.context.trim()}`);
-		}
-		return parts.join('\n\n');
+		return buildCombinedSystemPrompt({
+			conv: conversation,
+			globalContext,
+			projects,
+			useCanvas,
+			memories,
+			canvasFiles
+		});
 	});
 
 	function handleProjectChange(e: Event) {
