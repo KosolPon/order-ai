@@ -496,6 +496,11 @@ function replaceArrowSymbols(text: string): string {
 	return parts.join('');
 }
 
+function fixMarkdownHeaderSpaces(text: string): string {
+	if (!text) return '';
+	return text.replace(/^(#{1,6})([^#\s])/gm, '$1 $2');
+}
+
 const markdownCache = new Map<string, string>();
 
 /**
@@ -508,7 +513,8 @@ export function renderMarkdown(markdown: string): string {
 	if (cached) return cached;
 
 	const arrowProcessed = replaceArrowSymbols(markdown);
-	const preprocessed = preprocessCanvasTags(arrowProcessed);
+	const headerSpaceFixed = fixMarkdownHeaderSpaces(arrowProcessed);
+	const preprocessed = preprocessCanvasTags(headerSpaceFixed);
 	const rendered = markedInstance.parse(preprocessed) as string;
 
 	// Limit cache size to 500 entries to prevent memory leaks
