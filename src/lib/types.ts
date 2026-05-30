@@ -35,6 +35,7 @@ export interface Project {
 	context: string;
 	createdAt: number;
 	files?: ProjectFile[]; // Project-level reference files
+	localPath?: string; // Target workspace directory path for file syncing
 }
 
 export interface Conversation {

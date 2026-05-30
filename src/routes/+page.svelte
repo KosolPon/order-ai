@@ -824,20 +824,21 @@
 	}
 
 	// Project operations
-	function handleCreateProject(name: string, context: string = '', files: ProjectFile[] = []) {
+	function handleCreateProject(name: string, context: string = '', files: ProjectFile[] = [], localPath: string = '') {
 		const newProject: Project = {
 			id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
 			name,
 			context,
 			files,
+			localPath,
 			createdAt: Date.now()
 		};
 		projects = [...projects, newProject];
 	}
 
 	// Update project name, context, and files
-	function handleUpdateProject(id: string, name: string, context: string, files: ProjectFile[] = []) {
-		projects = projects.map((p) => (p.id === id ? { ...p, name, context, files } : p));
+	function handleUpdateProject(id: string, name: string, context: string, files: ProjectFile[] = [], localPath: string = '') {
+		projects = projects.map((p) => (p.id === id ? { ...p, name, context, files, localPath } : p));
 	}
 
 	// Delete project and handle chats
@@ -915,15 +916,23 @@
 			});
 
 			if (enableWorkspaceBridge && workspaceBridgeUrl) {
-				try {
-					const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
-					await fetch(`${cleanUrl}/file`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ path: file.name, content: file.content })
-					});
-				} catch (e) {
-					console.error('Failed to sync AI file to local workspace:', e);
+				const conv = conversations.find(c => c.id === chatId);
+				const project = conv?.projectId ? projects.find(p => p.id === conv.projectId) : null;
+
+				if (project && project.localPath) {
+					try {
+						const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+						await fetch(`${cleanUrl}/file`, {
+							method: 'POST',
+							headers: { 
+								'Content-Type': 'application/json',
+								'x-local-path': project.localPath
+							},
+							body: JSON.stringify({ path: file.name, content: file.content })
+						});
+					} catch (e) {
+						console.error('Failed to sync AI file to local workspace:', e);
+					}
 				}
 			}
 		}

@@ -117,10 +117,19 @@
 		const bridgeUrl = localStorage.getItem('workspace_bridge_url') || 'http://localhost:3000';
 		if (isBridgeEnabled && bridgeUrl) {
 			try {
+				const conv = await db.conversations.get(chatId);
+				if (!conv || !conv.projectId) return;
+
+				const project = await db.projects.get(conv.projectId);
+				if (!project || !project.localPath) return;
+
 				const cleanUrl = bridgeUrl.replace(/\/$/, '');
 				await fetch(`${cleanUrl}/file`, {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
+					headers: { 
+						'Content-Type': 'application/json',
+						'x-local-path': project.localPath
+					},
 					body: JSON.stringify({ path: name, content })
 				});
 			} catch (e) {

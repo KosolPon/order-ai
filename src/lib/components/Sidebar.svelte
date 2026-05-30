@@ -37,8 +37,8 @@
 		onNewConversation: () => void;
 		onDeleteConversation: (id: string) => void;
 		onUpdateTitle: (id: string, newTitle: string) => void;
-		onCreateProject: (name: string, context?: string) => void;
-		onUpdateProject: (id: string, name: string, context: string) => void;
+		onCreateProject: (name: string, context?: string, files?: ProjectFile[], localPath?: string) => void;
+		onUpdateProject: (id: string, name: string, context: string, files: ProjectFile[], localPath?: string) => void;
 		onDeleteProject: (id: string, deleteChats: boolean) => void;
 		onNewConversationInProject: (projectId: string) => void;
 		projectSettingsToOpenId: string | null;
@@ -72,6 +72,7 @@
 	let projectSettingsContext = $state('');
 	let projectSettingsFiles = $state<ProjectFile[]>([]);
 	let deleteProjectChatsOption = $state(false);
+	let projectSettingsLocalPath = $state('');
 
 	// File upload states
 	let fileInputRef = $state<HTMLInputElement | null>(null);
@@ -147,6 +148,7 @@
 		projectSettingsName = '';
 		projectSettingsContext = '';
 		projectSettingsFiles = [];
+		projectSettingsLocalPath = '';
 		fileError = null;
 		isProjectSettingsOpen = true;
 	}
@@ -157,6 +159,7 @@
 		projectSettingsName = project.name;
 		projectSettingsContext = project.context || '';
 		projectSettingsFiles = project.files ? [...project.files] : [];
+		projectSettingsLocalPath = project.localPath || '';
 		fileError = null;
 		deleteProjectChatsOption = false;
 		isProjectSettingsOpen = true;
@@ -170,9 +173,9 @@
 	function saveProjectSettings() {
 		if (!projectSettingsName.trim()) return;
 		if (selectedProjectForSettings) {
-			onUpdateProject(selectedProjectForSettings.id, projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles);
+			onUpdateProject(selectedProjectForSettings.id, projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles, projectSettingsLocalPath.trim());
 		} else {
-			onCreateProject(projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles);
+			onCreateProject(projectSettingsName.trim(), projectSettingsContext.trim(), projectSettingsFiles, projectSettingsLocalPath.trim());
 		}
 		closeProjectSettings();
 	}
@@ -255,6 +258,7 @@
 				projectSettingsName = proj.name;
 				projectSettingsContext = proj.context || '';
 				projectSettingsFiles = proj.files ? [...proj.files] : [];
+				projectSettingsLocalPath = proj.localPath || '';
 				deleteProjectChatsOption = false;
 				isProjectSettingsOpen = true;
 			}
@@ -523,6 +527,17 @@
 							bind:value={projectSettingsName} 
 							placeholder="Enter project name (e.g. Book, monitor)"
 						/>
+					</div>
+
+					<div class="modal-form-item">
+						<label for="project-localpath-input">Local Workspace Folder Path (เส้นทางโฟลเดอร์ในเครื่อง)</label>
+						<input 
+							id="project-localpath-input"
+							type="text" 
+							bind:value={projectSettingsLocalPath} 
+							placeholder="e.g. /Users/kosol/Developer/js/order-ai"
+						/>
+						<p class="modal-help-text">กำหนดเส้นทางโฟลเดอร์ในเครื่องที่ต้องการให้ AI ซิงก์ไฟล์เข้าออกสำหรับโปรเจกต์นี้ (เช่น พาธเต็มแบบ Absolute Path)</p>
 					</div>
 					
 					<div class="modal-form-item">
