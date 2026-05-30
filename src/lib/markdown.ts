@@ -345,43 +345,67 @@ function cleanCodeFences(text: string): string {
 	return cleaned;
 }
 
+function getLangFromName(name: string, type?: string): string {
+	let lang = (type || '').toLowerCase().trim();
+	if (!lang) {
+		const lowerName = name.toLowerCase();
+		if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) lang = 'html';
+		else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) lang = 'markdown';
+		else if (lowerName.endsWith('.js') || lowerName.endsWith('.jsx')) lang = 'javascript';
+		else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) lang = 'typescript';
+		else if (lowerName.endsWith('.svelte')) lang = 'svelte';
+		else if (lowerName.endsWith('.py')) lang = 'python';
+		else if (lowerName.endsWith('.css')) lang = 'css';
+		else if (lowerName.endsWith('.json')) lang = 'json';
+		else if (lowerName.endsWith('.sh') || lowerName.endsWith('.bash')) lang = 'bash';
+		else if (lowerName.endsWith('.sql')) lang = 'sql';
+		else lang = 'code';
+	}
+	return lang;
+}
+
+const LANG_ALIAS: Record<string, string> = {
+	js: 'javascript', ts: 'typescript', py: 'python',
+	sh: 'bash', yml: 'yaml', cs: 'csharp', kt: 'kotlin', golang: 'go'
+};
+
+/** Render a code string directly to highlighted HTML (bypasses marked, safe inside HTML blocks). */
+function renderCodeHtml(code: string, lang: string): string {
+	const normalLang = LANG_ALIAS[lang] || lang;
+	const id = `code-${Math.random().toString(36).slice(2, 11)}`;
+	let highlighted = code;
+	if (Prism.languages[normalLang]) {
+		try {
+			highlighted = Prism.highlight(code, Prism.languages[normalLang], normalLang);
+		} catch { /* use plain */ }
+	} else {
+		highlighted = code
+			.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	}
+	const displayLang = lang === 'code' ? 'text' : lang;
+	return `<div class="code-block-wrapper">
+		<div class="code-block-header">
+			<span>${displayLang}</span>
+			<button class="copy-btn" onclick="window.copyToClipboard('${id}')" data-code-id="${id}">
+				<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+				Copy
+			</button>
+		</div>
+		<pre class="language-${normalLang}"><code class="language-${normalLang}">${highlighted}</code></pre>
+		<template id="${id}">${encodeURIComponent(code)}</template>
+	</div>`;
+}
+
 function preprocessCanvasTags(text: string): string {
 	if (!text) return '';
 	
 	let processed = text;
 	
-	// 1. Handle fully closed tags
+	// 1. Handle fully closed <canvas> tags
 	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)<\/canvas>/gi, (match, name, type, content) => {
 		const cleanName = name.replace(/'/g, "\\'");
-		
-		// Determine language/type for formatting in chat
-		let lang = (type || '').toLowerCase().trim();
-		if (!lang) {
-			const lowerName = name.toLowerCase();
-			if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
-				lang = 'html';
-			} else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
-				lang = 'markdown';
-			} else if (lowerName.endsWith('.js') || lowerName.endsWith('.jsx')) {
-				lang = 'javascript';
-			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
-				lang = 'typescript';
-			} else if (lowerName.endsWith('.svelte')) {
-				lang = 'svelte';
-			} else if (lowerName.endsWith('.py')) {
-				lang = 'python';
-			} else if (lowerName.endsWith('.css')) {
-				lang = 'css';
-			} else if (lowerName.endsWith('.json')) {
-				lang = 'json';
-			} else if (lowerName.endsWith('.sh') || lowerName.endsWith('.bash')) {
-				lang = 'bash';
-			} else if (lowerName.endsWith('.sql')) {
-				lang = 'sql';
-			} else {
-				lang = 'code';
-			}
-		}
+		const lang = getLangFromName(name, type);
 
 		let renderedContent = '';
 		if (lang === 'markdown') {
@@ -407,37 +431,10 @@ function preprocessCanvasTags(text: string): string {
 		</div>\n\n${renderedContent}`;
 	});
  
-	// 2. Handle unclosed tags at the end of the text (streaming)
+	// 2. Handle unclosed <canvas> tags (streaming)
 	processed = processed.replace(/<canvas\s+name="([^"]+)"(?:\s+type="([^"]+)")?>([\s\S]*?)$/gi, (match, name, type, content) => {
 		const cleanName = name.replace(/'/g, "\\'");
-		
-		let lang = (type || '').toLowerCase().trim();
-		if (!lang) {
-			const lowerName = name.toLowerCase();
-			if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
-				lang = 'html';
-			} else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) {
-				lang = 'markdown';
-			} else if (lowerName.endsWith('.js') || lowerName.endsWith('.jsx')) {
-				lang = 'javascript';
-			} else if (lowerName.endsWith('.ts') || lowerName.endsWith('.tsx')) {
-				lang = 'typescript';
-			} else if (lowerName.endsWith('.svelte')) {
-				lang = 'svelte';
-			} else if (lowerName.endsWith('.py')) {
-				lang = 'python';
-			} else if (lowerName.endsWith('.css')) {
-				lang = 'css';
-			} else if (lowerName.endsWith('.json')) {
-				lang = 'json';
-			} else if (lowerName.endsWith('.sh') || lowerName.endsWith('.bash')) {
-				lang = 'bash';
-			} else if (lowerName.endsWith('.sql')) {
-				lang = 'sql';
-			} else {
-				lang = 'code';
-			}
-		}
+		const lang = getLangFromName(name, type);
 
 		let renderedContent = '';
 		if (lang === 'markdown') {
@@ -461,6 +458,83 @@ function preprocessCanvasTags(text: string): string {
 				<div class="typing-indicator small-indicator"><span></span><span></span><span></span></div>
 			</div>
 		</div>\n\n${renderedContent}`;
+	});
+
+	// 3. Handle fully closed <canvas-patch> tags
+	processed = processed.replace(/<canvas-patch\s+name="([^"]+)">([\s\S]*?)<\/canvas-patch>/gi, (match, name, body) => {
+		const lang = getLangFromName(name);
+
+		const searchMatch = /<search>([\s\S]*?)<\/search>/i.exec(body);
+		const replaceMatch = /<replace>([\s\S]*?)<\/replace>/i.exec(body);
+		const searchText = (searchMatch ? searchMatch[1] : '').trim();
+		const replaceText = (replaceMatch ? replaceMatch[1] : '').trim();
+
+		const searchHtml = renderCodeHtml(searchText, lang);
+		const replaceHtml = renderCodeHtml(replaceText, lang);
+
+		return `\n\n<div class="canvas-patch-card">
+			<div class="patch-card-header">
+				<div class="patch-card-icon">
+					<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+				</div>
+				<div class="patch-card-info">
+					<span class="patch-card-title">${name}</span>
+					<span class="patch-card-meta">Targeted patch</span>
+				</div>
+			</div>
+			<div class="patch-card-body">
+				<div class="patch-section patch-search">
+					<div class="patch-section-label patch-label-search">
+						<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+						Search
+					</div>
+					${searchHtml}
+				</div>
+				<div class="patch-section patch-replace">
+					<div class="patch-section-label patch-label-replace">
+						<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+						Replace
+					</div>
+					${replaceHtml}
+				</div>
+			</div>
+		</div>\n\n`;
+	});
+
+	// 4. Handle unclosed <canvas-patch> tags (streaming)
+	processed = processed.replace(/<canvas-patch\s+name="([^"]+)">([\s\S]*?)$/gi, (match, name, body) => {
+		const lang = getLangFromName(name);
+
+		const searchMatch = /<search>([\s\S]*?)<\/search>/i.exec(body);
+		const replaceMatch = /<replace>([\s\S]*?)<\/replace>/i.exec(body);
+		const searchText = (searchMatch ? searchMatch[1] : '').trim();
+		const replaceText = (replaceMatch ? replaceMatch[1] : '').trim();
+
+		const hasSearch = !!searchText;
+		const hasReplace = !!replaceText;
+
+		return `\n\n<div class="canvas-patch-card processing">
+			<div class="patch-card-header">
+				<div class="patch-card-icon animate-pulse">
+					<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+				</div>
+				<div class="patch-card-info">
+					<span class="patch-card-title">${name}</span>
+					<span class="patch-card-meta">Patching file...</span>
+				</div>
+				<div class="typing-indicator small-indicator"><span></span><span></span><span></span></div>
+			</div>
+			${hasSearch || hasReplace ? `<div class="patch-card-body">
+				${hasSearch ? `<div class="patch-section patch-search">
+					<div class="patch-section-label patch-label-search">Search</div>
+					${renderCodeHtml(searchText, lang)}
+				</div>` : ''}
+				${hasReplace ? `<div class="patch-section patch-replace">
+					<div class="patch-section-label patch-label-replace">Replace</div>
+					${renderCodeHtml(replaceText, lang)}
+				</div>` : ''}
+			</div>` : ''}
+		</div>\n\n`;
 	});
  
 	return processed;
@@ -508,6 +582,10 @@ function normalizeCodeFences(text: string): string {
 }
 
 const markdownCache = new Map<string, string>();
+
+export function clearMarkdownCache(): void {
+	markdownCache.clear();
+}
 
 /**
  * Render markdown string to HTML with code block highlighting
