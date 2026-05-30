@@ -1930,6 +1930,8 @@
 		{enableGemini}
 		{isConnected}
 		{isOllamaCloudConnected}
+		{enableWorkspaceBridge}
+		{workspaceBridgeUrl}
 		onSelectConversation={handleSelectConversation}
 		onNewConversation={handleNewConversation}
 		onDeleteConversation={handleDeleteConversation}

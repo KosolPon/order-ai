@@ -1130,8 +1130,8 @@
 													</div>
 
 													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
-														<strong>2. ติดตั้ง SSL Certificate สำหรับรันบน Netlify (กรณีใช้ HTTPS):</strong>
-														<p style="margin: 4px 0;">หากใช้งานแอปผ่านหน้าเว็บ Netlify (ที่เป็น HTTPS) คุณต้องสร้างใบรับรอง SSL ในโฟลเดอร์โปรเจกต์โดยรันคำสั่งนี้ใน Terminal:</p>
+														<strong>2. ติดตั้ง SSL Certificate (กรณีเข้าใช้งานผ่าน HTTPS):</strong>
+														<p style="margin: 4px 0;">หากใช้งานแอปพลิเคชันผ่านหน้าเว็บที่เข้ารหัส HTTPS คุณต้องสร้างใบรับรอง SSL ในโฟลเดอร์โปรเจกต์โดยรันคำสั่งนี้ใน Terminal:</p>
 														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/CN=localhost"</code></pre>
 														<p class="modal-help-text" style="margin: 4px 0 0 0;">และพิมพ์ลิงก์ <code>https://localhost:3000/status</code> บนบราวเซอร์เพื่อกด Advanced -> Proceed (Unsafe) ยอมรับใบรับรองในครั้งแรก</p>
 													</div>

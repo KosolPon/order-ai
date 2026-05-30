@@ -21,7 +21,9 @@
 		onDeleteProject,
 		onNewConversationInProject,
 		projectSettingsToOpenId = $bindable(null),
-		isSettingsOpen = $bindable(false)
+		isSettingsOpen = $bindable(false),
+		enableWorkspaceBridge = false,
+		workspaceBridgeUrl = ''
 	} = $props<{
 		conversations: Conversation[];
 		currentConversationId: string | null;
@@ -43,6 +45,8 @@
 		onNewConversationInProject: (projectId: string) => void;
 		projectSettingsToOpenId: string | null;
 		isSettingsOpen?: boolean;
+		enableWorkspaceBridge?: boolean;
+		workspaceBridgeUrl?: string;
 	}>();
 
 	let editingId = $state<string | null>(null);
@@ -73,6 +77,59 @@
 	let projectSettingsFiles = $state<ProjectFile[]>([]);
 	let deleteProjectChatsOption = $state(false);
 	let projectSettingsLocalPath = $state('');
+
+	// Folder Picker states & handlers
+	let isFolderPickerOpen = $state(false);
+	let folderPickerCurrentPath = $state('');
+	let folderPickerParentPath = $state('');
+	let folderPickerDirectories = $state<string[]>([]);
+	let folderPickerLoading = $state(false);
+	let folderPickerError = $state('');
+
+	async function openFolderPicker() {
+		isFolderPickerOpen = true;
+		folderPickerError = '';
+		folderPickerLoading = true;
+		try {
+			const startPath = projectSettingsLocalPath || '';
+			const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+			const res = await fetch(`${cleanUrl}/browse?path=${encodeURIComponent(startPath)}`);
+			if (!res.ok) throw new Error('Cannot connect to Workspace Bridge. Please check if the bridge is running.');
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
+			folderPickerCurrentPath = data.currentPath;
+			folderPickerParentPath = data.parentPath;
+			folderPickerDirectories = data.directories || [];
+		} catch (err: any) {
+			folderPickerError = err.message;
+		} finally {
+			folderPickerLoading = false;
+		}
+	}
+
+	async function navigateFolderPicker(targetPath: string) {
+		folderPickerError = '';
+		folderPickerLoading = true;
+		try {
+			const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+			const res = await fetch(`${cleanUrl}/browse?path=${encodeURIComponent(targetPath)}`);
+			if (!res.ok) throw new Error('Cannot browse directory');
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
+			folderPickerCurrentPath = data.currentPath;
+			folderPickerParentPath = data.parentPath;
+			folderPickerDirectories = data.directories || [];
+		} catch (err: any) {
+			folderPickerError = err.message;
+		} finally {
+			folderPickerLoading = false;
+		}
+	}
+
+	function selectFolderPickerPath() {
+		projectSettingsLocalPath = folderPickerCurrentPath;
+		isFolderPickerOpen = false;
+	}
 
 	// File upload states
 	let fileInputRef = $state<HTMLInputElement | null>(null);
@@ -531,12 +588,20 @@
 
 					<div class="modal-form-item">
 						<label for="project-localpath-input">Local Workspace Folder Path (เส้นทางโฟลเดอร์ในเครื่อง)</label>
-						<input 
-							id="project-localpath-input"
-							type="text" 
-							bind:value={projectSettingsLocalPath} 
-							placeholder="e.g. /Users/kosol/Developer/js/order-ai"
-						/>
+						<div style="display: flex; gap: 8px;">
+							<input 
+								id="project-localpath-input"
+								type="text" 
+								bind:value={projectSettingsLocalPath} 
+								placeholder="e.g. /path/to/your-project-folder"
+								style="flex: 1;"
+							/>
+							{#if enableWorkspaceBridge}
+								<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="padding: 0 16px; margin: 0; background-color: var(--accent-blue); color: #fff; height: 38px; font-weight: 500; white-space: nowrap; border: none; border-radius: 4px; cursor: pointer;">
+									เลือกโฟลเดอร์...
+								</button>
+							{/if}
+						</div>
 						<p class="modal-help-text">กำหนดเส้นทางโฟลเดอร์ในเครื่องที่ต้องการให้ AI ซิงก์ไฟล์เข้าออกสำหรับโปรเจกต์นี้ (เช่น พาธเต็มแบบ Absolute Path)</p>
 					</div>
 					
@@ -642,6 +707,56 @@
 				</div>
 			</div>
 		</div>
+
+		{#if isFolderPickerOpen}
+			<div class="modal-backdrop folder-picker-backdrop" onclick={() => isFolderPickerOpen = false} role="button" tabindex="-1">
+				<div class="project-modal-content folder-picker-content animate-zoom-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1" style="max-width: 500px; width: 90%; background-color: var(--bg-primary); border: 1px solid var(--border-color);">
+					<div class="modal-header">
+						<h3>เลือกโฟลเดอร์โครงการ (Select Workspace Directory)</h3>
+						<button class="modal-close-btn" onclick={() => isFolderPickerOpen = false} title="Close">✕</button>
+					</div>
+					<div class="modal-body" style="padding: 15px 0;">
+						<div class="folder-picker-path-bar" style="display: flex; gap: 8px; margin-bottom: 12px; padding: 0 20px;">
+							<input type="text" bind:value={folderPickerCurrentPath} style="flex: 1; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: monospace; font-size: 0.8rem;" />
+							<button type="button" class="modal-action-btn" onclick={() => navigateFolderPicker(folderPickerCurrentPath)} style="padding: 0 12px; margin: 0; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">เปิด</button>
+						</div>
+
+						{#if folderPickerLoading}
+							<div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายการโฟลเดอร์...</div>
+						{:else if folderPickerError}
+							<div style="text-align: center; padding: 20px; color: #ff6b6b; font-size: 0.85rem;">
+								<p style="margin-bottom: 10px;">{folderPickerError}</p>
+								<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer;">ลองอีกครั้ง</button>
+							</div>
+						{:else}
+							<div class="folder-picker-list" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+								{#if folderPickerCurrentPath !== folderPickerParentPath}
+									<div class="folder-picker-item" onclick={() => navigateFolderPicker(folderPickerParentPath)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && navigateFolderPicker(folderPickerParentPath)} style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; cursor: pointer; border-bottom: 1px solid var(--border-light); background: var(--bg-primary); transition: background 0.2s;">
+										<span style="font-size: 1.1rem;">📁</span>
+										<span style="font-size: 0.85rem; font-weight: 500; color: var(--accent-blue);">.. (ย้อนกลับโฟลเดอร์หลัก)</span>
+									</div>
+								{/if}
+
+								{#each folderPickerDirectories as dir}
+									<div class="folder-picker-item" onclick={() => navigateFolderPicker(folderPickerCurrentPath + (folderPickerCurrentPath.endsWith('/') || folderPickerCurrentPath.endsWith('\\') ? '' : '/') + dir)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && navigateFolderPicker(folderPickerCurrentPath + (folderPickerCurrentPath.endsWith('/') || folderPickerCurrentPath.endsWith('\\') ? '' : '/') + dir)} style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; cursor: pointer; border-bottom: 1px solid var(--border-light); background: var(--bg-primary); transition: background 0.2s;">
+										<span style="font-size: 1.1rem;">📁</span>
+										<span style="font-size: 0.85rem; color: var(--text-primary);">{dir}</span>
+									</div>
+								{/each}
+
+								{#if folderPickerDirectories.length === 0}
+									<div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 0.85rem;">ไม่พบโฟลเดอร์ย่อยในตำแหน่งนี้</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+					<div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px 0 20px; border-top: 1px solid var(--border-color);">
+						<button class="modal-btn secondary" onclick={() => isFolderPickerOpen = false}>ยกเลิก</button>
+						<button class="modal-btn primary" onclick={selectFolderPickerPath} disabled={folderPickerLoading || !!folderPickerError}>เลือกโฟลเดอร์นี้</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	{/if}
 </aside>
 
@@ -1692,5 +1807,9 @@
 		color: var(--text-primary);
 		background-color: var(--bg-primary);
 		box-shadow: var(--shadow-sm);
+	}
+
+	.folder-picker-item:hover {
+		background-color: var(--bg-hover) !important;
 	}
 </style>

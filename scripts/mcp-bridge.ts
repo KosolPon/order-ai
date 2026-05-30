@@ -125,6 +125,39 @@ Bun.serve({
 				);
 			}
 
+			// GET /browse?path=... - Browse directories for selector UI
+			if (url.pathname === "/browse" && req.method === "GET") {
+				const browsePath = url.searchParams.get("path") || WORKSPACE_DIR;
+				try {
+					const resolvedPath = resolve(browsePath);
+					const entries = await readdir(resolvedPath, { withFileTypes: true });
+					
+					// Exclude hidden folders like .git, node_modules etc. to keep it clean
+					const dirs = entries
+						.filter(entry => {
+							if (!entry.isDirectory()) return false;
+							const name = entry.name;
+							return name !== "node_modules" && name !== ".git" && !name.startsWith(".");
+						})
+						.map(entry => entry.name)
+						.sort();
+
+					return Response.json(
+						{
+							currentPath: resolvedPath,
+							parentPath: resolve(resolvedPath, ".."),
+							directories: dirs
+						},
+						{ headers: corsHeaders }
+					);
+				} catch (err: any) {
+					return Response.json(
+						{ error: err.message },
+						{ status: 400, headers: corsHeaders }
+					);
+				}
+			}
+
 			// For files and file operations, validate x-local-path header
 			if (url.pathname === "/files" || url.pathname === "/file" || url.pathname === "/execute") {
 				if (!allowedPath) {
