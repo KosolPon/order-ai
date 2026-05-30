@@ -629,7 +629,7 @@
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
@@ -672,7 +672,7 @@
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
@@ -715,7 +715,7 @@
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
@@ -1207,7 +1207,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		padding: 10px 12px;
+		padding: 6px 10px;
 		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
 		border-radius: 10px;
@@ -1287,7 +1287,7 @@
 		font-size: 1rem;
 		cursor: pointer;
 		transition: all var(--transition-fast);
-		padding: 4px;
+		padding: 2px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1317,7 +1317,7 @@
 		color: var(--text-muted);
 		cursor: pointer;
 		transition: all var(--transition-fast);
-		padding: 4px;
+		padding: 2px;
 		display: flex;
 		align-items: center;
 		justify-content: center;

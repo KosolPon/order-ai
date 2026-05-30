@@ -1136,7 +1136,7 @@
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
 																				</div>
-																				<div class="dropdown-meta-row" style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+																				<div class="dropdown-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
 																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
@@ -1184,7 +1184,7 @@
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
 																				</div>
-																				<div class="dropdown-meta-row" style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+																				<div class="dropdown-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
 																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
@@ -1233,7 +1233,7 @@
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
 																				</div>
-																				<div class="dropdown-meta-row" style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
+																				<div class="dropdown-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
 																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
@@ -2918,7 +2918,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		padding: 8px 10px;
+		padding: 5px 9px;
 		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
 		border-radius: 8px;
