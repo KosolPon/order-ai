@@ -41,10 +41,8 @@
 		}
 		return list.sort((a, b) => a.name.localeCompare(b.name));
 	});
-	let selectedModel = $state<string>('');
 	let activeModels = $state<string[]>(['']);
-	let prevSelectedModel = $state<string>('');
-	let prevFirstActive = $state<string>('');
+	const selectedModel = $derived(activeModels[0] || '');
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
 	let topP = $state<number>(0.9);
 	let topK = $state<number>(40);
@@ -56,7 +54,7 @@
 	let isConnected = $state<boolean>(false);
 	let isGenerating = $state<boolean>(false);
 	let input = $state<string>('');
-	let drafts = $state<Record<string, string>>({});
+	let drafts: Record<string, string> = {};
 	let attachments = $state<Attachment[]>([]);
 	let isInitialized = $state(false);
 	let theme = $state<string>('dark-blue');
@@ -282,9 +280,6 @@
 				}
 			}
 
-			if (activeModels[0]) {
-				selectedModel = activeModels[0];
-			}
 
 			const storedTopP = localStorage.getItem('ollama_topp');
 			if (storedTopP) topP = parseFloat(storedTopP);
@@ -407,8 +402,6 @@
 			}
 
 			isInitialized = true;
-			prevSelectedModel = selectedModel;
-			prevFirstActive = activeModels[0] || '';
 		});
 	});
 
@@ -497,8 +490,9 @@
 					const modelNames = availableModels.map((m) => m.name);
 					const storedModel = localStorage.getItem('ollama_selected_model');
 					if (storedModel && modelNames.includes(storedModel)) {
-						selectedModel = storedModel;
-					} else if (!selectedModel || !modelNames.includes(selectedModel)) {
+						activeModels[0] = storedModel;
+						activeModels = [...activeModels];
+					} else if (!activeModels[0] || !modelNames.includes(activeModels[0])) {
 						const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
 						const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
 						const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
@@ -513,7 +507,8 @@
 							return;
 						}
 
-						selectedModel = availableModels[0].name;
+						activeModels[0] = availableModels[0].name;
+						activeModels = [...activeModels];
 					}
 				}
 			});
@@ -559,26 +554,7 @@
 		}
 	});
 
-	// Synchronize selectedModel and activeModels[0]
-	$effect(() => {
-		if (!isInitialized) return;
-		
-		const currentSelected = selectedModel;
-		const currentFirstActive = activeModels[0] || '';
 
-		if (currentSelected !== prevSelectedModel) {
-			// selectedModel changed (from main prompt selector) -> update activeModels[0]
-			activeModels[0] = currentSelected;
-			activeModels = [...activeModels];
-			prevSelectedModel = currentSelected;
-			prevFirstActive = currentSelected;
-		} else if (currentFirstActive !== prevFirstActive) {
-			// activeModels[0] changed (from settings selector Step 1) -> update selectedModel
-			selectedModel = currentFirstActive;
-			prevSelectedModel = currentFirstActive;
-			prevFirstActive = currentFirstActive;
-		}
-	});
 
 	// Save active models and temperatures to localStorage
 	$effect(() => {
@@ -624,9 +600,13 @@
 		localStorage.setItem('ollama_customize_settings', String(customizeSettings));
 	});
 
-	// Save drafts to localStorage with 500ms debounce
+	// Watch for input changes to update drafts and save to localStorage with debounce
 	$effect(() => {
+		const currentInput = input;
+		const activeKey = currentConversationId || 'new-chat';
 		if (!isInitialized) return;
+		drafts[activeKey] = currentInput;
+
 		const dataToSave = JSON.stringify(drafts);
 		const timeout = setTimeout(() => {
 			localStorage.setItem('ollama_drafts', dataToSave);
@@ -672,21 +652,7 @@
 
 	// Layout widths are saved once resizing finishes in mouseup events
 
-	// Watch for input changes to update drafts
-	$effect(() => {
-		const activeKey = currentConversationId || 'new-chat';
-		if (drafts[activeKey] !== input) {
-			drafts[activeKey] = input;
-		}
-	});
 
-	// Watch for currentConversationId changes to switch active draft
-	$effect(() => {
-		const activeKey = currentConversationId || 'new-chat';
-		untrack(() => {
-			input = drafts[activeKey] || '';
-		});
-	});
 
 	// Trigger model loading whenever URL/keys change
 	$effect(() => {
@@ -713,8 +679,9 @@
 			const modelNames = availableModels.map((m) => m.name);
 			const storedModel = localStorage.getItem('ollama_selected_model');
 			if (storedModel && modelNames.includes(storedModel)) {
-				selectedModel = storedModel;
-			} else if (!selectedModel || !modelNames.includes(selectedModel)) {
+				activeModels[0] = storedModel;
+				activeModels = [...activeModels];
+			} else if (!activeModels[0] || !modelNames.includes(activeModels[0])) {
 				const isGeminiModel = storedModel && GEMINI_MODELS.some(m => m.name === storedModel);
 				const isCloudModel = storedModel && ollamaCloudModels.some(m => m.name === storedModel);
 				const isLocalModel = storedModel && !isGeminiModel && !isCloudModel;
@@ -729,7 +696,8 @@
 					return;
 				}
 
-				selectedModel = availableModels[0].name;
+				activeModels[0] = availableModels[0].name;
+				activeModels = [...activeModels];
 			}
 		}
 	}
@@ -774,11 +742,17 @@
 	}
 
 	// Create a new conversation
+	function selectConversation(id: string | null) {
+		currentConversationId = id;
+		selectedThinkingMsgId = null;
+		input = drafts[id || 'new-chat'] || '';
+	}
+
 	function handleNewConversation() {
 		// If there is already an empty conversation, just select it instead of creating a duplicate
 		const emptyConv = conversations.find(c => c.messages.length === 0 && !c.projectId);
 		if (emptyConv) {
-			currentConversationId = emptyConv.id;
+			selectConversation(emptyConv.id);
 			return;
 		}
 
@@ -791,7 +765,7 @@
 		};
 
 		conversations = [newConv, ...conversations];
-		currentConversationId = newConv.id;
+		selectConversation(newConv.id);
 	}
 
 	// Delete a conversation
@@ -800,9 +774,9 @@
 		
 		if (currentConversationId === id) {
 			if (conversations.length > 0) {
-				currentConversationId = conversations[0].id;
+				selectConversation(conversations[0].id);
 			} else {
-				currentConversationId = null;
+				selectConversation(null);
 			}
 		}
 	}
@@ -819,8 +793,7 @@
 
 	// Select a conversation
 	function handleSelectConversation(id: string) {
-		currentConversationId = id;
-		selectedThinkingMsgId = null;
+		selectConversation(id);
 	}
 
 	// Stop assistant generation
@@ -854,7 +827,7 @@
 		if (deleteChats) {
 			conversations = conversations.filter((c) => c.projectId !== id);
 			if (currentConversationId && !conversations.some((c) => c.id === currentConversationId)) {
-				currentConversationId = conversations.length > 0 ? conversations[0].id : null;
+				selectConversation(conversations.length > 0 ? conversations[0].id : null);
 			}
 		} else {
 			conversations = conversations.map((c) => (c.projectId === id ? { ...c, projectId: undefined } : c));
@@ -865,7 +838,7 @@
 	function handleNewConversationInProject(projectId: string) {
 		const emptyConv = conversations.find(c => c.messages.length === 0 && c.projectId === projectId);
 		if (emptyConv) {
-			currentConversationId = emptyConv.id;
+			selectConversation(emptyConv.id);
 			return;
 		}
 
@@ -878,7 +851,7 @@
 			projectId
 		};
 		conversations = [newConv, ...conversations];
-		currentConversationId = newConv.id;
+		selectConversation(newConv.id);
 	}
 
 	// Update chat-level context
@@ -1899,7 +1872,7 @@
 		<InputArea 
 			bind:input
 			{models}
-			bind:selectedModel
+			bind:selectedModel={activeModels[0]}
 			{activeModels}
 			onModelPillClick={() => {
 				showSidebar = true;
