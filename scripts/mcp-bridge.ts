@@ -143,7 +143,7 @@ Bun.serve({
 			}
 
 			// For files and file operations, validate x-local-path header
-			if (url.pathname === "/files" || url.pathname === "/file") {
+			if (url.pathname === "/files" || url.pathname === "/file" || url.pathname === "/search" || url.pathname === "/grep") {
 				if (!allowedPath) {
 					return new Response("Access Denied: Missing 'x-local-path' header", {
 						status: 403,
@@ -164,6 +164,67 @@ Bun.serve({
 			if (url.pathname === "/files" && req.method === "GET") {
 				const files = await getFilesRecursively(allowedPath!, allowedPath!);
 				return Response.json({ files }, { headers: corsHeaders });
+			}
+
+			// GET /search?q=name - Search files by name (fuzzy filename match)
+			if (url.pathname === "/search" && req.method === "GET") {
+				const query = url.searchParams.get("q")?.toLowerCase();
+				if (!query) {
+					return new Response("Missing 'q' parameter", { status: 400, headers: corsHeaders });
+				}
+
+				const allFiles = await getFilesRecursively(allowedPath!, allowedPath!);
+				const matches = allFiles.filter(f => {
+					const fileName = f.split(/[\/\\]/).pop()?.toLowerCase() || '';
+					return fileName.includes(query) || f.toLowerCase().includes(query);
+				});
+
+				return Response.json({ query, files: matches }, { headers: corsHeaders });
+			}
+
+			// GET /grep?q=pattern - Search file contents for a pattern
+			if (url.pathname === "/grep" && req.method === "GET") {
+				const query = url.searchParams.get("q");
+				const maxResults = parseInt(url.searchParams.get("max") || "20");
+				if (!query) {
+					return new Response("Missing 'q' parameter", { status: 400, headers: corsHeaders });
+				}
+
+				const allFiles = await getFilesRecursively(allowedPath!, allowedPath!);
+				const results: { path: string; matches: { line: number; text: string }[] }[] = [];
+				const queryLower = query.toLowerCase();
+
+				for (const filePath of allFiles) {
+					if (results.length >= maxResults) break;
+					try {
+						const safePath = getSafePath(filePath, allowedPath!);
+						const file = Bun.file(safePath);
+						if (!(await file.exists())) continue;
+
+						// Skip binary/large files
+						const size = (await stat(safePath)).size;
+						if (size > 500_000) continue;
+
+						const content = await file.text();
+						const lines = content.split('\n');
+						const fileMatches: { line: number; text: string }[] = [];
+
+						for (let i = 0; i < lines.length; i++) {
+							if (lines[i].toLowerCase().includes(queryLower)) {
+								fileMatches.push({ line: i + 1, text: lines[i].trim() });
+								if (fileMatches.length >= 10) break; // max 10 matches per file
+							}
+						}
+
+						if (fileMatches.length > 0) {
+							results.push({ path: filePath, matches: fileMatches });
+						}
+					} catch {
+						// skip unreadable files
+					}
+				}
+
+				return Response.json({ query, results }, { headers: corsHeaders });
 			}
 
 			// GET /file?path=... - Read file content

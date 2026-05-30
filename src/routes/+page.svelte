@@ -1028,16 +1028,61 @@
 						const { files } = await filesRes.json();
 						workspaceFileTree = files as string[];
 
-						// 2. Determine which files to pre-load
-						const CONFIG_FILES = ['package.json', 'svelte.config.js', 'tsconfig.json', 'vite.config.ts', 'vite.config.js', '.env.example'];
+						const CONFIG_FILES = ['package.json', 'svelte.config.js', 'tsconfig.json', 'vite.config.ts', 'vite.config.js'];
 						const lastUserMsg = conv.messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
 
-						const filesToRead = (files as string[]).filter(f =>
-							// Always include config files
-							CONFIG_FILES.some(cfg => f === cfg || f.endsWith('/' + cfg)) ||
-							// Include files mentioned in the last user message
-							lastUserMsg.includes(f)
-						).slice(0, 15); // max 15 files
+						// 2a. Filename search: extract *.ext patterns from user message → search bridge
+						const fileNamePatterns = [...new Set(lastUserMsg.match(/\b[\w.-]+\.(ts|svelte|js|jsx|tsx|css|json|html|md|py|sh)\b/g) || [])];
+						const searchFoundFiles = new Set<string>();
+
+						await Promise.all(fileNamePatterns.map(async (name) => {
+							try {
+								const res = await fetch(`${cleanUrl}/search?q=${encodeURIComponent(name)}`, {
+									headers: { 'x-local-path': project.localPath }
+								});
+								if (res.ok) {
+									const { files: found } = await res.json();
+									(found as string[]).forEach(f => searchFoundFiles.add(f));
+								}
+							} catch { /* ignore */ }
+						}));
+
+						// 2b. Keyword grep: extract quoted strings and identifiers from user message
+						const quotedTerms = [...new Set((lastUserMsg.match(/"([^"]{3,40})"|'([^']{3,40})'|`([^`]{3,40})`/g) || []).map(s => s.slice(1, -1)))];
+						const grepFoundFiles = new Set<string>();
+
+						await Promise.all(quotedTerms.slice(0, 3).map(async (term) => {
+							try {
+								const res = await fetch(`${cleanUrl}/grep?q=${encodeURIComponent(term)}&max=10`, {
+									headers: { 'x-local-path': project.localPath }
+								});
+								if (res.ok) {
+									const { results } = await res.json();
+									(results as any[]).forEach(r => grepFoundFiles.add(r.path));
+								}
+							} catch { /* ignore */ }
+						}));
+
+						// Priority 1: files found via filename search or grep
+						const smartFound = [...new Set([...searchFoundFiles, ...grepFoundFiles])];
+						// Priority 2: files explicitly mentioned by full path in user message
+						const mentionedFiles = (files as string[]).filter(f => lastUserMsg.includes(f));
+						// Priority 3: config files
+						const configFiles = (files as string[]).filter(f =>
+							CONFIG_FILES.some(cfg => f === cfg || f.endsWith('/' + cfg))
+						);
+						// Priority 4: all src/ and scripts/ files
+						const srcFiles = (files as string[]).filter(f =>
+							(f.startsWith('src/') || f.startsWith('scripts/')) &&
+							!smartFound.includes(f) && !mentionedFiles.includes(f) && !configFiles.includes(f)
+						);
+
+						// Combine deduplicated, keeping priority order
+						const seen = new Set<string>();
+						const filesToRead: string[] = [];
+						for (const f of [...smartFound, ...mentionedFiles, ...configFiles, ...srcFiles]) {
+							if (!seen.has(f)) { seen.add(f); filesToRead.push(f); }
+						}
 
 						let totalChars = 0;
 						for (const filePath of filesToRead) {
