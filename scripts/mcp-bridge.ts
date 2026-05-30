@@ -52,11 +52,27 @@ async function getFilesRecursively(dir: string, baseDir: string = WORKSPACE_DIR)
 	return files;
 }
 
+const KEY_PATH = join(WORKSPACE_DIR, "key.pem");
+const CERT_PATH = join(WORKSPACE_DIR, "cert.pem");
+
+const hasCert = await Bun.file(KEY_PATH).exists() && await Bun.file(CERT_PATH).exists();
+
+const tlsConfig = hasCert ? {
+	key: Bun.file(KEY_PATH),
+	cert: Bun.file(CERT_PATH),
+} : undefined;
+
 console.log(`Starting Local Workspace Bridge...`);
 console.log(`Target Workspace: ${WORKSPACE_DIR}`);
+if (hasCert) {
+	console.log(`TLS certificates detected. Running in secure HTTPS mode.`);
+} else {
+	console.log(`No certificates found (key.pem / cert.pem). Running in HTTP mode.`);
+}
 
 Bun.serve({
 	port: PORT,
+	tls: tlsConfig,
 	async fetch(req) {
 		// Handle CORS Preflight OPTIONS request
 		if (req.method === "OPTIONS") {
@@ -131,4 +147,4 @@ Bun.serve({
 	},
 });
 
-console.log(`Local Workspace Bridge is running on http://localhost:${PORT}`);
+console.log(`Local Workspace Bridge is running on ${hasCert ? 'https' : 'http'}://localhost:${PORT}`);

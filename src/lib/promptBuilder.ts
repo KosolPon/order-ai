@@ -9,6 +9,7 @@ interface BuildPromptParams {
 	useCanvas: boolean;
 	memories: { content: string }[];
 	canvasFiles: { name: string; type: string; content: string }[];
+	enableWorkspaceBridge?: boolean;
 }
 
 export function buildCombinedSystemPrompt({
@@ -17,7 +18,8 @@ export function buildCombinedSystemPrompt({
 	projects,
 	useCanvas,
 	memories,
-	canvasFiles
+	canvasFiles,
+	enableWorkspaceBridge
 }: BuildPromptParams): string {
 	if (!conv) return '';
 	const parts: string[] = [];
@@ -91,7 +93,13 @@ export function buildCombinedSystemPrompt({
 
 	// Append critical canvas syntax instructions for the AI
 	if (useCanvas) {
-		parts.push(`[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`);
+		let canvasDirective = `[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user. To create a new file or modify an existing file, you MUST wrap the complete, updated content of the file inside a <canvas name="filename.ext" type="html|markdown|code|text">...</canvas> tag block. Do not write explanations inside the <canvas> block itself, only the exact file contents. The system will extract it and display it in the Canvas panel on the right. For HTML pages, ensure they are self-contained and run standalone.`;
+		
+		if (enableWorkspaceBridge) {
+			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Any files you write or modify using the <canvas name="..."> tag will be saved directly to the user's real project directory on their computer (e.g. 'src/routes/+page.svelte', 'scripts/test.ts'). Do not apologize or claim you cannot modify local files; instead, write them using the canvas tag and confidently inform the user that you have created/updated the files in their workspace.`;
+		}
+		
+		parts.push(canvasDirective);
 	}
 
 	// Inject Response Style directives

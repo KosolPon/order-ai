@@ -956,7 +956,8 @@
 			projects,
 			useCanvas,
 			memories,
-			canvasFiles
+			canvasFiles,
+			enableWorkspaceBridge
 		});
 		
 		console.log('[System Context Debug] Calculated System Prompt:', combined);
