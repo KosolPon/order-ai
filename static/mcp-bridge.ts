@@ -313,14 +313,26 @@ Bun.serve({
 						let stderr = "";
 
 						proc.stdout?.on("data", (data) => {
-							stdout += data.toString();
+							const str = data.toString();
+							stdout += str;
+							process.stdout.write(str);
 						});
 						proc.stderr?.on("data", (data) => {
-							stderr += data.toString();
+							const str = data.toString();
+							stderr += str;
+							process.stderr.write(str);
 						});
 
+						// Pipe stdin so interactive commands (like bunx sv create) can receive terminal answers
+						process.stdin.resume();
+						process.stdin.pipe(proc.stdin);
+
 						const code = await new Promise<number | null>((resolve) => {
-							proc.on("close", (code) => resolve(code));
+							proc.on("close", (code) => {
+								process.stdin.unpipe(proc.stdin);
+								process.stdin.pause();
+								resolve(code);
+							});
 						});
 
 						return Response.json(
