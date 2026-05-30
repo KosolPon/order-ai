@@ -625,33 +625,33 @@
 													class:selected={selectedModel === model.name}
 													onclick={() => { selectedModel = model.name; showModelPopup = false; }}
 												>
-													<div class="model-card-content">
+													<div class="model-card-content" style="width: 100%;">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
+														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
+															<div class="model-actions">
+																<button 
+																	class="pin-btn pinned" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ถอนหมุดโมเดล"
+																>
+																	★
+																</button>
+																<button 
+																	class="hide-btn" 
+																	onclick={(e) => toggleHide(model.name, e)}
+																	title="ซ่อนโมเดล"
+																>
+																	<svg viewBox="0 0 24 24" width="14" height="14">
+																		<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																	</svg>
+																</button>
+															</div>
 														</div>
-													</div>
-													<div class="model-actions">
-														<button 
-															class="pin-btn pinned" 
-															onclick={(e) => togglePin(model.name, e)}
-															title="ถอนหมุดโมเดล"
-														>
-															★
-														</button>
-														<button 
-															class="hide-btn" 
-															onclick={(e) => toggleHide(model.name, e)}
-															title="ซ่อนโมเดล"
-														>
-															<svg viewBox="0 0 24 24" width="14" height="14">
-																<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-															</svg>
-														</button>
 													</div>
 												</div>
 											{/each}
@@ -668,33 +668,33 @@
 													class:selected={selectedModel === model.name}
 													onclick={() => { selectedModel = model.name; showModelPopup = false; }}
 												>
-													<div class="model-card-content">
+													<div class="model-card-content" style="width: 100%;">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
+														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
+															<div class="model-actions">
+																<button 
+																	class="pin-btn" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ปักหมุดโมเดล"
+																>
+																	★
+																</button>
+																<button 
+																	class="hide-btn" 
+																	onclick={(e) => toggleHide(model.name, e)}
+																	title="ซ่อนโมเดล"
+																>
+																	<svg viewBox="0 0 24 24" width="14" height="14">
+																		<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																	</svg>
+																</button>
+															</div>
 														</div>
-													</div>
-													<div class="model-actions">
-														<button 
-															class="pin-btn" 
-															onclick={(e) => togglePin(model.name, e)}
-															title="ปักหมุดโมเดล"
-														>
-															★
-														</button>
-														<button 
-															class="hide-btn" 
-															onclick={(e) => toggleHide(model.name, e)}
-															title="ซ่อนโมเดล"
-														>
-															<svg viewBox="0 0 24 24" width="14" height="14">
-																<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-															</svg>
-														</button>
 													</div>
 												</div>
 											{/each}
@@ -711,37 +711,41 @@
 													class:selected={selectedModel === model.name}
 													onclick={() => { selectedModel = model.name; showModelPopup = false; }}
 												>
-													<div class="model-card-content">
+													<div class="model-card-content" style="width: 100%;">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
 														</div>
-														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
+														<div class="model-meta-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;">
 															<span class="model-source-badge {model.source || 'local'}">
 																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
+															<div class="model-actions">
+																<button 
+																	class="pin-btn" 
+																	onclick={(e) => togglePin(model.name, e)}
+																	title="ปักหมุดโมเดล"
+																>
+																	★
+																</button>
+																<button 
+																	class="hide-btn hidden-active" 
+																	onclick={(e) => toggleHide(model.name, e)}
+																	title="แสดงโมเดล"
+																>
+																	<svg viewBox="0 0 24 24" width="14" height="14">
+																		<path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.2 2.7-2.78 3.44-4.74-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+																	</svg>
+																</button>
+															</div>
 														</div>
-													</div>
-													<div class="model-actions">
-														<button 
-															class="pin-btn" 
-															onclick={(e) => togglePin(model.name, e)}
-															title="ปักหมุดโมเดล"
-														>
-															★
-														</button>
-														<button 
-															class="hide-btn hidden-active" 
-															onclick={(e) => toggleHide(model.name, e)}
-															title="แสดงโมเดล"
-														>
-															<svg viewBox="0 0 24 24" width="14" height="14">
-																<path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.2 2.7-2.78 3.44-4.74-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-															</svg>
-														</button>
 													</div>
 												</div>
 											{/each}
 										</div>
+									{/if}
+
+									{#if favoriteModels.length === 0 && normalModels.length === 0 && hiddenModels.length === 0}
+										<div class="no-models-msg">ไม่พบโมเดลที่ค้นหา</div>
 									{/if}
 
 									{#if favoriteModels.length === 0 && normalModels.length === 0 && hiddenModels.length === 0}
@@ -1201,15 +1205,15 @@
 
 	.model-item-card {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		flex-direction: column;
+		align-items: stretch;
 		padding: 10px 12px;
 		background-color: var(--bg-primary);
 		border: 1px solid var(--border-color);
 		border-radius: 10px;
 		cursor: pointer;
 		transition: all var(--transition-fast);
-		gap: 8px;
+		gap: 4px;
 		position: relative;
 	}
 
