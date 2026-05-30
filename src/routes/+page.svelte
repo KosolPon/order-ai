@@ -27,6 +27,8 @@
 	let enableOllamaLocal = $state<boolean>(true);
 	let enableOllamaCloud = $state<boolean>(false);
 	let enableGemini = $state<boolean>(false);
+	let enableWorkspaceBridge = $state<boolean>(false);
+	let workspaceBridgeUrl = $state<string>('http://localhost:3000');
 	let ollamaModels = $state<OllamaModel[]>([]);
 	let ollamaCloudModels = $state<OllamaModel[]>([]);
 	let isOllamaCloudConnected = $state<boolean>(false);
@@ -216,6 +218,11 @@
 				if (storedCloud !== null) enableOllamaCloud = storedCloud === 'true';
 				const storedGemini = localStorage.getItem('ollama_enable_gemini');
 				if (storedGemini !== null) enableGemini = storedGemini === 'true';
+				
+				const storedBridgeUrl = localStorage.getItem('workspace_bridge_url');
+				if (storedBridgeUrl) workspaceBridgeUrl = storedBridgeUrl;
+				const storedBridgeEnable = localStorage.getItem('workspace_enable_bridge');
+				if (storedBridgeEnable !== null) enableWorkspaceBridge = storedBridgeEnable === 'true';
 			}
 
 			// Migrate legacy chats and projects from localStorage if they exist
@@ -481,6 +488,16 @@
 	$effect(() => {
 		if (!isInitialized) return;
 		localStorage.setItem('ollama_enable_gemini', String(enableGemini));
+	});
+
+	$effect(() => {
+		if (!isInitialized) return;
+		localStorage.setItem('workspace_enable_bridge', String(enableWorkspaceBridge));
+	});
+
+	$effect(() => {
+		if (!isInitialized) return;
+		localStorage.setItem('workspace_bridge_url', workspaceBridgeUrl);
 	});
 
 	$effect(() => {
@@ -896,6 +913,19 @@
 				content: file.content,
 				updatedAt: Date.now()
 			});
+
+			if (enableWorkspaceBridge && workspaceBridgeUrl) {
+				try {
+					const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+					await fetch(`${cleanUrl}/file`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ path: file.name, content: file.content })
+					});
+				} catch (e) {
+					console.error('Failed to sync AI file to local workspace:', e);
+				}
+			}
 		}
 	}
 
@@ -1853,6 +1883,8 @@
 		bind:enableOllamaLocal
 		bind:enableOllamaCloud
 		bind:enableGemini
+		bind:enableWorkspaceBridge
+		bind:workspaceBridgeUrl
 		bind:activeModels
 		bind:modelTemperatures
 		bind:topP

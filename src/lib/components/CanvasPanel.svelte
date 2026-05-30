@@ -111,6 +111,24 @@
 		}
 	});
 
+	// Helper to sync file to local workspace via bridge
+	async function syncFileToWorkspace(name: string, content: string) {
+		const isBridgeEnabled = localStorage.getItem('workspace_enable_bridge') === 'true';
+		const bridgeUrl = localStorage.getItem('workspace_bridge_url') || 'http://localhost:3000';
+		if (isBridgeEnabled && bridgeUrl) {
+			try {
+				const cleanUrl = bridgeUrl.replace(/\/$/, '');
+				await fetch(`${cleanUrl}/file`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ path: name, content })
+				});
+			} catch (e) {
+				console.error('Failed to sync manual edit to local workspace:', e);
+			}
+		}
+	}
+
 	// Debounced Auto-save to IndexedDB
 	let saveTimeout: any;
 	function handleEditorInput(e: Event) {
@@ -129,6 +147,7 @@
 				content: editorContent,
 				updatedAt: Date.now()
 			});
+			await syncFileToWorkspace(activeFile.name, editorContent);
 		}, 300);
 	}
 
@@ -162,6 +181,7 @@
 						content: editorContent,
 						updatedAt: Date.now()
 					});
+					await syncFileToWorkspace(activeFile.name, editorContent);
 				}, 300);
 			}
 		}

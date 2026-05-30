@@ -1,0 +1,134 @@
+import { join, resolve, relative } from "path";
+import { readdir, stat } from "fs/promises";
+
+const PORT = 3000;
+// Resolve the root directory of the project
+const WORKSPACE_DIR = resolve(join(import.meta.dir, ".."));
+
+// CORS headers helper
+const corsHeaders = {
+	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+	"Access-Control-Allow-Headers": "Content-Type",
+};
+
+// Safe path resolution to prevent directory traversal
+function getSafePath(relativePath: string): string {
+	const absolutePath = resolve(WORKSPACE_DIR, relativePath);
+	if (!absolutePath.startsWith(WORKSPACE_DIR)) {
+		throw new Error("Access denied: Path is outside workspace directory");
+	}
+	return absolutePath;
+}
+
+// Recursively get files list
+async function getFilesRecursively(dir: string, baseDir: string = WORKSPACE_DIR): Promise<string[]> {
+	const entries = await readdir(dir, { withFileTypes: true });
+	const files: string[] = [];
+
+	for (const entry of entries) {
+		const resPath = join(dir, entry.name);
+		const relPath = relative(baseDir, resPath);
+
+		// Exclusions to keep the payload small and safe
+		if (
+			entry.name === "node_modules" ||
+			entry.name === ".git" ||
+			entry.name === ".svelte-kit" ||
+			entry.name === ".netlify" ||
+			entry.name === ".DS_Store" ||
+			entry.name === "bun.lock"
+		) {
+			continue;
+		}
+
+		if (entry.isDirectory()) {
+			files.push(...(await getFilesRecursively(resPath, baseDir)));
+		} else {
+			files.push(relPath);
+		}
+	}
+
+	return files;
+}
+
+console.log(`Starting Local Workspace Bridge...`);
+console.log(`Target Workspace: ${WORKSPACE_DIR}`);
+
+Bun.serve({
+	port: PORT,
+	async fetch(req) {
+		// Handle CORS Preflight OPTIONS request
+		if (req.method === "OPTIONS") {
+			return new Response(null, { headers: corsHeaders });
+		}
+
+		const url = new URL(req.url);
+
+		try {
+			// GET /status
+			if (url.pathname === "/status" && req.method === "GET") {
+				return Response.json(
+					{ status: "ok", workspace: WORKSPACE_DIR },
+					{ headers: corsHeaders }
+				);
+			}
+
+			// GET /files - List all project files
+			if (url.pathname === "/files" && req.method === "GET") {
+				const files = await getFilesRecursively(WORKSPACE_DIR);
+				return Response.json({ files }, { headers: corsHeaders });
+			}
+
+			// GET /file?path=... - Read file content
+			if (url.pathname === "/file" && req.method === "GET") {
+				const filePathParam = url.searchParams.get("path");
+				if (!filePathParam) {
+					return new Response("Missing path parameter", { status: 400, headers: corsHeaders });
+				}
+
+				const safePath = getSafePath(filePathParam);
+				const file = Bun.file(safePath);
+				
+				if (!(await file.exists())) {
+					return new Response("File not found", { status: 404, headers: corsHeaders });
+				}
+
+				const content = await file.text();
+				return Response.json({ path: filePathParam, content }, { headers: corsHeaders });
+			}
+
+			// POST /file - Write/create file content
+			if (url.pathname === "/file" && req.method === "POST") {
+				const body = await req.json();
+				const { path: filePathParam, content } = body;
+
+				if (!filePathParam || typeof content !== "string") {
+					return new Response("Invalid request body. 'path' and 'content' are required.", {
+						status: 400,
+						headers: corsHeaders,
+					});
+				}
+
+				const safePath = getSafePath(filePathParam);
+				
+				// Ensure parent directory exists
+				const parentDir = resolve(safePath, "..");
+				await Bun.write(safePath, content);
+
+				console.log(`Saved file: ${filePathParam}`);
+				return Response.json({ success: true, path: filePathParam }, { headers: corsHeaders });
+			}
+
+			return new Response("Not found", { status: 404, headers: corsHeaders });
+		} catch (error: any) {
+			console.error("Error processing request:", error);
+			return Response.json(
+				{ error: error.message || "Internal Server Error" },
+				{ status: 500, headers: corsHeaders }
+			);
+		}
+	},
+});
+
+console.log(`Local Workspace Bridge is running on http://localhost:${PORT}`);

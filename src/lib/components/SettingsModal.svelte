@@ -12,6 +12,8 @@
 		enableOllamaLocal = $bindable(),
 		enableOllamaCloud = $bindable(),
 		enableGemini = $bindable(),
+		enableWorkspaceBridge = $bindable(),
+		workspaceBridgeUrl = $bindable(),
 		activeModels = $bindable(),
 		modelTemperatures = $bindable(),
 		topP = $bindable(),
@@ -36,6 +38,8 @@
 		enableOllamaLocal: boolean;
 		enableOllamaCloud: boolean;
 		enableGemini: boolean;
+		enableWorkspaceBridge: boolean;
+		workspaceBridgeUrl: string;
 		activeModels: string[];
 		modelTemperatures: number[];
 		topP: number;
@@ -56,9 +60,13 @@
 	import { fetchModels } from '$lib/ollama';
 	import { roleStore } from '$lib/roleStore.svelte';
 
-	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage' | 'roles'>('connections');
-	let selectedConnectionTab = $state<'local' | 'cloud' | 'gemini'>('local');
+	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage' | 'roles' | 'models'>('connections');
+	let selectedConnectionTab = $state<'local' | 'cloud' | 'gemini' | 'workspace_bridge'>('local');
 	let showOllamaCloudKey = $state(false);
+
+	let localEnableWorkspaceBridge = $state(enableWorkspaceBridge);
+	let testingWorkspaceBridge = $state(false);
+	let localStatusWorkspaceBridge = $state<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
 
 	// Custom Role States
 	let editingRoleId = $state<string | null>(null); // 'new', role.id, or null
@@ -149,6 +157,9 @@
 	$effect(() => {
 		localEnableGemini = enableGemini;
 	});
+	$effect(() => {
+		localEnableWorkspaceBridge = enableWorkspaceBridge;
+	});
 
 	function isValidUrl(urlString: string): boolean {
 		try {
@@ -159,7 +170,7 @@
 		}
 	}
 
-	function handleLocalToggle(service: 'local' | 'cloud' | 'gemini', checked: boolean) {
+	function handleLocalToggle(service: 'local' | 'cloud' | 'gemini' | 'workspace_bridge', checked: boolean) {
 		if (service === 'local') {
 			localEnableOllamaLocal = checked;
 			enableOllamaLocal = checked;
@@ -172,6 +183,9 @@
 			localEnableGemini = checked;
 			enableGemini = checked;
 			onRefreshModels();
+		} else if (service === 'workspace_bridge') {
+			localEnableWorkspaceBridge = checked;
+			enableWorkspaceBridge = checked;
 		}
 	}
 
@@ -187,8 +201,47 @@
 			if (geminiApiKey && enableGemini) {
 				localStatusGemini = { type: 'success', message: 'ตรวจสอบ Google Gemini API Key สำเร็จ! (Active)' };
 			}
+			if (enableWorkspaceBridge) {
+				localStatusWorkspaceBridge = { type: 'success', message: 'เชื่อมต่อ Workspace Bridge สำเร็จ! (Connected)' };
+			}
 		}
 	});
+
+	async function testWorkspaceBridgeConnection() {
+		const url = workspaceBridgeUrl;
+		if (!url) {
+			localStatusWorkspaceBridge = { type: 'error', message: 'กรุณากรอก URL' };
+			return;
+		}
+		if (!isValidUrl(url)) {
+			localStatusWorkspaceBridge = { type: 'error', message: 'รูปแบบ URL ไม่ถูกต้อง (เช่น http://localhost:3000)' };
+			return;
+		}
+		testingWorkspaceBridge = true;
+		localStatusWorkspaceBridge = { type: 'idle', message: 'กำลังตรวจสอบการเชื่อมต่อ... (Verifying...)' };
+		try {
+			const cleanUrl = url.replace(/\/$/, '');
+			const res = await fetch(`${cleanUrl}/status`);
+			if (!res.ok) {
+				throw new Error(`HTTP status ${res.status}`);
+			}
+			const data = await res.json();
+			if (data.status === 'ok') {
+				localStatusWorkspaceBridge = { type: 'success', message: `เชื่อมต่อสำเร็จ! โฟลเดอร์: ${data.workspace}` };
+				localEnableWorkspaceBridge = true;
+				enableWorkspaceBridge = true;
+			} else {
+				throw new Error('การตอบกลับจาก Server ไม่ถูกต้อง');
+			}
+		} catch (error: any) {
+			enableWorkspaceBridge = false;
+			localEnableWorkspaceBridge = false;
+			const errMsg = error?.message || 'เชื่อมต่อล้มเหลว ตรวจสอบว่าได้รันสคริปต์ใน Terminal หรือยัง';
+			localStatusWorkspaceBridge = { type: 'error', message: errMsg };
+		} finally {
+			testingWorkspaceBridge = false;
+		}
+	}
 
 	// Manual connection test functions
 	async function testLocalConnection() {
@@ -421,6 +474,16 @@
 			return filteredDropdownModels;
 		}
 	});
+
+	let localDropdownModels = $derived(
+		filteredDropdownModels.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+	);
+	let cloudDropdownModels = $derived(
+		filteredDropdownModels.filter((m: any) => m.source === 'cloud')
+	);
+	let geminiDropdownModels = $derived(
+		filteredDropdownModels.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
+	);
 
 	let pinnedDropdownModels = $derived(
 		activeDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
@@ -788,6 +851,15 @@
 									<span class="subtab-status-dot" class:active={enableGemini}></span>
 									<span>Gemini (Cloud)</span>
 								</button>
+								<button 
+									type="button"
+									class="connection-subtab-btn" 
+									class:active={selectedConnectionTab === 'workspace_bridge'} 
+									onclick={() => selectedConnectionTab = 'workspace_bridge'}
+								>
+									<span class="subtab-status-dot" class:active={enableWorkspaceBridge}></span>
+									<span>Workspace Bridge</span>
+								</button>
 							</div>
 
 							<div class="connection-subtab-content">
@@ -990,6 +1062,62 @@
 														{/if}
 													</button>
 												</div>
+											</div>
+										</div>
+									</div>
+								{:else if selectedConnectionTab === 'workspace_bridge'}
+									<!-- Workspace Local Bridge -->
+									<div class="api-service-card">
+										<div class="api-service-header">
+											<div class="api-service-info">
+												<h4>Workspace Local Bridge</h4>
+												<p>Sync files directly with your computer's folder</p>
+											</div>
+											<label class="toggle-switch">
+												<input type="checkbox" checked={localEnableWorkspaceBridge} disabled={localStatusWorkspaceBridge.type !== 'success'} onchange={(e) => handleLocalToggle('workspace_bridge', e.currentTarget.checked)} />
+												<span class="toggle-slider"></span>
+											</label>
+										</div>
+										<div class="api-service-body">
+											<div class="setting-item-block">
+												<label for="modal-bridge-url">Bridge Server URL</label>
+												<div class="modal-input-group">
+													<input 
+														id="modal-bridge-url"
+														type="text" 
+														placeholder="http://localhost:3000" 
+														bind:value={workspaceBridgeUrl}
+														oninput={() => {
+															localStatusWorkspaceBridge = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+															localEnableWorkspaceBridge = false;
+															enableWorkspaceBridge = false;
+														}}
+													/>
+												</div>
+												<div class="status-alert" class:success={localStatusWorkspaceBridge.type === 'success'} class:error={localStatusWorkspaceBridge.type === 'error'}>
+													<span class="status-alert-dot"></span>
+													<span>{localStatusWorkspaceBridge.message || (enableWorkspaceBridge ? 'เชื่อมต่อสำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+												</div>
+												<div class="test-btn-container">
+													<button 
+														type="button" 
+														class="modal-action-btn" 
+														onclick={testWorkspaceBridgeConnection}
+														disabled={testingWorkspaceBridge}
+													>
+														{#if testingWorkspaceBridge}
+															กำลังทดสอบ...
+														{:else}
+															ทดสอบการเชื่อมต่อ
+														{/if}
+													</button>
+												</div>
+											</div>
+
+											<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
+												<h4>Workspace Bridge Guide</h4>
+												<p>รันสคริปต์ด้านล่างนี้ใน Terminal ของโปรเจกต์คุณ เพื่อเชื่อมต่อให้ AI จัดการไฟล์ได้จริง:</p>
+												<pre><code>bun scripts/mcp-bridge.ts</code></pre>
 											</div>
 										</div>
 									</div>
@@ -1732,7 +1860,7 @@
 
 							<div class="models-manager-list scrollbar-custom" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; padding-right: 4px;">
 								{#each ['local', 'cloud', 'gemini'] as source}
-									{@const sourceModels = models.filter(m => {
+									{@const sourceModels = models.filter((m: any) => {
 										const mSource = m.source || (m.name.startsWith('gemini-') ? 'gemini' : 'local');
 										return mSource === source && (!searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 									})}
