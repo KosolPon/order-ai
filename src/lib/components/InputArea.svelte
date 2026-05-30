@@ -628,8 +628,10 @@
 													<div class="model-card-content">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
+														</div>
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
 															<span class="model-source-badge {model.source || 'local'}">
-																{model.source === 'gemini' ? 'G' : model.source === 'cloud' ? 'C' : 'L'}
+																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
 														</div>
 													</div>
@@ -669,8 +671,10 @@
 													<div class="model-card-content">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
+														</div>
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
 															<span class="model-source-badge {model.source || 'local'}">
-																{model.source === 'gemini' ? 'G' : model.source === 'cloud' ? 'C' : 'L'}
+																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
 														</div>
 													</div>
@@ -710,8 +714,10 @@
 													<div class="model-card-content">
 														<div class="model-name-row">
 															<span class="model-name-text" title={model.name}>{model.name}</span>
+														</div>
+														<div class="model-meta-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: flex-start;">
 															<span class="model-source-badge {model.source || 'local'}">
-																{model.source === 'gemini' ? 'G' : model.source === 'cloud' ? 'C' : 'L'}
+																{model.source === 'gemini' ? 'Gemini' : model.source === 'cloud' ? 'Cloud' : 'Local'}
 															</span>
 														</div>
 													</div>
@@ -1238,9 +1244,9 @@
 		font-size: 0.85rem;
 		font-weight: 550;
 		color: var(--text-primary);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		word-break: break-word;
+		overflow-wrap: break-word;
+		line-height: 1.25;
 		flex: 1;
 	}
 

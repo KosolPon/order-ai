@@ -1135,8 +1135,10 @@
 																			<div class="dropdown-card-content">
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																				</div>
+																				<div class="dropdown-meta-row" style="margin-top: 2px; display: flex; align-items: center; justify-content: flex-start;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
-																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
 																				</div>
 																			</div>
@@ -1181,8 +1183,10 @@
 																			<div class="dropdown-card-content">
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																				</div>
+																				<div class="dropdown-meta-row" style="margin-top: 2px; display: flex; align-items: center; justify-content: flex-start;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
-																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
 																				</div>
 																			</div>
@@ -1228,8 +1232,10 @@
 																			<div class="dropdown-card-content">
 																				<div class="dropdown-name-row">
 																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																				</div>
+																				<div class="dropdown-meta-row" style="margin-top: 2px; display: flex; align-items: center; justify-content: flex-start;">
 																					<span class="dropdown-source-badge {m.source || 'local'}">
-																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																						{m.source === 'gemini' ? 'Gemini' : m.source === 'cloud' ? 'Cloud' : 'Local'}
 																					</span>
 																				</div>
 																			</div>
@@ -2948,9 +2954,9 @@
 		font-size: 0.76rem;
 		font-weight: 500;
 		color: var(--text-primary);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		word-break: break-word;
+		overflow-wrap: break-word;
+		line-height: 1.25;
 		flex: 1;
 	}
 
