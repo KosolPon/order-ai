@@ -101,7 +101,8 @@
 			folderPickerParentPath = data.parentPath;
 			folderPickerDirectories = data.directories || [];
 		} catch (err: any) {
-			folderPickerError = err.message;
+			console.error('openFolderPicker error:', err);
+			folderPickerError = 'ไม่สามารถเชื่อมต่อ Workspace Bridge ได้ กรุณาตรวจสอบว่า:\n1. รันสคริปต์ `bun scripts/mcp-bridge.ts` ในเครื่องแล้ว\n2. หากใช้งานแอปผ่าน HTTPS (เช่น บน Netlify) ต้องติดตั้ง SSL และเข้าไปยอมรับใบรับรองที่ลิงก์ https://localhost:3000/status ก่อนใช้งาน';
 		} finally {
 			folderPickerLoading = false;
 		}
@@ -120,7 +121,8 @@
 			folderPickerParentPath = data.parentPath;
 			folderPickerDirectories = data.directories || [];
 		} catch (err: any) {
-			folderPickerError = err.message;
+			console.error('navigateFolderPicker error:', err);
+			folderPickerError = 'ไม่สามารถนำทางไปยังโฟลเดอร์ดังกล่าวได้ หรือการเชื่อมต่อขาดหาย';
 		} finally {
 			folderPickerLoading = false;
 		}
@@ -724,9 +726,11 @@
 						{#if folderPickerLoading}
 							<div style="text-align: center; padding: 30px; color: var(--text-muted);">กำลังโหลดรายการโฟลเดอร์...</div>
 						{:else if folderPickerError}
-							<div style="text-align: center; padding: 20px; color: #ff6b6b; font-size: 0.85rem;">
-								<p style="margin-bottom: 10px;">{folderPickerError}</p>
-								<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer;">ลองอีกครั้ง</button>
+							<div style="text-align: left; padding: 20px 30px; color: #ff6b6b; font-size: 0.82rem; white-space: pre-line; line-height: 1.5; max-width: 420px; margin: 0 auto;">
+								<p style="margin-bottom: 12px; font-weight: 500;">⚠️ {folderPickerError}</p>
+								<div style="text-align: center;">
+									<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-color); padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 500;">ลองใหม่</button>
+								</div>
 							</div>
 						{:else}
 							<div class="folder-picker-list" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
