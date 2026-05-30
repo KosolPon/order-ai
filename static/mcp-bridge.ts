@@ -1,5 +1,7 @@
 import { join, resolve, relative } from "path";
 import { readdir, stat } from "fs/promises";
+import { spawn } from "child_process";
+import readline from "readline";
 
 const PORT = 3000;
 // Resolve the root directory of the project
@@ -11,6 +13,20 @@ const corsHeaders = {
 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type, x-local-path",
 };
+
+// Prompt user confirmation in terminal
+function askConfirmation(command: string): Promise<boolean> {
+	return new Promise((resolve) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout,
+		});
+		rl.question(`\n⚠️  [AI Execution Request] The AI wants to run the following command:\n   👉 \x1b[33m${command}\x1b[0m\n   Allow execution? (y/N): `, (answer) => {
+			rl.close();
+			resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
+		});
+	});
+}
 
 // Safe path resolution to prevent directory traversal
 function getSafePath(relativePath: string, allowedPath: string): string {
@@ -110,7 +126,7 @@ Bun.serve({
 			}
 
 			// For files and file operations, validate x-local-path header
-			if (url.pathname === "/files" || url.pathname === "/file") {
+			if (url.pathname === "/files" || url.pathname === "/file" || url.pathname === "/execute") {
 				if (!allowedPath) {
 					return new Response("Access Denied: Missing 'x-local-path' header", {
 						status: 403,
@@ -171,6 +187,126 @@ Bun.serve({
 
 				console.log(`Saved file: ${filePathParam} to ${allowedPath}`);
 				return Response.json({ success: true, path: filePathParam }, { headers: corsHeaders });
+			}
+
+			// POST /execute - Execute terminal command
+			if (url.pathname === "/execute" && req.method === "POST") {
+				const body = await req.json();
+				const { command } = body;
+
+				if (!command || typeof command !== "string") {
+					return Response.json(
+						{ error: "Invalid request body. 'command' is required." },
+						{ status: 400, headers: corsHeaders }
+					);
+				}
+
+				const normalized = command.trim();
+				
+				// 1. Safety check for command chaining/redirection
+				const dangerousChars = [";", "&&", "|", "||", ">", "<", "`", "$("];
+				if (dangerousChars.some(char => normalized.includes(char))) {
+					return Response.json(
+						{ error: "Access Denied: Dangerous command chaining/redirection characters are blocked." },
+						{ status: 400, headers: corsHeaders }
+					);
+				}
+
+				// 2. Safety check against whitelist
+				const isWhitelisted = 
+					normalized === "bun install" ||
+					normalized.startsWith("bun install ") ||
+					normalized === "bun add" ||
+					normalized.startsWith("bun add ") ||
+					normalized === "bunx sv create" ||
+					normalized.startsWith("bunx sv create ") ||
+					normalized === "bun test" ||
+					normalized.startsWith("bun test ") ||
+					normalized === "bun run dev" ||
+					normalized.startsWith("bun run dev ");
+
+				if (!isWhitelisted) {
+					return Response.json(
+						{ error: "Access Denied: Command is not whitelisted. Allowed: bun install, bun add, bunx sv create, bun test, bun run dev" },
+						{ status: 400, headers: corsHeaders }
+					);
+				}
+
+				// 3. Prompt user confirmation in bridge terminal
+				const confirmed = await askConfirmation(normalized);
+				if (!confirmed) {
+					console.log(`Command execution denied by user: ${normalized}`);
+					return Response.json(
+						{ error: "Command execution denied by the user in terminal." },
+						{ status: 403, headers: corsHeaders }
+					);
+				}
+
+				console.log(`Executing command in ${allowedPath}: ${normalized}`);
+
+				// Parse command into binary and arguments
+				const args = normalized.split(/\s+/);
+				const cmd = args.shift() || "";
+
+				try {
+					const isDevServer = normalized.startsWith("bun run dev");
+
+					if (isDevServer) {
+						// For run dev, spawn in background, capture initial output for 2 seconds, then return
+						const proc = spawn(cmd, args, { cwd: allowedPath, shell: true });
+						
+						let output = "";
+						proc.stdout?.on("data", (data) => {
+							output += data.toString();
+						});
+						proc.stderr?.on("data", (data) => {
+							output += data.toString();
+						});
+
+						await new Promise((resolve) => setTimeout(resolve, 2000));
+
+						return Response.json(
+							{ 
+								success: true, 
+								output: `[Dev server started in background]\n${output}\n(Process is running on background PID ${proc.pid})` 
+							},
+							{ headers: corsHeaders }
+						);
+					} else {
+						// For standard commands, execute to completion
+						const proc = spawn(cmd, args, { cwd: allowedPath, shell: true });
+						
+						let stdout = "";
+						let stderr = "";
+
+						proc.stdout?.on("data", (data) => {
+							stdout += data.toString();
+						});
+						proc.stderr?.on("data", (data) => {
+							stderr += data.toString();
+						});
+
+						const code = await new Promise<number | null>((resolve) => {
+							proc.on("close", (code) => resolve(code));
+						});
+
+						return Response.json(
+							{ 
+								success: code === 0, 
+								output: stdout || stderr,
+								error: code !== 0 ? stderr || `Exit code ${code}` : undefined,
+								exitCode: code
+							},
+							{ headers: corsHeaders }
+						);
+					}
+				} catch (execError: any) {
+					console.error("Execution error:", execError);
+					return Response.json(
+						{ error: `Execution error: ${execError.message}` },
+						{ status: 500, headers: corsHeaders }
+					);
+				}
 			}
 
 			return new Response("Not found", { status: 404, headers: corsHeaders });

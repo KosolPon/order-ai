@@ -97,6 +97,21 @@ export function buildCombinedSystemPrompt({
 		
 		if (enableWorkspaceBridge) {
 			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Any files you write or modify using the <canvas name="..."> tag will be saved directly to the user's real project directory on their computer (e.g. 'src/routes/+page.svelte', 'scripts/test.ts'). Do not apologize or claim you cannot modify local files; instead, write them using the canvas tag and confidently inform the user that you have created/updated the files in their workspace.`;
+			
+			if (conv.projectId) {
+				canvasDirective += `\n\n[LOCAL COMMAND EXECUTION]: You can execute specific, whitelisted terminal commands directly in the local project workspace by using the <execute_command>...</execute_command> tag.
+Only the following commands (and their sub-packages/variations) are whitelisted and allowed:
+- bun install
+- bun add <package_name>
+- bunx sv create <project_name> (for SvelteKit/Svelte creation)
+- bun test
+- bun run dev
+
+Example usage:
+<execute_command>bunx sv create my-new-app</execute_command>
+
+IMPORTANT: Put only the exact command to run inside the tag. No extra characters, no comments, no chaining with && or ;. The user must manually press 'y' to confirm the execution in their local terminal running the bridge server. The execution output (stdout/stderr) will be returned to you in the next chat interaction, allowing you to proceed with project tasks.`;
+			}
 		}
 		
 		parts.push(canvasDirective);
