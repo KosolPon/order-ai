@@ -1011,6 +1011,59 @@
 			console.error('Failed to load canvas files for prompt injection:', e);
 		}
 
+		// Fetch workspace file tree + relevant file contents when bridge is enabled
+		let workspaceFileTree: string[] = [];
+		let workspaceReadFiles: { path: string; content: string }[] = [];
+
+		if (enableWorkspaceBridge && workspaceBridgeUrl && conv.projectId) {
+			const project = projects.find(p => p.id === conv.projectId);
+			if (project?.localPath) {
+				const cleanUrl = workspaceBridgeUrl.replace(/\/$/, '');
+				try {
+					// 1. Fetch file list
+					const filesRes = await fetch(`${cleanUrl}/files`, {
+						headers: { 'x-local-path': project.localPath }
+					});
+					if (filesRes.ok) {
+						const { files } = await filesRes.json();
+						workspaceFileTree = files as string[];
+
+						// 2. Determine which files to pre-load
+						const CONFIG_FILES = ['package.json', 'svelte.config.js', 'tsconfig.json', 'vite.config.ts', 'vite.config.js', '.env.example'];
+						const lastUserMsg = conv.messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+
+						const filesToRead = (files as string[]).filter(f =>
+							// Always include config files
+							CONFIG_FILES.some(cfg => f === cfg || f.endsWith('/' + cfg)) ||
+							// Include files mentioned in the last user message
+							lastUserMsg.includes(f)
+						).slice(0, 15); // max 15 files
+
+						let totalChars = 0;
+						for (const filePath of filesToRead) {
+							if (totalChars >= 40000) break;
+							try {
+								const fileRes = await fetch(`${cleanUrl}/file?path=${encodeURIComponent(filePath)}`, {
+									headers: { 'x-local-path': project.localPath }
+								});
+								if (fileRes.ok) {
+									const { content } = await fileRes.json();
+									if (typeof content === 'string' && totalChars + content.length <= 40000) {
+										workspaceReadFiles.push({ path: filePath, content });
+										totalChars += content.length;
+									}
+								}
+							} catch (e) {
+								// skip unreadable files silently
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Failed to fetch workspace context for system prompt:', e);
+				}
+			}
+		}
+
 		const combined = buildCombinedSystemPrompt({
 			conv,
 			globalContext,
@@ -1018,7 +1071,9 @@
 			useCanvas,
 			memories,
 			canvasFiles,
-			enableWorkspaceBridge
+			enableWorkspaceBridge,
+			workspaceFileTree,
+			workspaceReadFiles
 		});
 		
 		console.log('[System Context Debug] Calculated System Prompt:', combined);

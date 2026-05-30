@@ -10,6 +10,8 @@ interface BuildPromptParams {
 	memories: { content: string }[];
 	canvasFiles: { name: string; type: string; content: string }[];
 	enableWorkspaceBridge?: boolean;
+	workspaceFileTree?: string[];
+	workspaceReadFiles?: { path: string; content: string }[];
 }
 
 export function buildCombinedSystemPrompt({
@@ -19,7 +21,9 @@ export function buildCombinedSystemPrompt({
 	useCanvas,
 	memories,
 	canvasFiles,
-	enableWorkspaceBridge
+	enableWorkspaceBridge,
+	workspaceFileTree,
+	workspaceReadFiles
 }: BuildPromptParams): string {
 	if (!conv) return '';
 	const parts: string[] = [];
@@ -91,6 +95,21 @@ export function buildCombinedSystemPrompt({
 		parts.push(canvasPrompt);
 	}
 
+	// Inject workspace file tree and pre-loaded file contents
+	if (enableWorkspaceBridge && workspaceFileTree && workspaceFileTree.length > 0) {
+		let treePrompt = `[WORKSPACE FILE TREE]:\nThe following files exist in the connected local project workspace. You can read, create, or modify any of these files using <canvas> or <canvas-patch> tags:\n\n`;
+		treePrompt += workspaceFileTree.join('\n');
+		parts.push(treePrompt);
+	}
+
+	if (enableWorkspaceBridge && workspaceReadFiles && workspaceReadFiles.length > 0) {
+		let readPrompt = `[WORKSPACE FILE CONTENTS]:\nThe following files have been pre-loaded from the workspace for your reference. Use these as the source of truth when making edits — always prefer <canvas-patch> for targeted changes:\n`;
+		for (const f of workspaceReadFiles) {
+			readPrompt += `\nFile "${f.path}":\n\`\`\`\n${f.content}\n\`\`\``;
+		}
+		parts.push(readPrompt);
+	}
+
 	// Append critical canvas syntax instructions for the AI
 	if (useCanvas) {
 		let canvasDirective = `[CRITICAL CANVAS DIRECTIVE]: You have access to an interactive Workspace (Canvas) on the right side of the screen. You can display/modify documents, source code, or HTML pages for the user.
@@ -107,7 +126,11 @@ To make SMALL, TARGETED edits to an existing file (preferred when changing only 
 IMPORTANT: Always prefer <canvas-patch> over <canvas> when modifying existing files with small changes. Only use <canvas> (full rewrite) when creating new files or making extensive changes. Do not write explanations inside canvas blocks, only file content.`;
 
 		if (enableWorkspaceBridge) {
-			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Files written via <canvas> or patched via <canvas-patch> are saved directly to the user's real project directory. Do not apologize or claim you cannot modify local files; write or patch them confidently and inform the user what was updated.`;
+			canvasDirective += `\n\n[LOCAL WORKSPACE ACCESS ENABLED]: The Workspace is connected to the user's actual local filesystem. Files written via <canvas> or patched via <canvas-patch> are saved directly to the user's real project directory. Do not apologize or claim you cannot modify local files; write or patch them confidently and inform the user what was updated.${
+				workspaceFileTree && workspaceFileTree.length > 0
+					? ' You have been given the full file tree and pre-loaded file contents above — use them as context to make accurate, targeted edits.'
+					: ''
+			}`;
 		}
 		
 		parts.push(canvasDirective);
