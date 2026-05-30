@@ -1287,7 +1287,7 @@
 	.modal-btn.primary {
 		background-color: var(--accent-blue);
 		border: 1px solid var(--accent-blue);
-		color: #131314; /* Dark text for high contrast on light blue background in dark mode */
+		color: var(--accent-text, #131314);
 		font-weight: 600;
 	}
 

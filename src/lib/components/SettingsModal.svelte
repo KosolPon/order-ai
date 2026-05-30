@@ -1928,7 +1928,7 @@
 
 	.modal-action-btn {
 		background-color: var(--accent-blue);
-		color: var(--bg-primary);
+		color: var(--accent-text, var(--bg-primary));
 		border: none;
 		border-radius: 8px;
 		padding: 10px 20px;
@@ -2722,7 +2722,7 @@
 
 	.settings-save-btn {
 		background-color: var(--accent-blue);
-		color: var(--bg-primary);
+		color: var(--accent-text, var(--bg-primary));
 		border: none;
 		border-radius: 8px;
 		padding: 10px 20px;

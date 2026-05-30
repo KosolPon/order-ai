@@ -25,6 +25,7 @@
 
 	--accent-blue: #a8c7fa;
 	--accent-blue-hover: #c2e7ff;
+	--accent-text: #131314;
 	--accent-gradient: linear-gradient(74deg, #4285f4 0, #9b72cb 9%, #d96570 20%, #d96570 24%, #9b72cb 35%, #4285f4 44%, #9b72cb 50%, #d96570 56%, #131314 75%, #131314 100%);
 	--accent-glow: radial-gradient(circle at center, rgba(168, 199, 250, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
 
@@ -75,6 +76,7 @@
 
 	--accent-blue: #0b57d0;
 	--accent-blue-hover: #0842a0;
+	--accent-text: #ffffff;
 	--accent-gradient: linear-gradient(74deg, #0b57d0 0, #4285f4 20%, #7baaf7 44%, #a8c7fa 56%, #ffffff 75%, #ffffff 100%);
 	--accent-glow: radial-gradient(circle at center, rgba(11, 87, 208, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
 
@@ -102,7 +104,9 @@
 
 /* Blue Theme overrides (default dark-blue is set in :root, light-blue is set in [data-theme^="light"]) */
 [data-theme="dark-blue"] {
-	/* Uses :root defaults */
+	--accent-blue: #4d90e8;
+	--accent-blue-hover: #70aefa;
+	--accent-text: #ffffff;
 }
 [data-theme="light-blue"] {
 	/* Uses [data-theme^="light"] defaults */
