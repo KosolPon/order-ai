@@ -1114,10 +1114,34 @@
 												</div>
 											</div>
 
-											<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
-												<h4>Workspace Bridge Guide</h4>
-												<p>รันสคริปต์ด้านล่างนี้ใน Terminal ของโปรเจกต์คุณ เพื่อเชื่อมต่อให้ AI จัดการไฟล์ได้จริง:</p>
-												<pre><code>bun scripts/mcp-bridge.ts</code></pre>
+											<div class="cors-help-card animate-fade-in" style="margin-top: 15px; padding: 15px; border-radius: 8px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+												<h4 style="margin-top: 0; margin-bottom: 10px; color: var(--accent-blue);">Workspace Bridge Guide (ขั้นตอนการติดตั้งใช้งาน)</h4>
+												
+												<div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+													<div>
+														<strong>1. ดาวน์โหลดสคริปต์เซิร์ฟเวอร์:</strong>
+														<div style="margin-top: 6px;">
+															<a href="/mcp-bridge.ts" download="mcp-bridge.ts" class="modal-action-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.8rem; background-color: var(--accent-blue); color: #fff; border-radius: 4px; border: none; font-weight: 500; cursor: pointer;">
+																<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/></svg>
+																ดาวน์โหลด mcp-bridge.ts
+															</a>
+														</div>
+														<p class="modal-help-text" style="margin: 4px 0 0 0;">ดาวน์โหลดแล้วนำไปวางไว้ในโฟลเดอร์โปรเจกต์ของคุณ (เช่น สร้างโฟลเดอร์ <code>scripts/</code> แล้ววางไว้ข้างในเป็น <code>scripts/mcp-bridge.ts</code>)</p>
+													</div>
+
+													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
+														<strong>2. ติดตั้ง SSL Certificate สำหรับรันบน Netlify (กรณีใช้ HTTPS):</strong>
+														<p style="margin: 4px 0;">หากใช้งานแอปผ่านหน้าเว็บ Netlify (ที่เป็น HTTPS) คุณต้องสร้างใบรับรอง SSL ในโฟลเดอร์โปรเจกต์โดยรันคำสั่งนี้ใน Terminal:</p>
+														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/CN=localhost"</code></pre>
+														<p class="modal-help-text" style="margin: 4px 0 0 0;">และพิมพ์ลิงก์ <code>https://localhost:3000/status</code> บนบราวเซอร์เพื่อกด Advanced -> Proceed (Unsafe) ยอมรับใบรับรองในครั้งแรก</p>
+													</div>
+
+													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
+														<strong>3. เริ่มทำงานเซิร์ฟเวอร์ Bridge:</strong>
+														<p style="margin: 4px 0;">เปิด Terminal ในโฟลเดอร์โปรเจกต์แล้วรันสคริปต์:</p>
+														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>bun scripts/mcp-bridge.ts</code></pre>
+													</div>
+												</div>
 											</div>
 										</div>
 									</div>
