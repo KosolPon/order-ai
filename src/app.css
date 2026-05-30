@@ -108,9 +108,6 @@
 	--accent-blue-hover: #70aefa;
 	--accent-text: #ffffff;
 }
-[data-theme="light-blue"] {
-	/* Uses [data-theme^="light"] defaults */
-}
 
 /* Yellow Theme (Warm Sepia / Amber Sand) overrides */
 [data-theme="dark-yellow"] {
