@@ -287,12 +287,14 @@
 <style>
 	/* Page Layout Styling using variables in app.css */
 	.features-page {
-		min-height: 100vh;
+		height: 100vh;
+		max-height: 100vh;
 		background-color: var(--bg-primary);
 		color: var(--text-primary);
 		display: flex;
 		flex-direction: column;
 		overflow-x: hidden;
+		overflow-y: auto;
 	}
 
 	.container {
