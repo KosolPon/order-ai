@@ -164,8 +164,18 @@
 
 	// Raw message diagnostic view state
 	let rawDiagnosticMsg = $state<Message | null>(null);
+	let rawDiagnosticCopied = $state(false);
 	function closeRawDiagnostic() {
 		rawDiagnosticMsg = null;
+		rawDiagnosticCopied = false;
+	}
+	function handleCopyRawDiagnostic() {
+		if (!rawDiagnosticMsg) return;
+		navigator.clipboard.writeText(rawDiagnosticMsg.content || '');
+		rawDiagnosticCopied = true;
+		setTimeout(() => {
+			rawDiagnosticCopied = false;
+		}, 2000);
 	}
 	$effect(() => {
 		if (rawDiagnosticMsg) {
@@ -1179,6 +1189,8 @@
 		</div>
 	</header>
 
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div 
 		class="chat-viewport" 
 		bind:this={chatContainer} 
@@ -1605,7 +1617,9 @@
 	{#if lightboxImage}
 		<div class="lightbox-overlay" onclick={closeLightbox} onkeydown={(e) => e.key === 'Escape' && closeLightbox()} role="button" tabindex="-1" aria-label="Close Lightbox" transition:fade={{ duration: 150 }}>
 			<button class="lightbox-close" onclick={closeLightbox} aria-label="Close Lightbox">&times;</button>
-			<div onclick={(e) => e.stopPropagation()} role="presentation">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="presentation">
 				<img src={lightboxImage} alt={lightboxAlt} class="lightbox-content" />
 			</div>
 			{#if lightboxAlt}
@@ -1624,18 +1638,27 @@
 			aria-label="Close Diagnostic Overlay" 
 			transition:fade={{ duration: 150 }}
 		>
-			<button class="lightbox-close" onclick={closeRawDiagnostic} aria-label="Close Diagnostic">&times;</button>
-			
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="raw-diagnostic-card" onclick={(e) => e.stopPropagation()}>
+				<button class="raw-diagnostic-close" onclick={closeRawDiagnostic} aria-label="Close Diagnostic">&times;</button>
 				<div class="raw-diagnostic-header">
 					<h3>ข้อมูลดิบจาก AI (Raw Output)</h3>
 					<div class="raw-diagnostic-header-actions">
 						<span class="diagnostic-model-badge">{rawDiagnosticMsg.model || 'Unknown Model'}</span>
-						<button class="copy-raw-btn" onclick={() => {
-							navigator.clipboard.writeText(rawDiagnosticMsg?.content || '');
-						}}>คัดลอกดิบ</button>
+						<button class="copy-raw-btn" onclick={handleCopyRawDiagnostic}>
+							{#if rawDiagnosticCopied}
+								<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+									<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+								</svg>
+								คัดลอกแล้ว!
+							{:else}
+								<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px; display: inline-block;">
+									<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+								</svg>
+								คัดลอก
+							{/if}
+						</button>
 					</div>
 				</div>
 				<div class="raw-diagnostic-body-single">
@@ -2253,6 +2276,7 @@
 		line-height: 1.4;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -3167,6 +3191,32 @@
 		overflow: hidden;
 		box-shadow: var(--shadow-lg);
 		animation: zoomIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+		position: relative;
+	}
+
+	.raw-diagnostic-close {
+		position: absolute;
+		top: 12px;
+		right: 16px;
+		color: var(--text-secondary);
+		font-size: 1.5rem;
+		line-height: 1;
+		width: 32px;
+		height: 32px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		background: transparent;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+		border: none;
+		cursor: pointer;
+		z-index: 10;
+	}
+
+	.raw-diagnostic-close:hover {
+		background-color: var(--bg-hover);
+		color: var(--text-primary);
 	}
 
 	.raw-diagnostic-header {
