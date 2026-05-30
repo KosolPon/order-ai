@@ -1,6 +1,11 @@
 import { Marked } from 'marked';
 import Prism from 'prismjs';
 
+// Expose Prism globally for components/plugins to register properly
+if (typeof globalThis !== 'undefined') {
+	(globalThis as any).Prism = Prism;
+}
+
 // Load Prism components
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-typescript';
@@ -347,7 +352,7 @@ function cleanCodeFences(text: string): string {
 
 function getLangFromName(name: string, type?: string): string {
 	let lang = (type || '').toLowerCase().trim();
-	if (!lang) {
+	if (!lang || lang === 'code') {
 		const lowerName = name.toLowerCase();
 		if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) lang = 'html';
 		else if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown')) lang = 'markdown';

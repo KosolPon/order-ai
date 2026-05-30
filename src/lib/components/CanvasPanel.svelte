@@ -214,6 +214,7 @@
 		if (ext === 'css') return 'language-css';
 		if (ext === 'json') return 'language-json';
 		if (ext === 'html') return 'language-markup';
+		if (ext === 'svelte') return 'language-svelte';
 		if (ext === 'sh' || ext === 'bash') return 'language-bash';
 		return 'language-javascript';
 	});
@@ -228,6 +229,7 @@
 		else if (ext === 'css') lang = 'css';
 		else if (ext === 'json') lang = 'json';
 		else if (ext === 'html') lang = 'markup';
+		else if (ext === 'svelte') lang = 'svelte';
 		else if (ext === 'sh' || ext === 'bash') lang = 'bash';
 
 		const grammar = Prism.languages[lang] || Prism.languages.javascript;
