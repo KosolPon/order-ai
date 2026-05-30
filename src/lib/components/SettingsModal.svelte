@@ -317,6 +317,7 @@
 	let searchQuery = $state('');
 	let activeDropdownTab = $state<'all' | 'local' | 'cloud' | 'gemini'>('all');
 	let pinnedModelNames = $state<string[]>([]);
+	let hiddenModelNames = $state<string[]>([]);
 
 	let dropdownEl = $state<HTMLElement | null>(null);
 	let dropdownTriggers = $state<HTMLElement[]>([]);
@@ -352,53 +353,85 @@
 					}
 				}
 			};
+			const loadHidden = () => {
+				const stored = localStorage.getItem('hidden_models');
+				if (stored) {
+					try {
+						hiddenModelNames = JSON.parse(stored);
+					} catch (e) {
+						hiddenModelNames = [];
+					}
+				}
+			};
 			loadPinned();
+			loadHidden();
 			window.addEventListener('pinned_models_updated', loadPinned);
-			return () => window.removeEventListener('pinned_models_updated', loadPinned);
+			window.addEventListener('hidden_models_updated', loadHidden);
+			return () => {
+				window.removeEventListener('pinned_models_updated', loadPinned);
+				window.removeEventListener('hidden_models_updated', loadHidden);
+			};
 		}
 	});
 
-	function togglePin(modelName: string, e: MouseEvent) {
-		e.stopPropagation();
+	function togglePin(modelName: string, e?: MouseEvent) {
+		if (e) e.stopPropagation();
 		if (pinnedModelNames.includes(modelName)) {
 			pinnedModelNames = pinnedModelNames.filter(name => name !== modelName);
 		} else {
 			pinnedModelNames = [...pinnedModelNames, modelName];
+			if (hiddenModelNames.includes(modelName)) {
+				hiddenModelNames = hiddenModelNames.filter(name => name !== modelName);
+				localStorage.setItem('hidden_models', JSON.stringify(hiddenModelNames));
+				window.dispatchEvent(new Event('hidden_models_updated'));
+			}
 		}
 		localStorage.setItem('pinned_models', JSON.stringify(pinnedModelNames));
 		window.dispatchEvent(new Event('pinned_models_updated'));
+	}
+
+	function toggleHide(modelName: string, e?: MouseEvent) {
+		if (e) e.stopPropagation();
+		if (hiddenModelNames.includes(modelName)) {
+			hiddenModelNames = hiddenModelNames.filter(name => name !== modelName);
+		} else {
+			hiddenModelNames = [...hiddenModelNames, modelName];
+			if (pinnedModelNames.includes(modelName)) {
+				pinnedModelNames = pinnedModelNames.filter(name => name !== modelName);
+				localStorage.setItem('pinned_models', JSON.stringify(pinnedModelNames));
+				window.dispatchEvent(new Event('pinned_models_updated'));
+			}
+		}
+		localStorage.setItem('hidden_models', JSON.stringify(hiddenModelNames));
+		window.dispatchEvent(new Event('hidden_models_updated'));
 	}
 
 	let filteredDropdownModels = $derived(
 		models.filter((m: any) => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
 	);
 
+	let activeDropdownModels = $derived.by(() => {
+		if (activeDropdownTab === 'local') {
+			return filteredDropdownModels.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')));
+		} else if (activeDropdownTab === 'cloud') {
+			return filteredDropdownModels.filter((m: any) => m.source === 'cloud');
+		} else if (activeDropdownTab === 'gemini') {
+			return filteredDropdownModels.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')));
+		} else {
+			return filteredDropdownModels;
+		}
+	});
+
 	let pinnedDropdownModels = $derived(
-		filteredDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
+		activeDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
 	);
 
-	let localDropdownModels = $derived(
-		filteredDropdownModels.filter((m: any) => m.source === 'local' || (!m.source && !m.name.startsWith('gemini-')))
+	let normalDropdownModels = $derived(
+		activeDropdownModels.filter((m: any) => !pinnedModelNames.includes(m.name) && !hiddenModelNames.includes(m.name))
 	);
 
-	let cloudDropdownModels = $derived(
-		filteredDropdownModels.filter((m: any) => m.source === 'cloud')
-	);
-
-	let geminiDropdownModels = $derived(
-		filteredDropdownModels.filter((m: any) => m.source === 'gemini' || (!m.source && m.name.startsWith('gemini-')))
-	);
-
-	let pinnedLocalModels = $derived(
-		localDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
-	);
-
-	let pinnedCloudModels = $derived(
-		cloudDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
-	);
-
-	let pinnedGeminiModels = $derived(
-		geminiDropdownModels.filter((m: any) => pinnedModelNames.includes(m.name))
+	let hiddenDropdownModels = $derived(
+		activeDropdownModels.filter((m: any) => hiddenModelNames.includes(m.name))
 	);
 
 	// Storage Management States & Handlers
@@ -682,6 +715,17 @@
 						</svg>
 						<span>Agent Roles</span>
 					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'models'} 
+						onclick={() => activeTab = 'models'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+						</svg>
+						<span>Manage Models</span>
+					</button>
 				</nav>
 			</div>
 
@@ -701,6 +745,8 @@
 							Storage & Backup Management
 						{:else if activeTab === 'roles'}
 							Agent Roles Configuration (บทบาทโมเดล)
+						{:else if activeTab === 'models'}
+							Model Management (จัดการโมเดลที่ชื่นชอบ/ซ่อน)
 						{/if}
 					</h2>
 					<button class="settings-close-btn" onclick={closeSettings} aria-label="Close settings">
@@ -1073,28 +1119,28 @@
 
 														<!-- Model List -->
 														<div class="dropdown-list-container scrollbar-custom">
-															{#if activeDropdownTab === 'all'}
-																<!-- Pinned Section -->
-																{#if pinnedDropdownModels.length > 0}
-																	<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
-																	<div class="dropdown-model-grid">
-																		{#each pinnedDropdownModels as m}
-																			<div 
-																				class="dropdown-model-card" 
-																				class:selected={model === m.name}
-																				onclick={() => {
-																					updateModelStep(idx, m.name);
-																					activeDropdownIdx = null;
-																				}}
-																			>
-																				<div class="dropdown-card-content">
-																					<div class="dropdown-name-row">
-																						<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																						<span class="dropdown-source-badge {m.source || 'local'}">
-																							{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
-																						</span>
-																					</div>
+															<!-- Favorite Section -->
+															{#if pinnedDropdownModels.length > 0}
+																<div class="dropdown-group-header">★ โมเดลที่ชื่นชอบ</div>
+																<div class="dropdown-model-grid">
+																	{#each pinnedDropdownModels as m}
+																		<div 
+																			class="dropdown-model-card" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<div class="dropdown-card-content">
+																				<div class="dropdown-name-row">
+																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																					<span class="dropdown-source-badge {m.source || 'local'}">
+																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																					</span>
 																				</div>
+																			</div>
+																			<div class="dropdown-actions">
 																				<button 
 																					type="button"
 																					class="dropdown-pin-btn pinned" 
@@ -1103,30 +1149,44 @@
 																				>
 																					★
 																				</button>
+																				<button 
+																					type="button"
+																					class="dropdown-hide-btn" 
+																					onclick={(e) => toggleHide(m.name, e)}
+																					title="ซ่อนโมเดล"
+																				>
+																					<svg viewBox="0 0 24 24" width="12" height="12">
+																						<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																					</svg>
+																				</button>
 																			</div>
-																		{/each}
-																	</div>
-																{/if}
+																		</div>
+																	{/each}
+																</div>
+															{/if}
 
-																<!-- Local Section -->
-																{#if localDropdownModels.length > 0}
-																	<div class="dropdown-group-header">Local (Ollama Local)</div>
-																	<div class="dropdown-model-grid">
-																		{#each localDropdownModels as m}
-																			<div 
-																				class="dropdown-model-card" 
-																				class:selected={model === m.name}
-																				onclick={() => {
-																					updateModelStep(idx, m.name);
-																					activeDropdownIdx = null;
-																				}}
-																			>
-																				<div class="dropdown-card-content">
-																					<div class="dropdown-name-row">
-																						<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																						<span class="dropdown-source-badge local">L</span>
-																					</div>
+															<!-- Normal Section -->
+															{#if normalDropdownModels.length > 0}
+																<div class="dropdown-group-header">โมเดลทั่วไป</div>
+																<div class="dropdown-model-grid">
+																	{#each normalDropdownModels as m}
+																		<div 
+																			class="dropdown-model-card" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<div class="dropdown-card-content">
+																				<div class="dropdown-name-row">
+																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																					<span class="dropdown-source-badge {m.source || 'local'}">
+																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																					</span>
 																				</div>
+																			</div>
+																			<div class="dropdown-actions">
 																				<button 
 																					type="button"
 																					class="dropdown-pin-btn" 
@@ -1136,30 +1196,44 @@
 																				>
 																					★
 																				</button>
+																				<button 
+																					type="button"
+																					class="dropdown-hide-btn" 
+																					onclick={(e) => toggleHide(m.name, e)}
+																					title="ซ่อนโมเดล"
+																				>
+																					<svg viewBox="0 0 24 24" width="12" height="12">
+																						<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																					</svg>
+																				</button>
 																			</div>
-																		{/each}
-																	</div>
-																{/if}
+																		</div>
+																	{/each}
+																</div>
+															{/if}
 
-																<!-- Cloud Section -->
-																{#if cloudDropdownModels.length > 0}
-																	<div class="dropdown-group-header">Cloud (Ollama Cloud)</div>
-																	<div class="dropdown-model-grid">
-																		{#each cloudDropdownModels as m}
-																			<div 
-																				class="dropdown-model-card" 
-																				class:selected={model === m.name}
-																				onclick={() => {
-																					updateModelStep(idx, m.name);
-																					activeDropdownIdx = null;
-																				}}
-																			>
-																				<div class="dropdown-card-content">
-																					<div class="dropdown-name-row">
-																						<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																						<span class="dropdown-source-badge cloud">C</span>
-																					</div>
+															<!-- Hidden Section -->
+															{#if hiddenDropdownModels.length > 0}
+																<div class="dropdown-group-header">👁️ โมเดลที่ซ่อนไว้</div>
+																<div class="dropdown-model-grid">
+																	{#each hiddenDropdownModels as m}
+																		<div 
+																			class="dropdown-model-card dropdown-model-hidden" 
+																			class:selected={model === m.name}
+																			onclick={() => {
+																				updateModelStep(idx, m.name);
+																				activeDropdownIdx = null;
+																			}}
+																		>
+																			<div class="dropdown-card-content">
+																				<div class="dropdown-name-row">
+																					<span class="dropdown-name-text" title={m.name}>{m.name}</span>
+																					<span class="dropdown-source-badge {m.source || 'local'}">
+																						{m.source === 'gemini' ? 'G' : m.source === 'cloud' ? 'C' : 'L'}
+																					</span>
 																				</div>
+																			</div>
+																			<div class="dropdown-actions">
 																				<button 
 																					type="button"
 																					class="dropdown-pin-btn" 
@@ -1169,249 +1243,24 @@
 																				>
 																					★
 																				</button>
-																			</div>
-																		{/each}
-																	</div>
-																{/if}
-
-																<!-- Gemini Section -->
-																{#if geminiDropdownModels.length > 0}
-																	<div class="dropdown-group-header">Gemini (Google Gemini)</div>
-																	<div class="dropdown-model-grid">
-																		{#each geminiDropdownModels as m}
-																			<div 
-																				class="dropdown-model-card" 
-																				class:selected={model === m.name}
-																				onclick={() => {
-																					updateModelStep(idx, m.name);
-																					activeDropdownIdx = null;
-																				}}
-																			>
-																				<div class="dropdown-card-content">
-																					<div class="dropdown-name-row">
-																						<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																						<span class="dropdown-source-badge gemini">G</span>
-																					</div>
-																				</div>
 																				<button 
 																					type="button"
-																					class="dropdown-pin-btn" 
-																					class:pinned={pinnedModelNames.includes(m.name)}
-																					onclick={(e) => togglePin(m.name, e)}
-																					title={pinnedModelNames.includes(m.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
+																					class="dropdown-hide-btn hidden-active" 
+																					onclick={(e) => toggleHide(m.name, e)}
+																					title="แสดงโมเดล"
 																				>
-																					★
+																					<svg viewBox="0 0 24 24" width="12" height="12">
+																						<path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.2 2.7-2.78 3.44-4.74-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+																					</svg>
 																				</button>
 																			</div>
-																		{/each}
-																	</div>
-																{/if}
-
-																{#if filteredDropdownModels.length === 0}
-																	<div class="dropdown-empty">ไม่พบโมเดลที่ค้นหา</div>
-																{/if}
-
-															{:else}
-																<!-- Individual Tabs -->
-																{#if activeDropdownTab === 'local'}
-																	{#if localDropdownModels.length > 0}
-																		<!-- Pinned Local Section -->
-																		{#if pinnedLocalModels.length > 0}
-																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
-																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each pinnedLocalModels as m}
-																					<div 
-																						class="dropdown-model-card" 
-																						class:selected={model === m.name}
-																						onclick={() => {
-																							updateModelStep(idx, m.name);
-																							activeDropdownIdx = null;
-																						}}
-																					>
-																						<div class="dropdown-card-content">
-																							<div class="dropdown-name-row">
-																								<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																								<span class="dropdown-source-badge local">L</span>
-																							</div>
-																						</div>
-																						<button 
-																							type="button"
-																							class="dropdown-pin-btn pinned" 
-																							onclick={(e) => togglePin(m.name, e)}
-																							title="ถอนหมุดโมเดล"
-																						>
-																							★
-																						</button>
-																					</div>
-																				{/each}
-																			</div>
-																			<div class="dropdown-group-header">โมเดลทั้งหมด</div>
-																		{/if}
-
-																		<div class="dropdown-model-grid">
-																			{#each localDropdownModels as m}
-																				<div 
-																					class="dropdown-model-card" 
-																					class:selected={model === m.name}
-																					onclick={() => {
-																						updateModelStep(idx, m.name);
-																						activeDropdownIdx = null;
-																					}}
-																				>
-																					<div class="dropdown-card-content">
-																						<div class="dropdown-name-row">
-																							<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																							<span class="dropdown-source-badge local">L</span>
-																						</div>
-																					</div>
-																					<button 
-																						type="button"
-																						class="dropdown-pin-btn" 
-																						class:pinned={pinnedModelNames.includes(m.name)}
-																						onclick={(e) => togglePin(m.name, e)}
-																						title={pinnedModelNames.includes(m.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
-																					>
-																						★
-																					</button>
-																				</div>
-																			{/each}
 																		</div>
-																	{:else}
-																		<div class="dropdown-empty">ไม่พบโมเดล Local</div>
-																	{/if}
-																{:else if activeDropdownTab === 'cloud'}
-																	{#if cloudDropdownModels.length > 0}
-																		<!-- Pinned Cloud Section -->
-																		{#if pinnedCloudModels.length > 0}
-																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
-																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each pinnedCloudModels as m}
-																					<div 
-																						class="dropdown-model-card" 
-																						class:selected={model === m.name}
-																						onclick={() => {
-																							updateModelStep(idx, m.name);
-																							activeDropdownIdx = null;
-																						}}
-																					>
-																						<div class="dropdown-card-content">
-																							<div class="dropdown-name-row">
-																								<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																								<span class="dropdown-source-badge cloud">C</span>
-																							</div>
-																						</div>
-																						<button 
-																							type="button"
-																							class="dropdown-pin-btn pinned" 
-																							onclick={(e) => togglePin(m.name, e)}
-																							title="ถอนหมุดโมเดล"
-																						>
-																							★
-																						</button>
-																					</div>
-																				{/each}
-																			</div>
-																			<div class="dropdown-group-header">โมเดลทั้งหมด</div>
-																		{/if}
+																	{/each}
+																</div>
+															{/if}
 
-																		<div class="dropdown-model-grid">
-																			{#each cloudDropdownModels as m}
-																				<div 
-																					class="dropdown-model-card" 
-																					class:selected={model === m.name}
-																					onclick={() => {
-																						updateModelStep(idx, m.name);
-																						activeDropdownIdx = null;
-																					}}
-																				>
-																					<div class="dropdown-card-content">
-																						<div class="dropdown-name-row">
-																							<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																							<span class="dropdown-source-badge cloud">C</span>
-																						</div>
-																					</div>
-																					<button 
-																						type="button"
-																						class="dropdown-pin-btn" 
-																						class:pinned={pinnedModelNames.includes(m.name)}
-																						onclick={(e) => togglePin(m.name, e)}
-																						title={pinnedModelNames.includes(m.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
-																					>
-																						★
-																					</button>
-																				</div>
-																			{/each}
-																		</div>
-																	{:else}
-																		<div class="dropdown-empty">ไม่พบโมเดล Cloud</div>
-																	{/if}
-																{:else if activeDropdownTab === 'gemini'}
-																	{#if geminiDropdownModels.length > 0}
-																		<!-- Pinned Gemini Section -->
-																		{#if pinnedGeminiModels.length > 0}
-																			<div class="dropdown-group-header">ที่ปักหมุดไว้</div>
-																			<div class="dropdown-model-grid" style="margin-bottom: 6px;">
-																				{#each pinnedGeminiModels as m}
-																					<div 
-																						class="dropdown-model-card" 
-																						class:selected={model === m.name}
-																						onclick={() => {
-																							updateModelStep(idx, m.name);
-																							activeDropdownIdx = null;
-																						}}
-																					>
-																						<div class="dropdown-card-content">
-																							<div class="dropdown-name-row">
-																								<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																								<span class="dropdown-source-badge gemini">G</span>
-																							</div>
-																						</div>
-																						<button 
-																							type="button"
-																							class="dropdown-pin-btn pinned" 
-																							onclick={(e) => togglePin(m.name, e)}
-																							title="ถอนหมุดโมเดล"
-																						>
-																							★
-																						</button>
-																					</div>
-																				{/each}
-																			</div>
-																			<div class="dropdown-group-header">โมเดลทั้งหมด</div>
-																		{/if}
-
-																		<div class="dropdown-model-grid">
-																			{#each geminiDropdownModels as m}
-																				<div 
-																					class="dropdown-model-card" 
-																					class:selected={model === m.name}
-																					onclick={() => {
-																						updateModelStep(idx, m.name);
-																						activeDropdownIdx = null;
-																					}}
-																				>
-																					<div class="dropdown-card-content">
-																						<div class="dropdown-name-row">
-																							<span class="dropdown-name-text" title={m.name}>{m.name}</span>
-																							<span class="dropdown-source-badge gemini">G</span>
-																						</div>
-																					</div>
-																					<button 
-																						type="button"
-																						class="dropdown-pin-btn" 
-																						class:pinned={pinnedModelNames.includes(m.name)}
-																						onclick={(e) => togglePin(m.name, e)}
-																						title={pinnedModelNames.includes(m.name) ? "ถอนหมุดโมเดล" : "ปักหมุดโมเดล"}
-																					>
-																						★
-																					</button>
-																				</div>
-																			{/each}
-																		</div>
-																	{:else}
-																		<div class="dropdown-empty">ไม่พบโมเดล Gemini</div>
-																	{/if}
-																{/if}
+															{#if pinnedDropdownModels.length === 0 && normalDropdownModels.length === 0 && hiddenDropdownModels.length === 0}
+																<div class="dropdown-empty">ไม่พบโมเดลที่ค้นหา</div>
 															{/if}
 														</div>
 													</div>
@@ -1856,6 +1705,83 @@
 									</div>
 								</div>
 							{/if}
+						</div>
+					{:else if activeTab === 'models'}
+						<div class="settings-section">
+							<div class="section-header-action-row" style="margin-bottom: 16px;">
+								<div>
+									<h3 class="section-title-alt">จัดการโมเดลทั้งหมด (Model Favorites & Hiding)</h3>
+									<p class="modal-help-subtext">ตั้งค่าโมเดลที่ต้องการปักหมุดไว้ด้านบนสุด หรือซ่อนโมเดลที่ไม่ต้องการแสดงในเมนูเลือกหลัก</p>
+								</div>
+								<div class="model-manager-search" style="width: 250px;">
+									<input 
+										type="text" 
+										placeholder="ค้นหาโมเดล..." 
+										class="modal-text-input" 
+										bind:value={searchQuery} 
+										style="padding: 6px 12px; font-size: 0.85rem;"
+									/>
+								</div>
+							</div>
+
+							<div class="models-manager-list scrollbar-custom" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; padding-right: 4px;">
+								{#each ['local', 'cloud', 'gemini'] as source}
+									{@const sourceModels = models.filter(m => {
+										const mSource = m.source || (m.name.startsWith('gemini-') ? 'gemini' : 'local');
+										return mSource === source && (!searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+									})}
+									{#if sourceModels.length > 0}
+										<div class="manager-source-group" style="display: flex; flex-direction: column; gap: 8px;">
+											<h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+												<span>{source === 'local' ? 'Local Workstation' : source === 'cloud' ? 'Ollama Cloud' : 'Google Gemini'}</span>
+												<span class="model-source-badge {source}" style="font-size: 0.65rem; border-radius: 4px; padding: 1px 6px;">{sourceModels.length} models</span>
+											</h4>
+											<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px;">
+												{#each sourceModels as m}
+													<div class="manager-model-row" class:is-hidden={hiddenModelNames.includes(m.name)} style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; transition: all var(--transition-fast); opacity: {hiddenModelNames.includes(m.name) ? '0.55' : '1'}; border-style: {hiddenModelNames.includes(m.name) ? 'dashed' : 'solid'};">
+														<div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+															<span style="font-size: 0.85rem; font-weight: 550; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title={m.name}>{m.name}</span>
+															{#if m.details?.parameter_size && m.details.parameter_size !== 'unknown'}
+																<span style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Size: {m.details.parameter_size} | Format: {m.details.format || 'gguf'}</span>
+															{/if}
+														</div>
+														<div style="display: flex; align-items: center; gap: 8px;">
+															<button 
+																type="button" 
+																class="manager-action-btn-icon" 
+																class:active={pinnedModelNames.includes(m.name)} 
+																onclick={() => togglePin(m.name)}
+																title={pinnedModelNames.includes(m.name) ? "ถอนหมุดออกจากรายการโปรด" : "เพิ่มเป็นรายการโปรด"}
+																style="background: none; border: none; font-size: 1.15rem; color: {pinnedModelNames.includes(m.name) ? '#fdd663' : 'var(--text-muted)'}; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; transition: all var(--transition-fast);"
+															>
+																★
+															</button>
+															<button 
+																type="button" 
+																class="manager-action-btn-icon" 
+																class:active={hiddenModelNames.includes(m.name)} 
+																onclick={() => toggleHide(m.name)}
+																title={hiddenModelNames.includes(m.name) ? "เลิกซ่อนและแสดงในรายการหลัก" : "ซ่อนจากรายการหลัก"}
+																style="background: none; border: none; font-size: 1rem; color: {hiddenModelNames.includes(m.name) ? 'var(--text-muted)' : 'var(--text-primary)'}; opacity: {hiddenModelNames.includes(m.name) ? '0.5' : '0.85'}; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; transition: all var(--transition-fast);"
+															>
+																{#if hiddenModelNames.includes(m.name)}
+																	<svg viewBox="0 0 24 24" width="16" height="16">
+																		<path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.82l2.92 2.92c1.51-1.2 2.7-2.78 3.44-4.74-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+																	</svg>
+																{:else}
+																	<svg viewBox="0 0 24 24" width="16" height="16">
+																		<path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																	</svg>
+																{/if}
+															</button>
+														</div>
+													</div>
+												{/each}
+											</div>
+										</div>
+									{/if}
+								{/each}
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -3075,6 +3001,45 @@
 
 	.dropdown-pin-btn.pinned {
 		color: var(--accent-yellow);
+	}
+
+	.dropdown-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+
+	.dropdown-hide-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 2px 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color var(--transition-fast), transform 0.1s ease;
+		flex-shrink: 0;
+	}
+
+	.dropdown-hide-btn:hover {
+		color: var(--accent-blue);
+		transform: scale(1.15);
+	}
+
+	.dropdown-hide-btn.hidden-active {
+		color: var(--text-muted);
+		opacity: 0.6;
+	}
+
+	.dropdown-model-card.dropdown-model-hidden {
+		opacity: 0.5;
+		border-style: dashed;
+	}
+
+	.dropdown-model-card.dropdown-model-hidden:hover {
+		opacity: 0.85;
 	}
 
 	.dropdown-empty {
