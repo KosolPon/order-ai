@@ -46,6 +46,7 @@
 		return list.sort((a, b) => a.name.localeCompare(b.name));
 	});
 	let activeModels = $state<string[]>(['']);
+	let selectedModelVal = $state<string>('');
 	const selectedModel = $derived(activeModels[0] || '');
 	let modelTemperatures = $state<number[]>([0.7, 0.7, 0.7]);
 	let topP = $state<number>(0.9);
@@ -270,6 +271,7 @@
 			if (storedActiveModels) {
 				try {
 					activeModels = JSON.parse(storedActiveModels);
+					selectedModelVal = activeModels[0] || '';
 				} catch (e) {
 					console.error('Failed to parse active models from localStorage:', e);
 				}
@@ -277,6 +279,7 @@
 				const storedModel = localStorage.getItem('ollama_selected_model');
 				if (storedModel) {
 					activeModels = [storedModel];
+					selectedModelVal = storedModel;
 				}
 			}
 
@@ -574,12 +577,26 @@
 
 
 
+	// Bidirectional sync between selectedModelVal and activeModels[0]
+	$effect(() => {
+		if (selectedModelVal) {
+			activeModels[0] = selectedModelVal;
+		}
+	});
+
+	$effect(() => {
+		const m0 = activeModels[0];
+		if (m0 && m0 !== selectedModelVal) {
+			selectedModelVal = m0;
+		}
+	});
+
 	// Save active models and temperatures to localStorage
 	$effect(() => {
 		if (!isInitialized) return;
-		if (activeModels && activeModels.length > 0) {
-			localStorage.setItem('ollama_active_models', JSON.stringify(activeModels));
-			localStorage.setItem('ollama_selected_model', activeModels[0]);
+		localStorage.setItem('ollama_active_models', JSON.stringify(activeModels));
+		if (selectedModelVal) {
+			localStorage.setItem('ollama_selected_model', selectedModelVal);
 		}
 	});
 
@@ -1979,7 +1996,7 @@
 		<InputArea 
 			bind:input
 			{models}
-			bind:selectedModel={activeModels[0]}
+			bind:selectedModel={selectedModelVal}
 			{activeModels}
 			onModelPillClick={() => {
 				showSidebar = true;
