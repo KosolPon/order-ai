@@ -501,6 +501,12 @@ function fixMarkdownHeaderSpaces(text: string): string {
 	return text.replace(/^(#{1,6})([^#\s])/gm, '$1 $2');
 }
 
+function normalizeCodeFences(text: string): string {
+	if (!text) return '';
+	// Strip leading spaces/tabs from lines starting with code fences (``` or ~~~)
+	return text.replace(/^[ \t]+(\`{3,}|~{3,})/gm, '$1');
+}
+
 const markdownCache = new Map<string, string>();
 
 /**
@@ -512,7 +518,8 @@ export function renderMarkdown(markdown: string): string {
 	const cached = markdownCache.get(markdown);
 	if (cached) return cached;
 
-	const arrowProcessed = replaceArrowSymbols(markdown);
+	const normalizedFences = normalizeCodeFences(markdown);
+	const arrowProcessed = replaceArrowSymbols(normalizedFences);
 	const headerSpaceFixed = fixMarkdownHeaderSpaces(arrowProcessed);
 	const preprocessed = preprocessCanvasTags(headerSpaceFixed);
 	const rendered = markedInstance.parse(preprocessed) as string;
