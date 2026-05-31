@@ -63,6 +63,8 @@
 	let activeTab = $state<'connections' | 'chain' | 'advanced' | 'context' | 'storage' | 'roles' | 'models'>('connections');
 	let selectedConnectionTab = $state<'local' | 'cloud' | 'gemini' | 'workspace_bridge'>('local');
 	let showOllamaCloudKey = $state(false);
+	let showWorkspaceBridge = $state(false); // accordion for workspace bridge (developer tool)
+	let showSystemRoles = $state(false); // collapse system roles by default
 
 	let localEnableWorkspaceBridge = $state(enableWorkspaceBridge);
 	let testingWorkspaceBridge = $state(false);
@@ -712,6 +714,9 @@
 				</div>
 				
 				<nav class="settings-nav">
+					<!-- ── หมวดหลัก (ผู้ใช้ทั่วไป) ── -->
+					<div class="nav-section-label">ทั่วไป</div>
+
 					<button 
 						class="nav-tab-btn" 
 						class:active={activeTab === 'connections'} 
@@ -720,63 +725,7 @@
 						<svg viewBox="0 0 24 24" width="16" height="16">
 							<path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H5v-2h6V7h2v4h4v2z"/>
 						</svg>
-						<span>Connections & APIs</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
-						class:active={activeTab === 'chain'} 
-						onclick={() => activeTab = 'chain'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M17 16h-4v-2h4c1.1 0 2-.9 2-2s-.9-2-2-2h-4V8h4c2.2 0 4 1.8 4 4s-1.8 4-4 4zm-6-2H7c-1.1 0-2-.9-2-2s.9-2 2-2h4V8H7c-2.2 0-4 1.8-4 4s1.8 4 4 4h4v-2zm-3-3h8v2H8v-2z"/>
-						</svg>
-						<span>Model Chain Configuration</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
-						class:active={activeTab === 'advanced'} 
-						onclick={() => activeTab = 'advanced'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M12.91 4.29l7.8 7.8c.39.39.39 1.02 0 1.41l-7.8 7.8c-.39.39-1.02.39-1.41 0l-7.8-7.8c-.39-.39-.39-1.02 0-1.41l7.8-7.8c.39-.39 1.03-.39 1.41 0zM12 7a5 5 0 100 10 5 5 0 000-10zm0 8a3 3 0 110-6 3 3 0 010 6z"/>
-						</svg>
-						<span>Advanced Parameters</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
-						class:active={activeTab === 'context'} 
-						onclick={() => activeTab = 'context'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-						</svg>
-						<span>Global Context</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
-						class:active={activeTab === 'storage'} 
-						onclick={() => activeTab = 'storage'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<!-- database icon -->
-							<path fill="currentColor" d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5S7.59 4 12 4s8 1.57 8 3.5S16.41 9 12 9z"/>
-						</svg>
-						<span>Storage & Backup</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
-						class:active={activeTab === 'roles'} 
-						onclick={() => activeTab = 'roles'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-						</svg>
-						<span>Agent Roles</span>
+						<span>การเชื่อมต่อ AI</span>
 					</button>
 
 					<button 
@@ -787,7 +736,77 @@
 						<svg viewBox="0 0 24 24" width="16" height="16">
 							<path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
 						</svg>
-						<span>Manage Models</span>
+						<span>จัดการโมเดล</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'context'} 
+						onclick={() => activeTab = 'context'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+						</svg>
+						<span>System Prompt</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'roles'} 
+						onclick={() => activeTab = 'roles'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+						</svg>
+						<span>บทบาท AI (Roles)</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn" 
+						class:active={activeTab === 'storage'} 
+						onclick={() => activeTab = 'storage'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5v-2.3c1.94 1.15 4.8 1.8 8 1.8s6.06-.65 8-1.8v2.3c0 1.93-3.59 3.5-8 3.5zm0-5.5c-4.41 0-8-1.57-8-3.5S7.59 4 12 4s8 1.57 8 3.5S16.41 9 12 9z"/>
+						</svg>
+						<span>ข้อมูลและสำรอง</span>
+					</button>
+
+					<!-- ── ตัวคั่น: หมวดขั้นสูง ── -->
+					<div class="nav-divider"></div>
+					<div class="nav-section-label nav-section-label-advanced">⚙️ ขั้นสูง</div>
+
+					<button 
+						class="nav-tab-btn nav-tab-advanced" 
+						class:active={activeTab === 'models'} 
+						onclick={() => activeTab = 'models'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+						</svg>
+						<span>จัดการโมเดล</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn nav-tab-advanced" 
+						class:active={activeTab === 'chain'} 
+						onclick={() => activeTab = 'chain'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M17 16h-4v-2h4c1.1 0 2-.9 2-2s-.9-2-2-2h-4V8h4c2.2 0 4 1.8 4 4s-1.8 4-4 4zm-6-2H7c-1.1 0-2-.9-2-2s.9-2 2-2h4V8H7c-2.2 0-4 1.8-4 4s1.8 4 4 4h4v-2zm-3-3h8v2H8v-2z"/>
+						</svg>
+						<span>Model Chain</span>
+					</button>
+
+					<button 
+						class="nav-tab-btn nav-tab-advanced" 
+						class:active={activeTab === 'advanced'} 
+						onclick={() => activeTab = 'advanced'}
+					>
+						<svg viewBox="0 0 24 24" width="16" height="16">
+							<path fill="currentColor" d="M12.91 4.29l7.8 7.8c.39.39.39 1.02 0 1.41l-7.8 7.8c-.39.39-1.02.39-1.41 0l-7.8-7.8c-.39-.39-.39-1.02 0-1.41l7.8-7.8c.39-.39 1.03-.39 1.41 0zM12 7a5 5 0 100 10 5 5 0 000-10zm0 8a3 3 0 110-6 3 3 0 010 6z"/>
+						</svg>
+						<span>ค่า Parameters</span>
 					</button>
 				</nav>
 			</div>
@@ -797,19 +816,19 @@
 				<div class="settings-header">
 					<h2>
 						{#if activeTab === 'connections'}
-							Connections & APIs
+							การเชื่อมต่อ AI
 						{:else if activeTab === 'chain'}
-							Model Chain Configuration
+							Model Chain (ลำดับโมเดล)
 						{:else if activeTab === 'advanced'}
-							Advanced Parameters
+							ค่าพารามิเตอร์ขั้นสูง
 						{:else if activeTab === 'context'}
-							Global System Context
+							System Prompt (คำสั่งระบบ)
 						{:else if activeTab === 'storage'}
-							Storage & Backup Management
+							ข้อมูลและสำรอง
 						{:else if activeTab === 'roles'}
-							Agent Roles Configuration (บทบาทโมเดล)
+							บทบาท AI (Roles)
 						{:else if activeTab === 'models'}
-							Model Management (จัดการโมเดลที่ชื่นชอบ/ซ่อน)
+							จัดการโมเดล
 						{/if}
 					</h2>
 					<button class="settings-close-btn" onclick={closeSettings} aria-label="Close settings">
@@ -822,256 +841,178 @@
 				<div class="settings-body scrollbar-custom">
 					{#if activeTab === 'connections'}
 						<div class="settings-section">
-							<!-- Connection Sub-tabs -->
-							<div class="connection-subtabs">
-								<button 
-									type="button"
-									class="connection-subtab-btn" 
-									class:active={selectedConnectionTab === 'local'} 
-									onclick={() => selectedConnectionTab = 'local'}
-								>
-									<span class="subtab-status-dot" class:active={enableOllamaLocal}></span>
-									<span>Ollama (Local)</span>
-								</button>
-								<button 
-									type="button"
-									class="connection-subtab-btn" 
-									class:active={selectedConnectionTab === 'cloud'} 
-									onclick={() => selectedConnectionTab = 'cloud'}
-								>
-									<span class="subtab-status-dot" class:active={enableOllamaCloud}></span>
-									<span>Ollama (Cloud)</span>
-								</button>
-								<button 
-									type="button"
-									class="connection-subtab-btn" 
-									class:active={selectedConnectionTab === 'gemini'} 
-									onclick={() => selectedConnectionTab = 'gemini'}
-								>
-									<span class="subtab-status-dot" class:active={enableGemini}></span>
-									<span>Gemini (Cloud)</span>
-								</button>
-								<button 
-									type="button"
-									class="connection-subtab-btn" 
-									class:active={selectedConnectionTab === 'workspace_bridge'} 
-									onclick={() => selectedConnectionTab = 'workspace_bridge'}
-								>
-									<span class="subtab-status-dot" class:active={enableWorkspaceBridge}></span>
-									<span>Workspace Bridge</span>
-								</button>
+							<!-- ──── Provider Cards (แสดงทั้งหมดพร้อมกัน) ──── -->
+							<p class="modal-help-subtext" style="margin-bottom: 16px;">เลือกผู้ให้บริการ AI ที่คุณต้องการใช้งาน กรอก URL หรือ API Key แล้วกดปุ่มทดสอบ</p>
+
+							<!-- Ollama Local -->
+							<div class="api-service-card" style="margin-bottom: 16px;">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>🖥️ Ollama (รันบนเครื่องของคุณ)</h4>
+										<p>เรียกใช้ AI แบบโอเพนซอร์สบนเครื่องคอมพิวเตอร์ของคุณ ไม่ต้องเชื่อมอินเทอร์เน็ต ข้อมูลไม่ออกนอกเครื่อง</p>
+									</div>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableOllamaLocal} disabled={localStatusLocal.type !== 'success'} onchange={(e) => handleLocalToggle('local', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
+								</div>
+								<div class="api-service-body">
+									<div class="setting-item-block">
+										<label for="modal-ollama-url">URL เซิร์ฟเวอร์ Ollama</label>
+										<div class="modal-input-group">
+											<input 
+												id="modal-ollama-url"
+												type="text" 
+												placeholder="http://localhost:11434" 
+												bind:value={ollamaUrl}
+												oninput={() => {
+													localStatusLocal = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+													localEnableOllamaLocal = false;
+													enableOllamaLocal = false;
+												}}
+											/>
+										</div>
+										<div class="status-alert" class:success={localStatusLocal.type === 'success'} class:error={localStatusLocal.type === 'error'}>
+											<span class="status-alert-dot"></span>
+											<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่อสำเร็จ (Connected).` : 'ไม่ได้เชื่อมต่อ กรุณากดทดสอบก่อน')}</span>
+										</div>
+										<div class="test-btn-container">
+											<button type="button" class="modal-action-btn" onclick={testLocalConnection} disabled={testingLocal}>
+												{#if testingLocal}กำลังทดสอบ...{:else}ทดสอบการเชื่อมต่อ{/if}
+											</button>
+										</div>
+									</div>
+									{#if !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
+										<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
+											<h4>CORS Configuration Guide</h4>
+											<p>To connect local Ollama from a deployed site, you need to enable CORS origins:</p>
+											<ol>
+												<li>Close the Ollama application.</li>
+												<li>Run in Terminal to allow CORS:
+													<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
+												</li>
+												<li>Restart Ollama.</li>
+											</ol>
+										</div>
+									{/if}
+								</div>
 							</div>
 
-							<div class="connection-subtab-content">
-								{#if selectedConnectionTab === 'local'}
-									<!-- Ollama Local -->
-									<div class="api-service-card">
-										<div class="api-service-header">
-											<div class="api-service-info">
-												<h4>Ollama (Local Workstation)</h4>
-												<p>Execute open-source LLMs locally on your machine</p>
-											</div>
-											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableOllamaLocal} disabled={localStatusLocal.type !== 'success'} onchange={(e) => handleLocalToggle('local', e.currentTarget.checked)} />
-												<span class="toggle-slider"></span>
-											</label>
+							<!-- Gemini Cloud -->
+							<div class="api-service-card" style="margin-bottom: 16px;">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>✨ Google Gemini (Cloud)</h4>
+										<p>ใช้ Gemini AI จาก Google โดยตรง ต้องการ API Key จาก Google AI Studio (ฟรี)</p>
+									</div>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableGemini} disabled={localStatusGemini.type !== 'success'} onchange={(e) => handleLocalToggle('gemini', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
+								</div>
+								<div class="api-service-body">
+									<div class="setting-item-block">
+										<label for="modal-gemini-key">Google Gemini API Key</label>
+										<div class="modal-input-group">
+											<input 
+												id="modal-gemini-key"
+												type={showGeminiKey ? 'text' : 'password'} 
+												placeholder="AI Studio Gemini API Key..." 
+												bind:value={geminiApiKey}
+												oninput={() => {
+													localStatusGemini = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
+													localEnableGemini = false;
+													enableGemini = false;
+												}}
+											/>
+											<button class="modal-eye-btn" onclick={() => showGeminiKey = !showGeminiKey} title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}>
+												{#if showGeminiKey}
+													<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+												{:else}
+													<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+												{/if}
+											</button>
 										</div>
-										<div class="api-service-body">
-											<div class="setting-item-block">
-												<label for="modal-ollama-url">Ollama Server URL</label>
-												<div class="modal-input-group">
-													<input 
-														id="modal-ollama-url"
-														type="text" 
-														placeholder="http://localhost:11434" 
-														bind:value={ollamaUrl}
-														oninput={() => {
-															localStatusLocal = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
-															localEnableOllamaLocal = false;
-															enableOllamaLocal = false;
-														}}
-													/>
-												</div>
-												<div class="status-alert" class:success={localStatusLocal.type === 'success'} class:error={localStatusLocal.type === 'error'}>
-													<span class="status-alert-dot"></span>
-													<span>{localStatusLocal.message || (enableOllamaLocal ? `เชื่อมต่อสำเร็จ (Connected).` : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-												</div>
-												<div class="test-btn-container">
-													<button 
-														type="button" 
-														class="modal-action-btn" 
-														onclick={testLocalConnection}
-														disabled={testingLocal}
-													>
-														{#if testingLocal}
-															กำลังทดสอบ...
-														{:else}
-															ทดสอบการเชื่อมต่อ
-														{/if}
-													</button>
-												</div>
-											</div>
+										<div class="status-alert" class:success={localStatusGemini.type === 'success'} class:error={localStatusGemini.type === 'error'}>
+											<span class="status-alert-dot"></span>
+											<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ยังไม่ได้เชื่อมต่อ กรุณากรอก API Key แล้วทดสอบ')}</span>
+										</div>
+										<div class="test-btn-container">
+											<button type="button" class="modal-action-btn" onclick={testGeminiConnection} disabled={testingGemini}>
+												{#if testingGemini}กำลังทดสอบ...{:else}ทดสอบการเชื่อมต่อ{/if}
+											</button>
+										</div>
+									</div>
+								</div>
+							</div>
 
-											{#if !isConnected && typeof window !== 'undefined' && (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')}
-												<div class="cors-help-card animate-fade-in" style="margin-top: 10px;">
-													<h4>CORS Configuration Guide</h4>
-													<p>To connect local Ollama from a deployed site, you need to enable CORS origins:</p>
-													<ol>
-														<li>Close the Ollama application.</li>
-														<li>Run in Terminal to allow CORS:
-															<pre><code>launchctl setenv OLLAMA_ORIGINS "*"</code></pre>
-														</li>
-														<li>Restart Ollama.</li>
-													</ol>
-												</div>
-											{/if}
+							<!-- Ollama Cloud -->
+							<div class="api-service-card" style="margin-bottom: 16px;">
+								<div class="api-service-header">
+									<div class="api-service-info">
+										<h4>☁️ Ollama Cloud (Remote)</h4>
+										<p>เชื่อมต่อกับ Ollama ที่ติดตั้งบน Server หรือ Cloud ต้องการ URL และ API Key</p>
+									</div>
+									<label class="toggle-switch">
+										<input type="checkbox" checked={localEnableOllamaCloud} disabled={localStatusCloud.type !== 'success'} onchange={(e) => handleLocalToggle('cloud', e.currentTarget.checked)} />
+										<span class="toggle-slider"></span>
+									</label>
+								</div>
+								<div class="api-service-body">
+									<div class="setting-item-block">
+										<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
+										<input id="modal-ollama-cloud-url" type="text" class="modal-text-input" placeholder="https://ollama.com" bind:value={ollamaCloudUrl}
+											oninput={() => { localStatusCloud = { type: 'idle', message: 'แก้ไข Base URL แล้ว กรุณากดปุ่มทดสอบ' }; localEnableOllamaCloud = false; enableOllamaCloud = false; }}
+										/>
+									</div>
+									<div class="setting-item-block" style="margin-top: 10px;">
+										<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
+										<div class="modal-input-group">
+											<input id="modal-ollama-cloud-key" type={showOllamaCloudKey ? 'text' : 'password'} placeholder="Ollama Cloud API Key..." bind:value={ollamaCloudApiKey}
+												oninput={() => { localStatusCloud = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบ' }; localEnableOllamaCloud = false; enableOllamaCloud = false; }}
+											/>
+											<button class="modal-eye-btn" onclick={() => showOllamaCloudKey = !showOllamaCloudKey} title={showOllamaCloudKey ? 'Hide' : 'Show'}>
+												{#if showOllamaCloudKey}
+													<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
+												{:else}
+													<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+												{/if}
+											</button>
+										</div>
+										<div class="status-alert" class:success={localStatusCloud.type === 'success'} class:error={localStatusCloud.type === 'error'}>
+											<span class="status-alert-dot"></span>
+											<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud สำเร็จ.' : 'ยังไม่ได้เชื่อมต่อ กรุณากรอกข้อมูลแล้วทดสอบ')}</span>
+										</div>
+										<div class="test-btn-container">
+											<button type="button" class="modal-action-btn" onclick={testCloudConnection} disabled={testingCloud}>
+												{#if testingCloud}กำลังทดสอบ...{:else}ทดสอบการเชื่อมต่อ{/if}
+											</button>
 										</div>
 									</div>
-								{:else if selectedConnectionTab === 'cloud'}
-									<!-- Ollama Cloud -->
-									<div class="api-service-card">
-										<div class="api-service-header">
-											<div class="api-service-info">
-												<h4>Ollama Cloud</h4>
-												<p>Connect to a hosted/remote Ollama endpoint</p>
-											</div>
-											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableOllamaCloud} disabled={localStatusCloud.type !== 'success'} onchange={(e) => handleLocalToggle('cloud', e.currentTarget.checked)} />
-												<span class="toggle-slider"></span>
-											</label>
-										</div>
-										<div class="api-service-body">
-											<div class="setting-item-block">
-												<label for="modal-ollama-cloud-url">Ollama Cloud Base URL</label>
-												<input 
-													id="modal-ollama-cloud-url"
-													type="text" 
-													class="modal-text-input"
-													placeholder="https://ollama.com" 
-													bind:value={ollamaCloudUrl}
-													oninput={() => {
-														localStatusCloud = { type: 'idle', message: 'แก้ไข Base URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
-														localEnableOllamaCloud = false;
-														enableOllamaCloud = false;
-													}}
-												/>
-											</div>
+								</div>
+							</div>
 
-											<div class="setting-item-block" style="margin-top: 10px;">
-												<label for="modal-ollama-cloud-key">Ollama Cloud API Key</label>
-												<div class="modal-input-group">
-													<input 
-														id="modal-ollama-cloud-key"
-														type={showOllamaCloudKey ? 'text' : 'password'} 
-														placeholder="Ollama Cloud API Key..." 
-														bind:value={ollamaCloudApiKey}
-														oninput={() => {
-															localStatusCloud = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
-															localEnableOllamaCloud = false;
-															enableOllamaCloud = false;
-														}}
-													/>
-													<button 
-														class="modal-eye-btn" 
-														onclick={() => showOllamaCloudKey = !showOllamaCloudKey} 
-														title={showOllamaCloudKey ? 'Hide API Key' : 'Show API Key'}
-													>
-														{#if showOllamaCloudKey}
-															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-														{:else}
-															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-														{/if}
-													</button>
-												</div>
-												<div class="status-alert" class:success={localStatusCloud.type === 'success'} class:error={localStatusCloud.type === 'error'}>
-													<span class="status-alert-dot"></span>
-													<span>{localStatusCloud.message || (enableOllamaCloud ? 'เชื่อมต่อ Ollama Cloud สำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-												</div>
-												<div class="test-btn-container">
-													<button 
-														type="button" 
-														class="modal-action-btn" 
-														onclick={testCloudConnection}
-														disabled={testingCloud}
-													>
-														{#if testingCloud}
-															กำลังทดสอบ...
-														{:else}
-															ทดสอบการเชื่อมต่อ
-														{/if}
-													</button>
-												</div>
-											</div>
-										</div>
+							<!-- Workspace Bridge — Accordion (Developer Tool) -->
+							<div class="workspace-bridge-accordion">
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div class="ws-accordion-header" onclick={() => showWorkspaceBridge = !showWorkspaceBridge}>
+									<div style="display: flex; align-items: center; gap: 10px;">
+										<span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">🔧 Developer: Workspace Bridge</span>
+										{#if enableWorkspaceBridge}
+											<span class="subtab-status-dot active" style="width: 8px; height: 8px; border-radius: 50%; background: #51cf66; box-shadow: 0 0 6px rgba(81,207,102,0.6);"></span>
+										{/if}
 									</div>
-								{:else if selectedConnectionTab === 'gemini'}
-									<!-- Gemini Cloud -->
-									<div class="api-service-card">
-										<div class="api-service-header">
-											<div class="api-service-info">
-												<h4>Google Gemini (Cloud)</h4>
-												<p>Connect directly to official Gemini API Studio models</p>
-											</div>
-											<label class="toggle-switch">
-												<input type="checkbox" checked={localEnableGemini} disabled={localStatusGemini.type !== 'success'} onchange={(e) => handleLocalToggle('gemini', e.currentTarget.checked)} />
-												<span class="toggle-slider"></span>
-											</label>
-										</div>
-										<div class="api-service-body">
-											<div class="setting-item-block">
-												<label for="modal-gemini-key">Google Gemini API Key</label>
-												<div class="modal-input-group">
-													<input 
-														id="modal-gemini-key"
-														type={showGeminiKey ? 'text' : 'password'} 
-														placeholder="AI Studio Gemini API Key..." 
-														bind:value={geminiApiKey}
-														oninput={() => {
-															localStatusGemini = { type: 'idle', message: 'แก้ไข API Key แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
-															localEnableGemini = false;
-															enableGemini = false;
-														}}
-													/>
-													<button 
-														class="modal-eye-btn" 
-														onclick={() => showGeminiKey = !showGeminiKey} 
-														title={showGeminiKey ? 'Hide API Key' : 'Show API Key'}
-													>
-														{#if showGeminiKey}
-															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-														{:else}
-															<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-														{/if}
-													</button>
-												</div>
-												<div class="status-alert" class:success={localStatusGemini.type === 'success'} class:error={localStatusGemini.type === 'error'}>
-													<span class="status-alert-dot"></span>
-													<span>{localStatusGemini.message || (enableGemini ? 'Google Gemini API Key พร้อมใช้งาน (Active).' : 'ไม่ได้เปิดใช้งาน หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
-												</div>
-												<div class="test-btn-container">
-													<button 
-														type="button" 
-														class="modal-action-btn" 
-														onclick={testGeminiConnection}
-														disabled={testingGemini}
-													>
-														{#if testingGemini}
-															กำลังทดสอบ...
-														{:else}
-															ทดสอบการเชื่อมต่อ
-														{/if}
-													</button>
-												</div>
-											</div>
-										</div>
-									</div>
-								{:else if selectedConnectionTab === 'workspace_bridge'}
-									<!-- Workspace Local Bridge -->
-									<div class="api-service-card">
+									<svg style="transition: transform 0.2s; transform: rotate({showWorkspaceBridge ? '180deg' : '0deg'});" viewBox="0 0 24 24" width="16" height="16">
+										<path fill="currentColor" d="M7 10l5 5 5-5z"/>
+									</svg>
+								</div>
+								{#if showWorkspaceBridge}
+									<div class="api-service-card" style="margin-top: 12px; border-color: rgba(168, 199, 250, 0.2);">
 										<div class="api-service-header">
 											<div class="api-service-info">
 												<h4>Workspace Local Bridge</h4>
-												<p>Sync files directly with your computer's folder</p>
+												<p>Sync files directly with your computer's folder (สำหรับนักพัฒนา)</p>
 											</div>
 											<label class="toggle-switch">
 												<input type="checkbox" checked={localEnableWorkspaceBridge} disabled={localStatusWorkspaceBridge.type !== 'success'} onchange={(e) => handleLocalToggle('workspace_bridge', e.currentTarget.checked)} />
@@ -1082,63 +1023,35 @@
 											<div class="setting-item-block">
 												<label for="modal-bridge-url">Bridge Server URL</label>
 												<div class="modal-input-group">
-													<input 
-														id="modal-bridge-url"
-														type="text" 
-														placeholder="http://localhost:3000" 
-														bind:value={workspaceBridgeUrl}
-														oninput={() => {
-															localStatusWorkspaceBridge = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบการเชื่อมต่อ' };
-															localEnableWorkspaceBridge = false;
-															enableWorkspaceBridge = false;
-														}}
+													<input id="modal-bridge-url" type="text" placeholder="http://localhost:3000" bind:value={workspaceBridgeUrl}
+														oninput={() => { localStatusWorkspaceBridge = { type: 'idle', message: 'แก้ไข URL แล้ว กรุณากดปุ่มทดสอบ' }; localEnableWorkspaceBridge = false; enableWorkspaceBridge = false; }}
 													/>
 												</div>
 												<div class="status-alert" class:success={localStatusWorkspaceBridge.type === 'success'} class:error={localStatusWorkspaceBridge.type === 'error'}>
 													<span class="status-alert-dot"></span>
-													<span>{localStatusWorkspaceBridge.message || (enableWorkspaceBridge ? 'เชื่อมต่อสำเร็จ (Connected).' : 'ไม่ได้เชื่อมต่อ หรืออยู่ระหว่างรอการตรวจสอบ (Disconnected or waiting for verification).')}</span>
+													<span>{localStatusWorkspaceBridge.message || (enableWorkspaceBridge ? 'เชื่อมต่อสำเร็จ (Connected).' : 'ยังไม่ได้เชื่อมต่อ')}</span>
 												</div>
 												<div class="test-btn-container">
-													<button 
-														type="button" 
-														class="modal-action-btn" 
-														onclick={testWorkspaceBridgeConnection}
-														disabled={testingWorkspaceBridge}
-													>
-														{#if testingWorkspaceBridge}
-															กำลังทดสอบ...
-														{:else}
-															ทดสอบการเชื่อมต่อ
-														{/if}
+													<button type="button" class="modal-action-btn" onclick={testWorkspaceBridgeConnection} disabled={testingWorkspaceBridge}>
+														{#if testingWorkspaceBridge}กำลังทดสอบ...{:else}ทดสอบการเชื่อมต่อ{/if}
 													</button>
 												</div>
 											</div>
 
 											<div class="cors-help-card animate-fade-in" style="margin-top: 15px; padding: 15px; border-radius: 8px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
-												<h4 style="margin-top: 0; margin-bottom: 10px; color: var(--accent-blue);">Workspace Bridge Guide (ขั้นตอนการติดตั้งใช้งาน)</h4>
-												
+												<h4 style="margin-top: 0; margin-bottom: 10px; color: var(--accent-blue);">Workspace Bridge Guide</h4>
 												<div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
 													<div>
-														<strong>1. ดาวน์โหลดสคริปต์เซิร์ฟเวอร์:</strong>
+														<strong>1. ดาวน์โหลดสคริปต์:</strong>
 														<div style="margin-top: 6px;">
 															<a href="/mcp-bridge.ts" download="mcp-bridge.ts" class="modal-action-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.8rem; background-color: var(--accent-blue); color: #fff; border-radius: 4px; border: none; font-weight: 500; cursor: pointer;">
 																<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/></svg>
 																ดาวน์โหลด mcp-bridge.ts
 															</a>
 														</div>
-														<p class="modal-help-text" style="margin: 4px 0 0 0;">ดาวน์โหลดแล้วนำไปวางไว้ในโฟลเดอร์โปรเจกต์ของคุณ (เช่น สร้างโฟลเดอร์ <code>scripts/</code> แล้ววางไว้ข้างในเป็น <code>scripts/mcp-bridge.ts</code>)</p>
 													</div>
-
 													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
-														<strong>2. ติดตั้ง SSL Certificate (กรณีเข้าใช้งานผ่าน HTTPS):</strong>
-														<p style="margin: 4px 0;">หากใช้งานแอปพลิเคชันผ่านหน้าเว็บที่เข้ารหัส HTTPS คุณต้องสร้างใบรับรอง SSL ในโฟลเดอร์โปรเจกต์โดยรันคำสั่งนี้ใน Terminal:</p>
-														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/CN=localhost"</code></pre>
-														<p class="modal-help-text" style="margin: 4px 0 0 0;">และพิมพ์ลิงก์ <code>https://localhost:3000/status</code> บนบราวเซอร์เพื่อกด Advanced -> Proceed (Unsafe) ยอมรับใบรับรองในครั้งแรก</p>
-													</div>
-
-													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
-														<strong>3. เริ่มทำงานเซิร์ฟเวอร์ Bridge:</strong>
-														<p style="margin: 4px 0;">เปิด Terminal ในโฟลเดอร์โปรเจกต์แล้วรันสคริปต์:</p>
+														<strong>2. รันเซิร์ฟเวอร์:</strong>
 														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>bun scripts/mcp-bridge.ts</code></pre>
 													</div>
 												</div>
@@ -1150,10 +1063,17 @@
 						</div>
 					{:else if activeTab === 'chain'}
 						<div class="settings-section">
-							<div class="setting-item-block">
-								<div class="model-chain-intro">
-									<h3>Multi-Model Execution Chain (โครงสร้างการต่อสายโมเดล)</h3>
+							<!-- Info Banner for general users -->
+							<div class="chain-info-banner">
+								<div class="chain-info-icon">🔗</div>
+								<div>
+									<h3 style="margin: 0 0 4px 0; font-size: 0.95rem;">Multi-Model Chain (ลำดับโมเดล)</h3>
+									<p class="modal-help-subtext" style="margin: 0;">ฟีเจอร์นี้ให้คุณต่อโมเดลหลายตัวเป็นลำดับ เช่น โมเดลแรกรับคำถาม → โมเดลที่สองประมวลผล ผู้ใช้ทั่วไปไม่จำเป็นต้องปรับ ใช้ Step 1 เพียงตัวเดียวก็เพียงพอ</p>
 								</div>
+							</div>
+
+							<div class="setting-item-block">
+								<!-- (model chain intro removed, replaced with chain-info-banner above) -->
 							</div>
 
 							<div class="model-chain-cards">
@@ -1478,16 +1398,62 @@
 						</div>
 					{:else if activeTab === 'advanced'}
 						<div class="settings-section">
-							<div class="setting-item-block" style="margin-bottom: 8px; border-bottom: 1px solid var(--border-light); padding-bottom: 16px;">
-								<label class="modal-checkbox-label" for="modal-customize-settings">
+							<!-- Advanced Mode Hero Card -->
+							<div class="advanced-hero-card" class:advanced-hero-on={customizeSettings}>
+								<div class="advanced-hero-left">
+									<div class="advanced-hero-icon">{customizeSettings ? '🔬' : '🔒'}</div>
+									<div>
+										<h3 class="advanced-hero-title">
+											{customizeSettings ? 'โหมดขั้นสูง — เปิดอยู่' : 'ค่า Parameters อัตโนมัติ'}
+										</h3>
+										<p class="advanced-hero-desc">
+											{#if customizeSettings}
+												คุณกำลังปรับแต่งค่าพารามิเตอร์โมเดลเอง การเปลี่ยนแปลงมีผลทันที
+											{:else}
+												ระบบใช้ค่าเริ่มต้นที่เหมาะสมที่สุด สำหรับผู้ใช้ทั่วไปไม่จำเป็นต้องปรับ
+											{/if}
+										</p>
+									</div>
+								</div>
+								<label class="toggle-switch" title="เปิด/ปิดการปรับค่าขั้นสูง">
 									<input 
 										type="checkbox" 
 										id="modal-customize-settings" 
 										bind:checked={customizeSettings} 
 									/>
-									<span>Enable Manual Parameter Tuning (ปรับแต่งพารามิเตอร์โมเดลด้วยตัวเอง)</span>
+									<span class="toggle-slider"></span>
 								</label>
 							</div>
+
+							{#if !customizeSettings}
+								<!-- Summary of current values when disabled -->
+								<div class="advanced-summary-grid">
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Temperature</span>
+										<span class="advanced-summary-val">{(modelTemperatures[0] ?? 0.7).toFixed(2)}</span>
+									</div>
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Top P</span>
+										<span class="advanced-summary-val">{topP.toFixed(2)}</span>
+									</div>
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Top K</span>
+										<span class="advanced-summary-val">{topK}</span>
+									</div>
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Context</span>
+										<span class="advanced-summary-val">{numCtx >= 1024 ? (numCtx / 1024).toFixed(0) + 'K' : numCtx}</span>
+									</div>
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Max Tokens</span>
+										<span class="advanced-summary-val">{numPredict === 0 ? '∞' : numPredict}</span>
+									</div>
+									<div class="advanced-summary-item">
+										<span class="advanced-summary-label">Repeat Penalty</span>
+										<span class="advanced-summary-val">{repeatPenalty.toFixed(2)}</span>
+									</div>
+								</div>
+							{/if}
 
 							<div class="advanced-sliders-container" class:disabled-settings={!customizeSettings}>
 								<!-- Top P -->
@@ -2262,7 +2228,53 @@
 		gap: 10px;
 	}
 
-	/* Toggle Switch CSS */
+	/* Status Alert — used in connection cards */
+	.status-alert {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 10px;
+		border-radius: 6px;
+		background-color: color-mix(in srgb, var(--text-muted) 8%, transparent);
+		border: 1px solid var(--border-color);
+		font-size: 0.78rem;
+		color: var(--text-secondary);
+		margin-top: 6px;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.status-alert.success {
+		background-color: color-mix(in srgb, #51cf66 10%, transparent);
+		border-color: color-mix(in srgb, #51cf66 30%, transparent);
+		color: #69db7c;
+	}
+
+	.status-alert.error {
+		background-color: color-mix(in srgb, #ff6b6b 10%, transparent);
+		border-color: color-mix(in srgb, #ff6b6b 30%, transparent);
+		color: #ff8787;
+	}
+
+	.status-alert-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		background-color: var(--text-muted);
+		transition: background-color var(--transition-fast);
+	}
+
+	.status-alert.success .status-alert-dot {
+		background-color: #51cf66;
+		box-shadow: 0 0 6px rgba(81, 207, 102, 0.6);
+	}
+
+	.status-alert.error .status-alert-dot {
+		background-color: #ff6b6b;
+		box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
+	}
+
+
 	.toggle-switch {
 		position: relative;
 		display: inline-block;
@@ -3680,4 +3692,179 @@
 		background-color: var(--bg-hover);
 		color: var(--text-primary);
 	}
+
+	/* ── Nav Section Labels & Divider ── */
+	.nav-section-label {
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.6px;
+		color: var(--text-muted);
+		padding: 8px 16px 4px 16px;
+		user-select: none;
+	}
+
+	.nav-section-label-advanced {
+		color: var(--text-muted);
+		opacity: 0.8;
+	}
+
+	.nav-divider {
+		height: 1px;
+		background-color: var(--border-color);
+		margin: 8px 12px;
+	}
+
+	.nav-tab-advanced {
+		opacity: 0.75;
+	}
+
+	.nav-tab-advanced:hover,
+	.nav-tab-advanced.active {
+		opacity: 1;
+	}
+
+	/* ── Workspace Bridge Accordion ── */
+	.workspace-bridge-accordion {
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		background-color: var(--bg-secondary);
+		overflow: hidden;
+	}
+
+	.ws-accordion-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 12px 16px;
+		cursor: pointer;
+		transition: background-color var(--transition-fast);
+		user-select: none;
+	}
+
+	.ws-accordion-header:hover {
+		background-color: var(--bg-hover);
+	}
+
+	/* ── Chain Info Banner ── */
+	.chain-info-banner {
+		display: flex;
+		align-items: flex-start;
+		gap: 14px;
+		background-color: color-mix(in srgb, var(--accent-blue) 6%, var(--bg-secondary));
+		border: 1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--border-color));
+		border-radius: 10px;
+		padding: 14px 16px;
+		margin-bottom: 20px;
+	}
+
+	.chain-info-icon {
+		font-size: 1.5rem;
+		flex-shrink: 0;
+		margin-top: 2px;
+	}
+
+	/* ── Advanced Hero Card ── */
+	.advanced-hero-card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 16px 20px;
+		border-radius: 12px;
+		border: 2px solid var(--border-color);
+		background-color: var(--bg-secondary);
+		margin-bottom: 20px;
+		transition: border-color var(--transition-fast), background-color var(--transition-fast);
+	}
+
+	.advanced-hero-card.advanced-hero-on {
+		border-color: color-mix(in srgb, var(--accent-blue) 50%, var(--border-color));
+		background-color: color-mix(in srgb, var(--accent-blue) 5%, var(--bg-secondary));
+	}
+
+	.advanced-hero-left {
+		display: flex;
+		align-items: flex-start;
+		gap: 14px;
+		flex: 1;
+	}
+
+	.advanced-hero-icon {
+		font-size: 1.8rem;
+		flex-shrink: 0;
+	}
+
+	.advanced-hero-title {
+		margin: 0 0 4px 0;
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		font-family: var(--font-title);
+	}
+
+	.advanced-hero-desc {
+		margin: 0;
+		font-size: 0.82rem;
+		color: var(--text-secondary);
+		line-height: 1.45;
+	}
+
+	/* ── Advanced Summary Grid (read-only values) ── */
+	.advanced-summary-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 10px;
+		margin-bottom: 20px;
+	}
+
+	@media (max-width: 600px) {
+		.advanced-summary-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	.advanced-summary-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 10px;
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		gap: 4px;
+		text-align: center;
+	}
+
+	.advanced-summary-label {
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		color: var(--text-muted);
+	}
+
+	.advanced-summary-val {
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--accent-blue);
+		font-family: var(--font-mono, monospace);
+	}
+
+	/* Mobile overrides for nav labels in horizontal mode */
+	@media (max-width: 1024px) {
+		.nav-section-label {
+			display: none;
+		}
+		.nav-divider {
+			display: none;
+		}
+		.nav-tab-advanced {
+			opacity: 1;
+		}
+		.advanced-summary-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
 </style>
+
