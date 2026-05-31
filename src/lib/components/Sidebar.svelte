@@ -1672,31 +1672,6 @@
 		}
 	}
 
-	.connection-mode-selector {
-		display: flex;
-		background-color: var(--bg-tertiary);
-		border: 1px solid var(--border-color);
-		border-radius: 6px;
-		overflow: hidden;
-		padding: 2px;
-		gap: 2px;
-		margin-bottom: 4px;
-	}
-
-	.mode-selector-btn {
-		flex: 1;
-		padding: 6px 2px;
-		font-size: 0.75rem;
-		border-radius: 4px;
-		font-weight: 500;
-		color: var(--text-muted);
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		transition: all var(--transition-fast);
-		text-align: center;
-	}
-
 	.folder-picker-item:hover {
 		background-color: var(--bg-hover) !important;
 	}
