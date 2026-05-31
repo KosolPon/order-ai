@@ -2052,8 +2052,11 @@
 		background-color: rgba(0, 0, 0, 0.65);
 		backdrop-filter: blur(8px);
 		display: flex;
+		flex-direction: column;
 		align-items: center;
-		justify-content: center;
+		overflow-y: auto;
+		padding: 20px 10px;
+		box-sizing: border-box;
 		z-index: 10000; /* Ensure it stays above everything */
 	}
 
@@ -2069,6 +2072,7 @@
 		display: flex;
 		overflow: hidden;
 		text-align: left;
+		margin: auto;
 	}
 
 	/* Sidebar Styles */
@@ -2838,19 +2842,21 @@
 		background: var(--text-muted);
 	}
 
-	@media (max-width: 768px) {
+	@media (max-width: 1024px) {
 		.settings-modal-content {
 			flex-direction: column;
-			height: 90vh;
-			max-height: 90vh;
+			height: auto;
+			max-height: none;
 			width: 100%;
-			max-width: calc(100vw - 32px);
+			max-width: calc(100vw - 20px);
 			box-sizing: border-box;
+			overflow: visible;
+			margin: 20px auto;
 		}
 
 		.settings-content-wrapper {
 			min-height: 0;
-			flex: 1;
+			flex: none;
 		}
 
 		.settings-sidebar {
@@ -2905,6 +2911,8 @@
 		.settings-body {
 			padding: 16px;
 			gap: 16px;
+			overflow-y: visible;
+			flex: none;
 		}
 
 		.connection-tabs-header {
