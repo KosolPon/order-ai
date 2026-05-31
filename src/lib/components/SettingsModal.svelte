@@ -730,17 +730,6 @@
 
 					<button 
 						class="nav-tab-btn" 
-						class:active={activeTab === 'models'} 
-						onclick={() => activeTab = 'models'}
-					>
-						<svg viewBox="0 0 24 24" width="16" height="16">
-							<path fill="currentColor" d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
-						</svg>
-						<span>จัดการโมเดล</span>
-					</button>
-
-					<button 
-						class="nav-tab-btn" 
 						class:active={activeTab === 'context'} 
 						onclick={() => activeTab = 'context'}
 					>
@@ -1128,6 +1117,7 @@
 														bind:this={dropdownEl} 
 														class="custom-select-dropdown"
 														onclick={(e) => e.stopPropagation()}
+														role="presentation"
 													>
 														<!-- Search Header -->
 														<div class="dropdown-search-wrapper">
@@ -1199,9 +1189,18 @@
 																		<div 
 																			class="dropdown-model-card" 
 																			class:selected={model === m.name}
+																			role="button"
+																			tabindex="0"
 																			onclick={() => {
 																				updateModelStep(idx, m.name);
 																				activeDropdownIdx = null;
+																			}}
+																			onkeydown={(e) => {
+																				if (e.key === 'Enter' || e.key === ' ') {
+																					e.preventDefault();
+																					updateModelStep(idx, m.name);
+																					activeDropdownIdx = null;
+																				}
 																			}}
 																		>
 																			<div class="dropdown-card-content" style="width: 100%;">
@@ -1247,9 +1246,18 @@
 																		<div 
 																			class="dropdown-model-card" 
 																			class:selected={model === m.name}
+																			role="button"
+																			tabindex="0"
 																			onclick={() => {
 																				updateModelStep(idx, m.name);
 																				activeDropdownIdx = null;
+																			}}
+																			onkeydown={(e) => {
+																				if (e.key === 'Enter' || e.key === ' ') {
+																					e.preventDefault();
+																					updateModelStep(idx, m.name);
+																					activeDropdownIdx = null;
+																				}
 																			}}
 																		>
 																			<div class="dropdown-card-content" style="width: 100%;">
@@ -1296,9 +1304,18 @@
 																		<div 
 																			class="dropdown-model-card dropdown-model-hidden" 
 																			class:selected={model === m.name}
+																			role="button"
+																			tabindex="0"
 																			onclick={() => {
 																				updateModelStep(idx, m.name);
 																				activeDropdownIdx = null;
+																			}}
+																			onkeydown={(e) => {
+																				if (e.key === 'Enter' || e.key === ' ') {
+																					e.preventDefault();
+																					updateModelStep(idx, m.name);
+																					activeDropdownIdx = null;
+																				}
 																			}}
 																		>
 																			<div class="dropdown-card-content" style="width: 100%;">
@@ -2479,20 +2496,7 @@
 		color: var(--accent-blue);
 	}
 
-	/* Model Chain Configuration */
-	.model-chain-intro h3 {
-		margin: 0 0 4px 0;
-		font-size: 0.95rem;
-		font-weight: 600;
-		color: var(--text-primary);
-	}
 
-	.model-chain-intro p {
-		margin: 0;
-		font-size: 0.78rem;
-		color: var(--text-muted);
-		line-height: 1.4;
-	}
 
 	.model-chain-cards {
 		display: flex;
@@ -2616,11 +2620,7 @@
 		user-select: none;
 	}
 
-	.modal-checkbox-label input {
-		width: 15px;
-		height: 15px;
-		cursor: pointer;
-	}
+
 
 	.modal-help-subtext {
 		margin: 4px 0 0 25px;
@@ -2751,18 +2751,6 @@
 		color: #e2b200;
 	}
 
-	.fallback-warning-text h4 {
-		margin: 0 0 2px 0;
-		font-size: 0.84rem;
-		font-weight: 600;
-	}
-
-	.fallback-warning-text p {
-		margin: 0;
-		font-size: 0.76rem;
-		color: var(--text-secondary);
-		line-height: 1.4;
-	}
 
 	.advanced-sliders-container {
 		display: flex;
