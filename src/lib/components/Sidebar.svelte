@@ -72,6 +72,7 @@
 	});
 	let isProjectSettingsOpen = $state(false);
 	let mousedownTarget: EventTarget | null = null;
+	let showProjectAdvanced = $state(false);
 	let selectedProjectForSettings = $state<Project | null>(null);
 	let projectSettingsName = $state('');
 	let projectSettingsContext = $state('');
@@ -210,6 +211,7 @@
 		projectSettingsFiles = [];
 		projectSettingsLocalPath = '';
 		fileError = null;
+		showProjectAdvanced = false;
 		isProjectSettingsOpen = true;
 	}
 
@@ -222,6 +224,7 @@
 		projectSettingsLocalPath = project.localPath || '';
 		fileError = null;
 		deleteProjectChatsOption = false;
+		showProjectAdvanced = !!(project.context?.trim() || project.localPath?.trim() || (project.files && project.files.length > 0));
 		isProjectSettingsOpen = true;
 	}
 
@@ -591,7 +594,7 @@
 				
 				<div class="modal-body">
 					<div class="modal-form-item">
-						<label for="project-name-input">Project Name</label>
+						<label for="project-name-input">Project Name (ชื่อโครงการ)</label>
 						<input 
 							id="project-name-input"
 							type="text" 
@@ -600,111 +603,129 @@
 						/>
 					</div>
 
-					<div class="modal-form-item">
-						<label for="project-localpath-input">Local Workspace Folder Path (เส้นทางโฟลเดอร์ในเครื่อง)</label>
-						<div style="display: flex; gap: 8px;">
-							<input 
-								id="project-localpath-input"
-								type="text" 
-								bind:value={projectSettingsLocalPath} 
-								placeholder="e.g. /path/to/your-project-folder"
-								style="flex: 1;"
-							/>
-							{#if enableWorkspaceBridge}
-								<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="padding: 0 16px; margin: 0; background-color: var(--accent-blue); color: #fff; height: 38px; font-weight: 500; white-space: nowrap; border: none; border-radius: 4px; cursor: pointer;">
-									เลือกโฟลเดอร์...
-								</button>
-							{/if}
-						</div>
-						<p class="modal-help-text">กำหนดเส้นทางโฟลเดอร์ในเครื่องที่ต้องการให้ AI ซิงก์ไฟล์เข้าออกสำหรับโปรเจกต์นี้ (เช่น พาธเต็มแบบ Absolute Path)</p>
-					</div>
-					
-					<div class="modal-form-item">
-						<label for="project-context-textarea">Project Context (System Instruction)</label>
-						<textarea 
-							id="project-context-textarea"
-							bind:value={projectSettingsContext} 
-							placeholder="Enter context instructions that will apply to all chats in this project..." 
-							rows="5"
-						></textarea>
-						<p class="modal-help-text">This context prompt will be automatically injected into all chats inside this project.</p>
+					<!-- Collapsible Advanced Options Toggle -->
+					<div class="project-advanced-toggle">
+						<button 
+							type="button" 
+							class="project-advanced-btn" 
+							onclick={() => showProjectAdvanced = !showProjectAdvanced}
+						>
+							<svg class="toggle-chevron" class:rotated={showProjectAdvanced} viewBox="0 0 24 24" width="16" height="16">
+								<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+							</svg>
+							<span>{showProjectAdvanced ? 'ซ่อนการตั้งค่าขั้นสูง' : 'ตั้งค่าขั้นสูง (Workspace Path, Prompts, Files...)'}</span>
+						</button>
 					</div>
 
-					<div class="modal-form-item">
-						<div class="files-section-header">
-							<span class="files-section-title">Reference Files (.txt, .md, etc.)</span>
-							<span class="files-size-indicator" class:size-warning={totalFilesSize > 1.2 * 1024 * 1024}>
-								{Math.round(totalFilesSize / 1024)} KB / 1536 KB
-							</span>
-						</div>
-						
-						<!-- Files List -->
-						<div class="modal-files-list">
-							{#if projectSettingsFiles.length === 0}
-								<div class="empty-files-message text-muted">No reference files attached yet.</div>
-							{:else}
-								{#each projectSettingsFiles as file}
-									<div class="project-file-item">
-										<div class="file-item-left">
-											<svg class="file-icon" viewBox="0 0 24 24" width="16" height="16">
-												<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+					{#if showProjectAdvanced}
+						<div class="project-advanced-content-wrapper">
+							<div class="modal-form-item">
+								<label for="project-localpath-input">Local Workspace Folder Path (เส้นทางโฟลเดอร์ในเครื่อง)</label>
+								<div style="display: flex; gap: 8px;">
+									<input 
+										id="project-localpath-input"
+										type="text" 
+										bind:value={projectSettingsLocalPath} 
+										placeholder="e.g. /path/to/your-project-folder"
+										style="flex: 1;"
+									/>
+									{#if enableWorkspaceBridge}
+										<button type="button" class="modal-action-btn" onclick={openFolderPicker} style="padding: 0 16px; margin: 0; background-color: var(--accent-blue); color: #fff; height: 38px; font-weight: 500; white-space: nowrap; border: none; border-radius: 4px; cursor: pointer;">
+											เลือกโฟลเดอร์...
+										</button>
+									{/if}
+								</div>
+								<p class="modal-help-text">กำหนดเส้นทางโฟลเดอร์ในเครื่องที่ต้องการให้ AI ซิงก์ไฟล์เข้าออกสำหรับโปรเจกต์นี้ (เช่น พาธเต็มแบบ Absolute Path)</p>
+							</div>
+							
+							<div class="modal-form-item" style="margin-top: 14px;">
+								<label for="project-context-textarea">Project Context (System Instruction)</label>
+								<textarea 
+									id="project-context-textarea"
+									bind:value={projectSettingsContext} 
+									placeholder="Enter context instructions that will apply to all chats in this project..." 
+									rows="4"
+								></textarea>
+								<p class="modal-help-text">คำสั่งหรือบริบทเริ่มต้นนี้จะถูกแทรกเข้าไปในห้องแชททั้งหมดภายใต้โปรเจกต์นี้โดยอัตโนมัติ</p>
+							</div>
+
+							<div class="modal-form-item" style="margin-top: 14px;">
+								<div class="files-section-header">
+									<span class="files-section-title">Reference Files (.txt, .md, etc.)</span>
+									<span class="files-size-indicator" class:size-warning={totalFilesSize > 1.2 * 1024 * 1024}>
+										{Math.round(totalFilesSize / 1024)} KB / 1536 KB
+									</span>
+								</div>
+								
+								<!-- Files List -->
+								<div class="modal-files-list">
+									{#if projectSettingsFiles.length === 0}
+										<div class="empty-files-message text-muted">No reference files attached yet.</div>
+									{:else}
+										{#each projectSettingsFiles as file}
+											<div class="project-file-item">
+												<div class="file-item-left">
+													<svg class="file-icon" viewBox="0 0 24 24" width="16" height="16">
+														<path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+													</svg>
+													<span class="project-file-name" title={file.name}>{file.name}</span>
+													<span class="project-file-size">({Math.round(file.size / 1024)} KB)</span>
+												</div>
+												<button class="remove-file-btn" onclick={() => removeProjectFile(file.id)} title="Remove File">
+													✕
+												</button>
+											</div>
+										{/each}
+									{/if}
+								</div>
+
+								<!-- File Upload Input -->
+								<div class="file-upload-wrapper">
+									<input 
+										type="file" 
+										id="project-file-upload" 
+										accept=".txt,.md,.js,.ts,.json,.css,.html,.svelte" 
+										onchange={handleFileUpload} 
+										bind:this={fileInputRef}
+										style="display: none;"
+									/>
+									<button 
+										type="button" 
+										class="upload-trigger-btn" 
+										onclick={() => fileInputRef?.click()}
+										disabled={isReadingFile || totalFilesSize >= 1.5 * 1024 * 1024}
+									>
+										{#if isReadingFile}
+											<div class="upload-spinner"></div>
+											<span>Reading file...</span>
+										{:else}
+											<svg viewBox="0 0 24 24" width="16" height="16">
+												<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
 											</svg>
-											<span class="project-file-name" title={file.name}>{file.name}</span>
-											<span class="project-file-size">({Math.round(file.size / 1024)} KB)</span>
-										</div>
-										<button class="remove-file-btn" onclick={() => removeProjectFile(file.id)} title="Remove File">
-											✕
+											<span>Attach Reference File</span>
+										{/if}
+									</button>
+								</div>
+								
+								{#if fileError}
+									<div class="file-upload-error">{fileError}</div>
+								{/if}
+							</div>
+
+							{#if selectedProjectForSettings}
+								<div class="modal-delete-section">
+									<div class="danger-title">Danger Zone</div>
+									<div class="delete-controls">
+										<label class="checkbox-label" for="delete-chats-checkbox">
+											<input type="checkbox" id="delete-chats-checkbox" bind:checked={deleteProjectChatsOption} />
+											<span>Also delete all chats inside this project</span>
+										</label>
+										<button class="delete-project-btn" onclick={handleDeleteProjectClick}>
+											Delete Project
 										</button>
 									</div>
-								{/each}
+								</div>
 							{/if}
-						</div>
-
-						<!-- File Upload Input -->
-						<div class="file-upload-wrapper">
-							<input 
-								type="file" 
-								id="project-file-upload" 
-								accept=".txt,.md,.js,.ts,.json,.css,.html,.svelte" 
-								onchange={handleFileUpload} 
-								bind:this={fileInputRef}
-								style="display: none;"
-							/>
-							<button 
-								type="button" 
-								class="upload-trigger-btn" 
-								onclick={() => fileInputRef?.click()}
-								disabled={isReadingFile || totalFilesSize >= 1.5 * 1024 * 1024}
-							>
-								{#if isReadingFile}
-									<div class="upload-spinner"></div>
-									<span>Reading file...</span>
-								{:else}
-									<svg viewBox="0 0 24 24" width="16" height="16">
-										<path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-									</svg>
-									<span>Attach Reference File</span>
-								{/if}
-							</button>
-						</div>
-						
-						{#if fileError}
-							<div class="file-upload-error">{fileError}</div>
-						{/if}
-					</div>
-
-					{#if selectedProjectForSettings}
-						<div class="modal-delete-section">
-							<div class="danger-title">Danger Zone</div>
-							<div class="delete-controls">
-								<label class="checkbox-label" for="delete-chats-checkbox">
-									<input type="checkbox" id="delete-chats-checkbox" bind:checked={deleteProjectChatsOption} />
-									<span>Also delete all chats inside this project</span>
-								</label>
-								<button class="delete-project-btn" onclick={handleDeleteProjectClick}>
-									Delete Project
-								</button>
-							</div>
 						</div>
 					{/if}
 				</div>
@@ -1324,6 +1345,65 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
+		max-height: 65vh;
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+
+	/* Project Advanced Options CSS */
+	.project-advanced-toggle {
+		margin-top: 8px;
+		border-top: 1px solid var(--border-light);
+		padding-top: 14px;
+	}
+
+	.project-advanced-btn {
+		background: none;
+		border: none;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--accent-blue);
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		padding: 4px 8px;
+		margin-left: -8px;
+		border-radius: 6px;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
+	}
+
+	.project-advanced-btn:hover {
+		background-color: rgba(168, 199, 250, 0.08);
+		color: var(--accent-blue-hover);
+	}
+
+	.toggle-chevron {
+		transition: transform var(--transition-normal);
+		color: var(--text-muted);
+	}
+
+	.toggle-chevron.rotated {
+		transform: rotate(180deg);
+		color: var(--accent-blue);
+	}
+
+	.project-advanced-content-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		animation: fadeIn 0.2s ease-out;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.modal-form-item {
