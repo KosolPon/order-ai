@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Conversation, OllamaModel, Project, ProjectFile } from '$lib/types';
+	import type { Conversation, Project, ProjectFile } from '$lib/types';
 	
 	let {
 		conversations = [],
@@ -224,7 +224,7 @@
 		projectSettingsLocalPath = project.localPath || '';
 		fileError = null;
 		deleteProjectChatsOption = false;
-		showProjectAdvanced = !!(project.context?.trim() || project.localPath?.trim() || (project.files && project.files.length > 0));
+		showProjectAdvanced = !!(project.localPath?.trim() || (project.files && project.files.length > 0));
 		isProjectSettingsOpen = true;
 	}
 
