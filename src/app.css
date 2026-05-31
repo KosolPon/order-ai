@@ -2596,8 +2596,7 @@ pre[class*="language-"] {
 .typing-indicator span, 
 .pulse-mic, 
 .spinner-glow, 
-.spin, 
-.thinking-icon {
+.spin {
 	animation: none !important;
 	transition: none !important;
 }
