@@ -65,6 +65,7 @@
 	let showOllamaCloudKey = $state(false);
 	let showWorkspaceBridge = $state(false); // accordion for workspace bridge (developer tool)
 	let showSystemRoles = $state(false); // collapse system roles by default
+	let mousedownTarget: EventTarget | null = null;
 
 	let localEnableWorkspaceBridge = $state(enableWorkspaceBridge);
 	let testingWorkspaceBridge = $state(false);
@@ -689,7 +690,12 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div 
 		class="modal-backdrop" 
-		onclick={closeSettings} 
+		onmousedown={(e) => mousedownTarget = e.target}
+		onclick={(e) => {
+			if (e.target === e.currentTarget && mousedownTarget === e.currentTarget) {
+				closeSettings();
+			}
+		}} 
 		transition:fade={{ duration: 150 }}
 		role="button" 
 		tabindex="-1"
