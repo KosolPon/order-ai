@@ -71,6 +71,7 @@
 		}
 	});
 	let isProjectSettingsOpen = $state(false);
+	let mousedownTarget: EventTarget | null = null;
 	let selectedProjectForSettings = $state<Project | null>(null);
 	let projectSettingsName = $state('');
 	let projectSettingsContext = $state('');
@@ -569,7 +570,18 @@
 
 	<!-- Project Settings Modal (rendered relative to viewport) -->
 	{#if isProjectSettingsOpen}
-		<div class="modal-backdrop" onclick={closeProjectSettings} onkeydown={(e) => e.key === 'Escape' && closeProjectSettings()} role="button" tabindex="-1">
+		<div 
+			class="modal-backdrop" 
+			onmousedown={(e) => mousedownTarget = e.target}
+			onclick={(e) => {
+				if (e.target === e.currentTarget && mousedownTarget === e.currentTarget) {
+					closeProjectSettings();
+				}
+			}} 
+			onkeydown={(e) => e.key === 'Escape' && closeProjectSettings()} 
+			role="button" 
+			tabindex="-1"
+		>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div class="project-modal-content animate-zoom-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
 				<div class="modal-header">
@@ -711,7 +723,17 @@
 		</div>
 
 		{#if isFolderPickerOpen}
-			<div class="modal-backdrop folder-picker-backdrop" onclick={() => isFolderPickerOpen = false} role="button" tabindex="-1">
+			<div 
+				class="modal-backdrop folder-picker-backdrop" 
+				onmousedown={(e) => mousedownTarget = e.target}
+				onclick={(e) => {
+					if (e.target === e.currentTarget && mousedownTarget === e.currentTarget) {
+						isFolderPickerOpen = false;
+					}
+				}} 
+				role="button" 
+				tabindex="-1"
+			>
 				<div class="project-modal-content folder-picker-content animate-zoom-in" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1" style="max-width: 500px; width: 90%; background-color: var(--bg-primary); border: 1px solid var(--border-color);">
 					<div class="modal-header">
 						<h3>เลือกโฟลเดอร์โครงการ (Select Workspace Directory)</h3>
