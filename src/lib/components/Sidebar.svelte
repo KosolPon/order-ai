@@ -603,6 +603,17 @@
 						/>
 					</div>
 
+					<div class="modal-form-item" style="margin-top: 14px;">
+						<label for="project-context-textarea">Project Context (System Instruction)</label>
+						<textarea 
+							id="project-context-textarea"
+							bind:value={projectSettingsContext} 
+							placeholder="Enter context instructions that will apply to all chats in this project..." 
+							rows="4"
+						></textarea>
+						<p class="modal-help-text">คำสั่งหรือบริบทเริ่มต้นนี้จะถูกแทรกเข้าไปในห้องแชททั้งหมดภายใต้โปรเจกต์นี้โดยอัตโนมัติ</p>
+					</div>
+
 					<!-- Collapsible Advanced Options Toggle -->
 					<div class="project-advanced-toggle">
 						<button 
@@ -613,7 +624,7 @@
 							<svg class="toggle-chevron" class:rotated={showProjectAdvanced} viewBox="0 0 24 24" width="16" height="16">
 								<path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
 							</svg>
-							<span>{showProjectAdvanced ? 'ซ่อนการตั้งค่าขั้นสูง' : 'ตั้งค่าขั้นสูง (Workspace Path, Prompts, Files...)'}</span>
+							<span>{showProjectAdvanced ? 'ซ่อนการตั้งค่าขั้นสูง' : 'ตั้งค่าขั้นสูง (Workspace Path, Files...)'}</span>
 						</button>
 					</div>
 
@@ -638,16 +649,7 @@
 								<p class="modal-help-text">กำหนดเส้นทางโฟลเดอร์ในเครื่องที่ต้องการให้ AI ซิงก์ไฟล์เข้าออกสำหรับโปรเจกต์นี้ (เช่น พาธเต็มแบบ Absolute Path)</p>
 							</div>
 							
-							<div class="modal-form-item" style="margin-top: 14px;">
-								<label for="project-context-textarea">Project Context (System Instruction)</label>
-								<textarea 
-									id="project-context-textarea"
-									bind:value={projectSettingsContext} 
-									placeholder="Enter context instructions that will apply to all chats in this project..." 
-									rows="4"
-								></textarea>
-								<p class="modal-help-text">คำสั่งหรือบริบทเริ่มต้นนี้จะถูกแทรกเข้าไปในห้องแชททั้งหมดภายใต้โปรเจกต์นี้โดยอัตโนมัติ</p>
-							</div>
+							
 
 							<div class="modal-form-item" style="margin-top: 14px;">
 								<div class="files-section-header">
@@ -744,6 +746,7 @@
 		</div>
 
 		{#if isFolderPickerOpen}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div 
 				class="modal-backdrop folder-picker-backdrop" 
 				onmousedown={(e) => mousedownTarget = e.target}
@@ -842,26 +845,6 @@
 	.glow-icon {
 		color: var(--accent-blue);
 		filter: drop-shadow(0 0 4px rgba(168, 199, 250, 0.4));
-	}
-
-	.new-chat-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		background: var(--bg-primary);
-		border: 1px solid var(--border-color);
-		padding: 10px 16px;
-		border-radius: 99px;
-		font-weight: 500;
-		transition: all var(--transition-fast);
-		box-shadow: var(--shadow-sm);
-	}
-
-	.new-chat-btn:hover {
-		background: var(--bg-hover);
-		border-color: var(--accent-blue);
-		box-shadow: 0 0 8px rgba(168, 199, 250, 0.15);
 	}
 
 	.history-container {
@@ -1069,41 +1052,6 @@
 		box-shadow: 0 0 4px rgba(81, 207, 102, 0.4);
 	}
 
-	.chevron {
-		color: var(--text-muted);
-		transition: transform var(--transition-normal);
-	}
-
-	.chevron.open {
-		transform: rotate(180deg);
-	}
-
-	.setting-value-wrapper {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.reset-individual-btn {
-		background: none;
-		border: none;
-		color: var(--text-muted);
-		padding: 2px;
-		border-radius: 4px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.reset-individual-btn:hover {
-		color: var(--accent-blue);
-		background-color: var(--bg-hover);
-	}
-
-
-
 	/* Projects & Modal CSS */
 	.history-header {
 		display: flex;
@@ -1262,23 +1210,6 @@
 		margin-top: 10px;
 		border-top: 1px solid var(--border-light);
 		padding-top: 14px;
-	}
-
-	.global-context-textarea {
-		background-color: var(--bg-secondary);
-		border: 1px solid var(--border-color);
-		border-radius: 6px;
-		padding: 8px;
-		color: var(--text-primary);
-		font-size: 0.82rem;
-		resize: vertical;
-		outline: none;
-		font-family: inherit;
-		line-height: 1.4;
-	}
-
-	.global-context-textarea:focus {
-		border-color: var(--accent-blue);
 	}
 
 	/* Modal Overlay CSS */
@@ -1721,144 +1652,6 @@
 		margin-top: 4px;
 	}
 
-	.model-chain-section {
-		border-top: 1px solid var(--border-light);
-		padding-top: 12px;
-		margin-top: 8px;
-	}
-
-	.model-chain-list {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-bottom: 8px;
-	}
-
-	.chain-step {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		padding: 8px;
-		background-color: var(--bg-secondary);
-		border-radius: 8px;
-		border: 1px solid var(--border-color);
-		position: relative;
-	}
-
-	.chain-step-header {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.step-badge {
-		font-size: 0.65rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		background-color: var(--accent-blue);
-		color: #ffffff;
-		padding: 2px 6px;
-		border-radius: 4px;
-	}
-
-	.step-role-label {
-		font-size: 0.65rem;
-		color: var(--text-muted);
-		font-weight: 500;
-	}
-
-	.remove-step-btn {
-		margin-left: auto;
-		background: none;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		font-size: 0.75rem;
-		padding: 2px 6px;
-		border-radius: 4px;
-		transition: all var(--transition-fast);
-	}
-
-	.remove-step-btn:hover {
-		color: #ff6b6b;
-		background-color: var(--bg-hover);
-	}
-
-	.step-temp-container {
-		margin-top: 4px;
-		padding-top: 4px;
-		border-top: 1px dashed var(--border-light);
-	}
-
-	.add-step-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		width: 100%;
-		padding: 8px;
-		border-radius: 6px;
-		border: 1px dashed var(--border-color);
-		background: none;
-		color: var(--accent-blue);
-		font-size: 0.8rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.add-step-btn:hover:not(:disabled) {
-		background-color: var(--bg-hover);
-		border-color: var(--accent-blue);
-	}
-
-	.add-step-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.advanced-settings-toggle-btn {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		width: 100%;
-		background: none;
-		border: none;
-		color: var(--text-secondary);
-		font-size: 0.78rem;
-		font-weight: 600;
-		cursor: pointer;
-		padding: 4px 0;
-		transition: color var(--transition-fast);
-	}
-
-	.advanced-settings-toggle-btn:hover {
-		color: var(--text-primary);
-	}
-
-	.sub-setting-item {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
-	.model-select-dropdown {
-		background-color: var(--bg-primary);
-		border: 1px solid var(--border-color);
-		border-radius: 6px;
-		padding: 6px 10px;
-		color: var(--text-primary);
-		font-size: 0.85rem;
-		outline: none;
-		cursor: pointer;
-		width: 100%;
-		transition: border-color var(--transition-fast);
-	}
-
-	.model-select-dropdown:focus {
-		border-color: var(--accent-blue);
-	}
-
 	.checkbox-label {
 		display: flex;
 		align-items: center;
@@ -1902,17 +1695,6 @@
 		cursor: pointer;
 		transition: all var(--transition-fast);
 		text-align: center;
-	}
-
-	.mode-selector-btn:hover {
-		color: var(--text-primary);
-		background-color: rgba(255, 255, 255, 0.05);
-	}
-
-	.mode-selector-btn.active {
-		color: var(--text-primary);
-		background-color: var(--bg-primary);
-		box-shadow: var(--shadow-sm);
 	}
 
 	.folder-picker-item:hover {
