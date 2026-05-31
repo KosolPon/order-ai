@@ -1693,14 +1693,14 @@
 										<svg viewBox="0 0 24 24" width="16" height="16">
 											<path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
 										</svg>
-										ส่งออกข้อมูลทั้งหมด (Export JSON)
+										ส่งออกข้อมูลทั้งหมด (Backup)
 									</button>
 
 									<button type="button" class="storage-action-btn import-btn" onclick={() => importFileInput?.click()}>
 										<svg viewBox="0 0 24 24" width="16" height="16">
 											<path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/>
 										</svg>
-										กู้คืนข้อมูลสำรอง (Restore Backup)
+										กู้คืนข้อมูลสำรอง (Restore)
 									</button>
 									<input 
 										type="file" 
