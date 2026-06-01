@@ -2593,7 +2593,6 @@ pre[class*="language-"] {
 
 /* Globally disable continuous infinite animations that cause e-ink flickering/ghosting */
 .animate-pulse, 
-.typing-indicator span, 
 .pulse-mic, 
 .spinner-glow, 
 .spin {

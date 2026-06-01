@@ -104,7 +104,7 @@
 			folderPickerDirectories = data.directories || [];
 		} catch (err: any) {
 			console.error('openFolderPicker error:', err);
-			folderPickerError = 'ไม่สามารถเชื่อมต่อ Workspace Bridge ได้ กรุณาตรวจสอบว่า:\n1. รันสคริปต์ `bun scripts/mcp-bridge.ts` ในเครื่องแล้ว\n2. หากใช้งานแอปผ่าน HTTPS (เช่น บน Netlify) ต้องติดตั้ง SSL และเข้าไปยอมรับใบรับรองที่ลิงก์ https://localhost:3000/status ก่อนใช้งาน';
+			folderPickerError = 'ไม่สามารถเชื่อมต่อ Workspace Bridge ได้ กรุณาตรวจสอบว่า:\n1. รันสคริปต์ `bun scripts/mcp-bridge.ts` ในเครื่องแล้ว\n2. หากใช้งานแอปผ่าน HTTPS ต้องติดตั้ง SSL และเข้าไปยอมรับใบรับรองที่ลิงก์ https://localhost:3000/status ก่อนใช้งาน';
 		} finally {
 			folderPickerLoading = false;
 		}

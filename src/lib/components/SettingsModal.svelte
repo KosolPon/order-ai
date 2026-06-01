@@ -1033,7 +1033,7 @@
 												</div>
 											</div>
 
-											<div class="cors-help-card animate-fade-in" style="margin-top: 15px; padding: 15px; border-radius: 8px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+											<!-- <div class="cors-help-card animate-fade-in" style="margin-top: 15px; padding: 15px; border-radius: 8px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
 												<h4 style="margin-top: 0; margin-bottom: 10px; color: var(--accent-blue);">Workspace Bridge Guide</h4>
 												<div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
 													<div>
@@ -1046,11 +1046,15 @@
 														</div>
 													</div>
 													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
-														<strong>2. รันเซิร์ฟเวอร์:</strong>
+														<strong>2. สร้าง SSL Certificate:</strong>
+														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -sha256 -days 365 -nodes -subj "/CN=localhost"</code></pre>
+													</div>
+													<div style="border-top: 1px dashed var(--border-color); padding-top: 8px;">
+														<strong>3. รันเซิร์ฟเวอร์:</strong>
 														<pre style="background: var(--bg-primary); padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.75rem; margin: 4px 0;"><code>bun scripts/mcp-bridge.ts</code></pre>
 													</div>
 												</div>
-											</div>
+											</div> -->
 										</div>
 									</div>
 								{/if}

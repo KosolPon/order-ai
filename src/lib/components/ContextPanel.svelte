@@ -299,6 +299,7 @@ import type { Conversation, Project } from '$lib/types';
 
 				<!-- Response Style Selection -->
 				<div class="panel-section">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label class="section-label">Response Style (รูปแบบผลลัพธ์)</label>
 					
 					<!-- Tone Select -->
